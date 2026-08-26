@@ -1,0 +1,115 @@
+@page "/"
+@page "/battle"
+
+<PageTitle>포켓몬 배틀</PageTitle>
+
+<main class="battle-page">
+    <header class="battle-header">
+        <div>
+            <p class="eyebrow">BATTLE LAB / SERVER SESSION</p>
+            <h1>포켓몬 배틀</h1>
+            <p class="intro">순수 C#과 Blazor Server로 만드는 확장형 배틀 화면입니다.</p>
+        </div>
+        <div class="header-status">
+            <span class="status-dot"></span>
+            <span>연결됨</span>
+        </div>
+    </header>
+
+    <section class="battle-arena" aria-label="배틀 상태">
+        <div class="arena-grid">
+            <article class="fighter-card player-card">
+                <div class="fighter-topline">
+                    <span class="fighter-label">PLAYER</span>
+                    <span class="level-label">LV. 01</span>
+                </div>
+                <div class="fighter-placeholder" aria-hidden="true">?</div>
+                <h2>내 포켓몬</h2>
+                <p class="placeholder-copy">PokemonData를 추가하면 여기에 표시됩니다.</p>
+                <div class="health-row">
+                    <span>HP</span>
+                    <div class="health-track"><span class="health-fill player-health"></span></div>
+                    <strong>— / —</strong>
+                </div>
+            </article>
+
+            <div class="versus-mark" aria-hidden="true">VS</div>
+
+            <article class="fighter-card opponent-card">
+                <div class="fighter-topline">
+                    <span class="fighter-label">OPPONENT</span>
+                    <span class="level-label">LV. 01</span>
+                </div>
+                <div class="fighter-placeholder opponent-placeholder" aria-hidden="true">?</div>
+                <h2>상대 포켓몬</h2>
+                <p class="placeholder-copy">PokemonDatabase를 추가하면 여기에 표시됩니다.</p>
+                <div class="health-row">
+                    <span>HP</span>
+                    <div class="health-track"><span class="health-fill opponent-health"></span></div>
+                    <strong>— / —</strong>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <section class="command-panel" aria-label="배틀 커맨드">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">TURN @Turn</p>
+                <h2>기술 선택</h2>
+            </div>
+            <span class="selection-pill">@SelectedMove</span>
+        </div>
+
+        <div class="move-grid">
+            @foreach (var move in MoveSlots)
+            {
+                <button type="button"
+                        class="move-button @(SelectedMove == move ? "is-selected" : string.Empty)"
+                        @onclick="() => SelectMove(move)">
+                    <span class="move-index">@((Array.IndexOf(MoveSlots, move) + 1).ToString("D2"))</span>
+                    <span>@move</span>
+                    <span class="move-arrow" aria-hidden="true">→</span>
+                </button>
+            }
+        </div>
+
+        <div class="battle-log" role="status" aria-live="polite">
+            <span class="log-marker"></span>
+            <p>@BattleMessage</p>
+        </div>
+
+        <div class="command-footer">
+            <p>기술과 포켓몬 데이터는 각 역할별 파일에 직접 추가할 수 있습니다.</p>
+            <button type="button" class="reset-button" @onclick="ResetBattle">상태 초기화</button>
+        </div>
+    </section>
+</main>
+
+@code {
+    private readonly string[] MoveSlots =
+    [
+        "기술 슬롯 1",
+        "기술 슬롯 2",
+        "기술 슬롯 3",
+        "기술 슬롯 4"
+    ];
+
+    private int Turn;
+    private string SelectedMove = "선택된 기술 없음";
+    private string BattleMessage = "기술 슬롯을 눌러 배틀 커맨드를 선택해 보세요.";
+
+    private void SelectMove(string move)
+    {
+        SelectedMove = move;
+        Turn++;
+        BattleMessage = $"{move}을(를) 선택했습니다. 실제 효과는 기술 데이터를 추가한 뒤 연결할 수 있습니다.";
+    }
+
+    private void ResetBattle()
+    {
+        Turn = 0;
+        SelectedMove = "선택된 기술 없음";
+        BattleMessage = "배틀 상태를 초기화했습니다. 기술 슬롯을 눌러 시작해 보세요.";
+    }
+}
