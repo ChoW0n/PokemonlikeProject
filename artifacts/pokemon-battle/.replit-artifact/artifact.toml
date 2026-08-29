@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Pokemon Battle"
+description = "A server-rendered Blazor battle game powered by the PokemonBattle .NET application."
+version = "1.0.0"
+id = "artifacts/pokemon-battle"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26159
+
+[services.development]
+run = "pnpm --filter @workspace/pokemon-battle run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pokemon-battle", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/pokemon-battle/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26159"
+BASE_PATH = "/"
