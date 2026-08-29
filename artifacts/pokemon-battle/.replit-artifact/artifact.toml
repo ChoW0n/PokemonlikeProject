@@ -9,20 +9,20 @@ router = "path"
 [[services]]
 name = "web"
 paths = [ "/" ]
-localPort = 26159
+localPort = 3000
 
 [services.development]
-run = "pnpm --filter @workspace/pokemon-battle run dev"
+run = "dotnet run --project ../../PokemonBattle/PokemonBattle.csproj --no-launch-profile --urls http://0.0.0.0:3000"
 
-[services.production]
-build = [ "pnpm", "--filter", "@workspace/pokemon-battle", "run", "build" ]
-serve = "static"
-publicDir = "artifacts/pokemon-battle/dist/public"
+[services.production.build]
+args = [ "dotnet", "publish", "../../PokemonBattle/PokemonBattle.csproj", "-c", "Release", "-o", "../../PokemonBattle/publish", "--no-restore" ]
 
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
+[services.production.run]
+args = [ "dotnet", "../../PokemonBattle/publish/PokemonBattle.dll", "--urls", "http://0.0.0.0:3000" ]
+
+[services.production.run.env]
+ASPNETCORE_ENVIRONMENT = "Production"
 
 [services.env]
-PORT = "26159"
+PORT = "3000"
 BASE_PATH = "/"
