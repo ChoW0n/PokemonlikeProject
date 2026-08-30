@@ -49,8 +49,11 @@ using (var scope = app.Services.CreateScope())
             ""Id"" SERIAL PRIMARY KEY,
             ""Username"" TEXT NOT NULL,
             ""CurrentScore"" INTEGER NOT NULL,
-            ""LoadoutsJson"" TEXT NOT NULL
+            ""LoadoutsJson"" TEXT NOT NULL,
+            ""LegendaryProgressPercent"" INTEGER NOT NULL DEFAULT 0
         );
+        ALTER TABLE ""PlayerRuns""
+            ADD COLUMN IF NOT EXISTS ""LegendaryProgressPercent"" INTEGER NOT NULL DEFAULT 0;
     ");
 
     if (!db.Users.Any(u => u.Username == "admin"))

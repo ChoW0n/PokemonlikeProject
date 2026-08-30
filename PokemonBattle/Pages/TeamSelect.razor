@@ -410,7 +410,7 @@
 
     private void LoadPresetByName(string name)
     {
-        var loaded = State.LoadPreset(name);
+        var loaded = State.LoadPreset(name, TeamLoadouts);
         if (loaded == null) return;
 
         TeamLoadouts = loaded
@@ -426,7 +426,7 @@
                     ChosenMoveNames = l.ChosenMoveNames.Where(m => validKeys.Contains(m)).ToList(),
                     ChosenAbility = l.ChosenAbility,
                     ChosenItem = l.ChosenItem,
-                    Level = existing?.Level ?? l.Level
+                    Level = existing?.Level ?? 1
                 };
             }).ToList();
     }

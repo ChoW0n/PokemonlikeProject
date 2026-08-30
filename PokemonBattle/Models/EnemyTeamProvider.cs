@@ -4,13 +4,15 @@ public static class EnemyTeamProvider
 {
     private static readonly Random rng = new Random();
 
-    //전설/환상 포켓몬 도감번호. 별도 보스전 시스템이 생기기 전까지는 일반 랜덤 조우에서 제외
+    //전설/환상 포켓몬 도감번호. 진행률 100% 달성 전까지 일반 랜덤 조우에서 제외
     private static readonly HashSet<int> LegendaryIds = new()
     {
         144,145,146,150,151,243,244,245,249,250,251,377,378,379,380,381,382,383,384,385,386,
         480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,
         638,639,640,641,642,643,644,645,646,647,648,649,716,717,718
     };
+
+    public static bool IsLegendary(int pokemonId) => LegendaryIds.Contains(pokemonId);
 
     private static readonly HashSet<int> FirstStageIds = new()
     {
@@ -38,12 +40,17 @@ public static class EnemyTeamProvider
         712, 714, 716, 717, 718, 719, 720, 721
     };
 
-    public static List<KeyValuePair<int, PokemonData>> GetRandomTeam(int count, int poolSize, bool firstStageOnly, HashSet<int> excludeIds)
+    public static List<KeyValuePair<int, PokemonData>> GetRandomTeam(
+        int count,
+        int poolSize,
+        bool firstStageOnly,
+        HashSet<int> excludeIds,
+        bool legendaryUnlocked = false)
     {
         var candidates = PokemonDatabase.All
             .Where(p => p.Key <= poolSize)
             .Where(p => !excludeIds.Contains(p.Key))
-            .Where(p => !LegendaryIds.Contains(p.Key));
+            .Where(p => legendaryUnlocked || !LegendaryIds.Contains(p.Key));
 
         if (firstStageOnly)
         {
@@ -54,7 +61,10 @@ public static class EnemyTeamProvider
 
         if (pool.Count < count)
         {
-            pool = PokemonDatabase.All.Where(p => p.Key <= poolSize && !LegendaryIds.Contains(p.Key)).ToList();
+            pool = PokemonDatabase.All
+                .Where(p => p.Key <= poolSize)
+                .Where(p => legendaryUnlocked || !LegendaryIds.Contains(p.Key))
+                .ToList();
             if (firstStageOnly) pool = pool.Where(p => FirstStageIds.Contains(p.Key)).ToList();
         }
 
