@@ -1,18 +1,23 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <link rel="stylesheet" href="app.css" />
-    <link rel="stylesheet" href="PokemonBattle.styles.css" />
+    <link rel="stylesheet" href="app.css?v=@CacheBuster" />
+    <link rel="stylesheet" href="PokemonBattle.styles.css?v=@CacheBuster" />
     <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body>
     <Routes @rendermode="InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
+    <script src="js/battleEffects.js?v=@CacheBuster"></script>
 </body>
 
 </html>
+
+@code {
+    private static readonly string CacheBuster = DateTime.Now.Ticks.ToString();
+}

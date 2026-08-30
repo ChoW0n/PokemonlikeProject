@@ -1,0 +1,120 @@
+@page "/preview"
+@using PokemonBattle.Services
+@using PokemonBattle.Models
+@using PokemonBattle.Components
+@inject GameState State
+@inject UnlockService Unlocks
+@inject NavigationManager Nav
+
+<PageTitle>상대 라인업</PageTitle>
+
+<main class="preview-page">
+    <h1>상대 포켓몬 라인업</h1>
+    <p>클릭하면 스탯과 기술을 확인할 수 있습니다. (현재 라운드: @(State.CurrentScore + 1))</p>
+
+    @if (EnemyLoadouts.Count == 0)
+    {
+        <p>상대 팀 구성 중...</p>
+    }
+    else
+    {
+        <div class="enemy-grid">
+            @foreach (var loadout in EnemyLoadouts)
+            {
+                var data = PokemonDatabase.All[loadout.PokemonId];
+                <div class="enemy-card @(SelectedId == loadout.PokemonId ? "is-selected" : string.Empty)"
+                     @onclick="() => ToggleDetail(loadout.PokemonId)">
+                    <img src="@data.ImageUrl" alt="@data.Name" class="enemy-sprite" />
+                    <h3>@data.Name</h3>
+                    <div class="hud-types">
+                        <img src="@TypeIcons.GetUrl(data.Type1)" class="type-icon-img" alt="@data.Type1" />
+                        @if (data.Type2 != null)
+                        {
+                            <img src="@TypeIcons.GetUrl(data.Type2.Value)" class="type-icon-img" alt="@data.Type2" />
+                        }
+                    </div>
+
+                    @if (SelectedId == loadout.PokemonId)
+                    {
+                        <div class="enemy-detail">
+                            <div class="gauge-group">
+                                <GaugeBar Label="HP" Percent="@StatBarHelper.StatPercent(data.BaseHp)" ColorClass="@StatBarHelper.StatColor(data.BaseHp)" DisplayText="@data.BaseHp.ToString()" />
+                                <GaugeBar Label="공격" Percent="@StatBarHelper.StatPercent(data.BaseAtk)" ColorClass="@StatBarHelper.StatColor(data.BaseAtk)" DisplayText="@data.BaseAtk.ToString()" />
+                                <GaugeBar Label="방어" Percent="@StatBarHelper.StatPercent(data.BaseDef)" ColorClass="@StatBarHelper.StatColor(data.BaseDef)" DisplayText="@data.BaseDef.ToString()" />
+                                <GaugeBar Label="특공" Percent="@StatBarHelper.StatPercent(data.BaseSpAtk)" ColorClass="@StatBarHelper.StatColor(data.BaseSpAtk)" DisplayText="@data.BaseSpAtk.ToString()" />
+                                <GaugeBar Label="특방" Percent="@StatBarHelper.StatPercent(data.BaseSpDef)" ColorClass="@StatBarHelper.StatColor(data.BaseSpDef)" DisplayText="@data.BaseSpDef.ToString()" />
+                                <GaugeBar Label="속도" Percent="@StatBarHelper.StatPercent(data.BaseSpd)" ColorClass="@StatBarHelper.StatColor(data.BaseSpd)" DisplayText="@data.BaseSpd.ToString()" />
+                            </div>
+                            <p class="enemy-ability">특성: @loadout.ChosenAbility</p>
+                            <div class="move-chip-row">
+                                @foreach (var mk in loadout.ChosenMoveNames)
+                                {
+                                    var m = MoveDatabase.All[mk];
+                                    <span class="move-chip" style="border-color:@TypeColors.GetHex(m.Type)">@m.Name</span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <button type="button" @onclick="ConfirmTeamAndGo">
+            이 상대 팀(@(EnemyLoadouts.Count)마리)과 배틀 준비하기
+        </button>
+    }
+</main>
+
+@code {
+    private List<PokemonLoadout> EnemyLoadouts = new();
+    private int? SelectedId;
+    private Random rng = new Random();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var unlocked = await Unlocks.GetUnlockedIds();
+
+        bool firstStageOnly = unlocked.Count < 12;
+        int poolSize = Math.Clamp(20 + unlocked.Count * 8, 30, 721);
+        int teamSize = Math.Clamp(unlocked.Count, 1, 6);
+        int enemyLevel = 1 + State.CurrentScore;
+
+        var team = EnemyTeamProvider.GetRandomTeam(teamSize, poolSize, firstStageOnly, unlocked);
+
+        EnemyLoadouts = team.Select(e =>
+        {
+            var moves = EnemyTeamProvider.PickProMoveset(e.Value);
+            string ability = e.Value.AbilityNames.Length > 0 ? e.Value.AbilityNames[rng.Next(e.Value.AbilityNames.Length)] : "";
+            var items = ItemDatabase.GetAvailableItems(e.Value.Name);
+            string item = items[rng.Next(items.Count)].Name;
+            return new PokemonLoadout
+            {
+                PokemonId = e.Key,
+                ChosenMoveNames = moves,
+                ChosenAbility = ability,
+                ChosenItem = item,
+                Level = enemyLevel
+            };
+        }).ToList();
+    }
+
+    private void ToggleDetail(int id)
+    {
+        SelectedId = SelectedId == id ? null : id;
+    }
+
+    private void ConfirmTeamAndGo()
+    {
+        State.SetEnemyLoadouts(EnemyLoadouts);
+
+        if (State.PlayerLoadouts.Count == 0)
+        {
+            State.GoTo(GameScreen.TeamSelect);
+            Nav.NavigateTo("/select");
+        }
+        else
+        {
+            Nav.NavigateTo("/continue");
+        }
+    }
+}

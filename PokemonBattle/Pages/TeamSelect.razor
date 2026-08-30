@@ -1,0 +1,436 @@
+@page "/select"
+@using PokemonBattle.Services
+@using PokemonBattle.Models
+@using PokemonBattle.Components
+@inject GameState State
+@inject UnlockService Unlocks
+@inject NavigationManager Nav
+
+<PageTitle>포켓몬 도감</PageTitle>
+
+<main class="dex-page">
+    <div class="pokedex-shell">
+        <div class="pokedex-top">
+            <div class="pokedex-lens"></div>
+            <div class="pokedex-lights">
+                <span class="light red"></span>
+                <span class="light yellow"></span>
+                <span class="light green"></span>
+            </div>
+        </div>
+
+        <div class="pokedex-screen">
+            @if (ConfiguringId == null)
+            {
+                <input class="dex-search"
+                       placeholder="포켓몬 이름 검색..."
+                       value="@RawSearchText"
+                       @oninput="OnSearchChanged" />
+
+                <button type="button" class="lock-toggle" @onclick="() => ShowLocked = !ShowLocked">
+                    @(ShowLocked ? "🔓 잠긴 포켓몬 숨기기" : "🔒 잠긴 포켓몬 보기")
+                </button>
+
+                <div class="dex-grid">
+                    @foreach (var entry in FilteredPokemon)
+                    {
+                        bool isUnlocked = UnlockedIds.Contains(entry.Key);
+                        var existingInTeam = TeamLoadouts.FirstOrDefault(l => l.PokemonId == entry.Key);
+                        <div class="dex-entry @(existingInTeam != null ? "is-selected" : "") @(isUnlocked ? "" : "is-locked")"
+                             @onclick="() => StartConfiguring(entry.Key, isUnlocked)">
+                            <span class="dex-number">No.@entry.Key.ToString("D3") @(existingInTeam != null ? $"Lv.{existingInTeam.Level}" : "")</span>
+                            <img src="@entry.Value.ImageUrl" alt="@entry.Value.Name" class="dex-sprite" />
+                            <span class="dex-name">@(isUnlocked ? entry.Value.Name : "???")</span>
+                            @if (isUnlocked)
+                            {
+                                <div class="dex-type-icons">
+                                    <img src="@TypeIcons.GetUrl(entry.Value.Type1)" class="type-icon-img small" alt="@entry.Value.Type1" />
+                                    @if (entry.Value.Type2 != null)
+                                    {
+                                        <img src="@TypeIcons.GetUrl(entry.Value.Type2.Value)" class="type-icon-img small" alt="@entry.Value.Type2" />
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="dex-type">🔒 잠김</span>
+                            }
+                        </div>
+                    }
+                </div>
+                @if (TotalMatchCount > FilteredPokemon.Count)
+                {
+                    <p class="config-label">@FilteredPokemon.Count / @TotalMatchCount 표시 중 (검색어를 좁혀보세요)</p>
+                }
+
+                @if (TeamLoadouts.Count > 0)
+                {
+                    <p class="config-label">배틀 순서 (위쪽이 먼저 출전합니다)</p>
+                    <div class="dex-grid">
+                        @for (int i = 0; i < TeamLoadouts.Count; i++)
+                        {
+                            int idx = i;
+                            var data = PokemonDatabase.All[TeamLoadouts[idx].PokemonId];
+                            <div class="dex-entry">
+                                <span class="dex-number">#@(idx + 1) Lv.@TeamLoadouts[idx].Level</span>
+                                <img src="@data.ImageUrl" alt="@data.Name" class="dex-sprite" />
+                                <span class="dex-name">@data.Name</span>
+                                <div class="order-buttons">
+                                    <button type="button" disabled="@(idx == 0)" @onclick="() => MoveOrderUp(idx)">↑</button>
+                                    <button type="button" disabled="@(idx == TeamLoadouts.Count - 1)" @onclick="() => MoveOrderDown(idx)">↓</button>
+                                    <button type="button" class="remove-btn" @onclick="() => RemoveFromTeam(idx)">✕</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <p class="config-label">저장된 프리셋</p>
+                <div class="preset-row">
+                    <input class="dex-search" placeholder="프리셋 이름" value="@PresetName" @oninput="OnPresetNameChanged" />
+                    <button type="button" disabled="@(TeamLoadouts.Count == 0 || string.IsNullOrWhiteSpace(PresetName))" @onclick="SaveCurrentPreset">저장</button>
+                </div>
+                @foreach (var name in State.ListPresetNames())
+                {
+                    <div class="dex-entry" @onclick="() => LoadPresetByName(name)">
+                        <span class="dex-name">📁 @name</span>
+                    </div>
+                }
+            }
+            else
+            {
+                var picked = PokemonDatabase.All[ConfiguringId.Value];
+                <div class="dex-detail">
+                    <div class="dex-detail-header">
+                        <strong>@picked.Name</strong>
+                        <span class="dex-detail-level">Lv.@DraftLevel</span>
+                        <div class="hud-types">
+                            <img src="@TypeIcons.GetUrl(picked.Type1)" class="type-icon-img" alt="@picked.Type1" />
+                            @if (picked.Type2 != null)
+                            {
+                                <img src="@TypeIcons.GetUrl(picked.Type2.Value)" class="type-icon-img" alt="@picked.Type2" />
+                            }
+                        </div>
+                    </div>
+                    <div class="gauge-group">
+                        <GaugeBar Label="HP" Percent="@StatBarHelper.StatPercent(picked.BaseHp)" ColorClass="@StatBarHelper.StatColor(picked.BaseHp)" DisplayText="@picked.BaseHp.ToString()" />
+                        <GaugeBar Label="공격" Percent="@StatBarHelper.StatPercent(picked.BaseAtk)" ColorClass="@StatBarHelper.StatColor(picked.BaseAtk)" DisplayText="@picked.BaseAtk.ToString()" />
+                        <GaugeBar Label="방어" Percent="@StatBarHelper.StatPercent(picked.BaseDef)" ColorClass="@StatBarHelper.StatColor(picked.BaseDef)" DisplayText="@picked.BaseDef.ToString()" />
+                        <GaugeBar Label="특공" Percent="@StatBarHelper.StatPercent(picked.BaseSpAtk)" ColorClass="@StatBarHelper.StatColor(picked.BaseSpAtk)" DisplayText="@picked.BaseSpAtk.ToString()" />
+                        <GaugeBar Label="특방" Percent="@StatBarHelper.StatPercent(picked.BaseSpDef)" ColorClass="@StatBarHelper.StatColor(picked.BaseSpDef)" DisplayText="@picked.BaseSpDef.ToString()" />
+                        <GaugeBar Label="속도" Percent="@StatBarHelper.StatPercent(picked.BaseSpd)" ColorClass="@StatBarHelper.StatColor(picked.BaseSpd)" DisplayText="@picked.BaseSpd.ToString()" />
+                    </div>
+                </div>
+
+                <p class="config-label">기술 선택 (@DraftMoves.Count / 4) — 눌러서 자세히 볼 수 있습니다</p>
+                <div class="dex-grid">
+                    @foreach (var moveKey in picked.MoveNames)
+                    {
+                        var move = MoveDatabase.All[moveKey];
+                        <div class="dex-entry move-tile @(DraftMoves.Contains(moveKey) ? "is-selected" : string.Empty) @(ViewingMoveKey == moveKey ? "is-viewing" : "")"
+                             @onclick="() => ViewOrToggleMove(moveKey)">
+                            <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
+                            <span class="dex-name">@move.Name @(move.Priority > 0 ? "⚡" : "")</span>
+                            <span class="dex-type">@(move.IsStatus ? "변화기" : "공격기")</span>
+                        </div>
+                    }
+                </div>
+                @if (ViewingMoveKey != null)
+                {
+                    var vmove = MoveDatabase.All[ViewingMoveKey];
+                    <div class="info-panel">
+                        @if (!vmove.IsStatus)
+                        {
+                            <GaugeBar Label="위력" Percent="@StatBarHelper.PowerPercent(vmove.Power)" ColorClass="@StatBarHelper.PowerColor(vmove.Power)" DisplayText="@vmove.Power.ToString()" />
+                        }
+                        <GaugeBar Label="명중" Percent="@(vmove.AlwaysHits ? 100 : StatBarHelper.AccuracyPercent(vmove.Accuracy))" ColorClass="@(vmove.AlwaysHits ? "gauge-vhigh" : StatBarHelper.AccuracyColor(vmove.Accuracy))" DisplayText="@(vmove.AlwaysHits ? "필중" : $"{vmove.Accuracy}%")" />
+                        <p class="info-desc">@(string.IsNullOrWhiteSpace(vmove.Description) ? "설명 없음" : vmove.Description)</p>
+                        <button type="button" class="info-select-btn @(DraftMoves.Contains(ViewingMoveKey) ? "is-active" : "")" @onclick="() => ToggleMove(ViewingMoveKey)">
+                            @(DraftMoves.Contains(ViewingMoveKey) ? "선택 해제" : "이 기술 선택")
+                        </button>
+                    </div>
+                }
+
+                <p class="config-label">특성 선택 — 눌러서 설명을 확인할 수 있습니다</p>
+                <div class="dex-grid">
+                    @foreach (var ability in picked.AbilityNames)
+                    {
+                        <div class="dex-entry @(DraftAbility == ability ? "is-selected" : string.Empty) @(ViewingAbility == ability ? "is-viewing" : "")"
+                             @onclick="() => ViewingAbility = ability">
+                            <span class="dex-name">@ability</span>
+                        </div>
+                    }
+                </div>
+                @if (ViewingAbility != null)
+                {
+                    string desc = AbilityDatabase.All.TryGetValue(ViewingAbility, out var info) ? info.Description : "";
+                    <div class="info-panel">
+                        <p class="info-desc">@(string.IsNullOrWhiteSpace(desc) ? "설명 없음" : desc)</p>
+                        <button type="button" class="info-select-btn @(DraftAbility == ViewingAbility ? "is-active" : "")" @onclick="() => DraftAbility = ViewingAbility">
+                            @(DraftAbility == ViewingAbility ? "선택됨" : "이 특성 선택")
+                        </button>
+                    </div>
+                }
+
+                <p class="config-label">도구 선택 — 눌러서 설명을 확인할 수 있습니다</p>
+                <input class="dex-search" placeholder="도구 이름 검색..." value="@ItemSearchText" @oninput="OnItemSearchChanged" />
+                <div class="dex-grid">
+                    @foreach (var item in FilteredItems(picked.Name))
+                    {
+                        <div class="dex-entry @(DraftItem == item.Name ? "is-selected" : string.Empty) @(ViewingItemName == item.Name ? "is-viewing" : "")"
+                             @onclick="() => ViewingItemName = item.Name">
+                            @if (item.IconUrl != null)
+                            {
+                                <img src="@item.IconUrl" alt="@item.Name" class="item-icon" />
+                            }
+                            <span class="dex-name">@item.Name</span>
+                        </div>
+                    }
+                </div>
+                @if (ViewingItemName != null)
+                {
+                    var vitem = ItemDatabase.GetAvailableItems(picked.Name).First(i => i.Name == ViewingItemName);
+                    <div class="info-panel">
+                        <p class="info-desc">@vitem.Description</p>
+                        <button type="button" class="info-select-btn @(DraftItem == ViewingItemName ? "is-active" : "")" @onclick="() => DraftItem = ViewingItemName">
+                            @(DraftItem == ViewingItemName ? "선택됨" : "이 도구 선택")
+                        </button>
+                    </div>
+                }
+
+                <div class="pokedex-footer">
+                    <button type="button" @onclick="CancelConfiguring">취소</button>
+                    <button type="button" disabled="@(DraftMoves.Count == 0)" @onclick="ConfirmConfiguring">이 구성으로 팀에 추가</button>
+                </div>
+            }
+        </div>
+
+        @if (ConfiguringId == null)
+        {
+            <div class="pokedex-footer">
+                <p>팀 구성: @TeamLoadouts.Count / @Math.Min(UnlockedIds.Count, 6)</p>
+                <button type="button" disabled="@(!CanStart)" @onclick="ConfirmTeam">
+                    이 팀으로 배틀 시작
+                </button>
+            </div>
+        }
+    </div>
+</main>
+
+@code {
+    private string RawSearchText = "";
+    private string SearchText = "";
+    private CancellationTokenSource? _searchDebounce;
+    private bool ShowLocked = false;
+
+    private string ItemSearchText = "";
+    private string PresetName = "";
+    private List<PokemonLoadout> TeamLoadouts = new();
+    private HashSet<int> UnlockedIds = new();
+
+    private int? ConfiguringId;
+    private List<string> DraftMoves = new();
+    private string DraftAbility = "";
+    private string DraftItem = "없음";
+    private int DraftLevel = 1;
+
+    private string? ViewingMoveKey;
+    private string? ViewingAbility;
+    private string? ViewingItemName;
+
+    private bool CanStart => TeamLoadouts.Count > 0 && TeamLoadouts.Count == Math.Min(UnlockedIds.Count, 6);
+
+    protected override async Task OnInitializedAsync()
+    {
+        UnlockedIds = await Unlocks.GetUnlockedIds();
+        await State.LoadRunForCurrentUser();
+
+        if (State.PlayerLoadouts.Count > 0)
+        {
+            TeamLoadouts = State.PlayerLoadouts.Select(l =>
+            {
+                var validKeys = PokemonDatabase.All.ContainsKey(l.PokemonId)
+                    ? PokemonDatabase.All[l.PokemonId].MoveNames.ToHashSet()
+                    : new HashSet<string>();
+
+                return new PokemonLoadout
+                {
+                    PokemonId = l.PokemonId,
+                    ChosenMoveNames = l.ChosenMoveNames.Where(m => validKeys.Contains(m)).ToList(),
+                    ChosenAbility = l.ChosenAbility,
+                    ChosenItem = l.ChosenItem,
+                    Level = l.Level
+                };
+            }).ToList();
+        }
+    }
+
+    private int TotalMatchCount =>
+        PokemonDatabase.All.Count(p =>
+            (SearchText == "" || p.Value.Name.Contains(SearchText)) &&
+            (ShowLocked || UnlockedIds.Contains(p.Key)));
+
+    private List<KeyValuePair<int, PokemonData>> FilteredPokemon =>
+        PokemonDatabase.All
+            .Where(p => SearchText == "" || p.Value.Name.Contains(SearchText))
+            .Where(p => ShowLocked || UnlockedIds.Contains(p.Key))
+            .OrderBy(p => p.Key)
+            .Take(60)
+            .ToList();
+
+    private List<Item> FilteredItems(string pokemonName)
+    {
+        return ItemDatabase.GetAvailableItems(pokemonName)
+            .Where(i => i.Name.Contains(ItemSearchText))
+            .ToList();
+    }
+
+    private async void OnSearchChanged(ChangeEventArgs e)
+    {
+        RawSearchText = e.Value?.ToString() ?? "";
+
+        _searchDebounce?.Cancel();
+        var cts = new CancellationTokenSource();
+        _searchDebounce = cts;
+
+        try
+        {
+            await Task.Delay(250, cts.Token);
+            SearchText = RawSearchText;
+            StateHasChanged();
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private void OnItemSearchChanged(ChangeEventArgs e)
+    {
+        ItemSearchText = e.Value?.ToString() ?? "";
+    }
+
+    private void OnPresetNameChanged(ChangeEventArgs e)
+    {
+        PresetName = e.Value?.ToString() ?? "";
+    }
+
+    private void StartConfiguring(int id, bool isUnlocked)
+    {
+        if (!isUnlocked) return;
+
+        int maxTeamSize = Math.Min(UnlockedIds.Count, 6);
+        if (TeamLoadouts.Count >= maxTeamSize && !TeamLoadouts.Any(l => l.PokemonId == id)) return;
+
+        ConfiguringId = id;
+        ItemSearchText = "";
+        ViewingMoveKey = null;
+        ViewingAbility = null;
+        ViewingItemName = null;
+
+        var existing = TeamLoadouts.FirstOrDefault(l => l.PokemonId == id);
+
+        var validKeys = PokemonDatabase.All[id].MoveNames.ToHashSet();
+        DraftMoves = existing != null
+            ? existing.ChosenMoveNames.Where(m => validKeys.Contains(m)).ToList()
+            : new List<string>();
+
+        DraftAbility = existing?.ChosenAbility ?? PokemonDatabase.All[id].AbilityNames.FirstOrDefault() ?? "";
+        DraftItem = existing?.ChosenItem ?? "없음";
+        DraftLevel = existing?.Level ?? 1;
+    }
+
+    private void ViewOrToggleMove(string moveKey)
+    {
+        ViewingMoveKey = moveKey;
+    }
+
+    private void ToggleMove(string moveKey)
+    {
+        if (DraftMoves.Contains(moveKey))
+        {
+            DraftMoves.Remove(moveKey);
+        }
+        else if (DraftMoves.Count < 4)
+        {
+            DraftMoves.Add(moveKey);
+        }
+    }
+
+    private void CancelConfiguring()
+    {
+        ConfiguringId = null;
+    }
+
+    private void ConfirmConfiguring()
+    {
+        if (ConfiguringId == null) return;
+
+        TeamLoadouts.RemoveAll(l => l.PokemonId == ConfiguringId.Value);
+        TeamLoadouts.Add(new PokemonLoadout
+        {
+            PokemonId = ConfiguringId.Value,
+            ChosenMoveNames = new List<string>(DraftMoves),
+            ChosenAbility = DraftAbility,
+            ChosenItem = DraftItem,
+            Level = DraftLevel
+        });
+
+        ConfiguringId = null;
+    }
+
+    private void MoveOrderUp(int idx)
+    {
+        if (idx <= 0) return;
+        (TeamLoadouts[idx - 1], TeamLoadouts[idx]) = (TeamLoadouts[idx], TeamLoadouts[idx - 1]);
+    }
+
+    private void MoveOrderDown(int idx)
+    {
+        if (idx >= TeamLoadouts.Count - 1) return;
+        (TeamLoadouts[idx + 1], TeamLoadouts[idx]) = (TeamLoadouts[idx], TeamLoadouts[idx + 1]);
+    }
+
+    private void RemoveFromTeam(int idx)
+    {
+        TeamLoadouts.RemoveAt(idx);
+    }
+
+    private void SaveCurrentPreset()
+    {
+        if (TeamLoadouts.Count == 0 || string.IsNullOrWhiteSpace(PresetName)) return;
+        State.SavePreset(PresetName, new List<PokemonLoadout>(TeamLoadouts));
+        PresetName = "";
+    }
+
+    private void LoadPresetByName(string name)
+    {
+        var loaded = State.LoadPreset(name);
+        if (loaded == null) return;
+
+        TeamLoadouts = loaded
+            .Where(l => UnlockedIds.Contains(l.PokemonId) && PokemonDatabase.All.ContainsKey(l.PokemonId))
+            .Take(Math.Min(UnlockedIds.Count, 6))
+            .Select(l =>
+            {
+                var existing = TeamLoadouts.FirstOrDefault(t => t.PokemonId == l.PokemonId);
+                var validKeys = PokemonDatabase.All[l.PokemonId].MoveNames.ToHashSet();
+                return new PokemonLoadout
+                {
+                    PokemonId = l.PokemonId,
+                    ChosenMoveNames = l.ChosenMoveNames.Where(m => validKeys.Contains(m)).ToList(),
+                    ChosenAbility = l.ChosenAbility,
+                    ChosenItem = l.ChosenItem,
+                    Level = existing?.Level ?? l.Level
+                };
+            }).ToList();
+    }
+
+    private void ConfirmTeam()
+    {
+        if (!CanStart) return;
+
+        State.SetPlayerLoadouts(TeamLoadouts);
+        State.GoTo(GameScreen.Battle);
+        Nav.NavigateTo("/battle");
+    }
+}

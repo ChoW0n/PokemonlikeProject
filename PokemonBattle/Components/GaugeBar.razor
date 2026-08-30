@@ -1,0 +1,12 @@
+<div class="gauge-row">
+    <span class="gauge-label">@Label</span>
+    <div class="gauge-track"><span class="gauge-fill @ColorClass" style="width:@Percent%"></span></div>
+    <span class="gauge-num">@DisplayText</span>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public int Percent { get; set; }
+    [Parameter] public string ColorClass { get; set; } = "gauge-mid";
+    [Parameter] public string DisplayText { get; set; } = "";
+}

@@ -1,0 +1,15 @@
+/home/runner/workspace/DataGen/bin/Debug/net8.0/DataGen
+/home/runner/workspace/DataGen/bin/Debug/net8.0/DataGen.deps.json
+/home/runner/workspace/DataGen/bin/Debug/net8.0/DataGen.runtimeconfig.json
+/home/runner/workspace/DataGen/bin/Debug/net8.0/DataGen.dll
+/home/runner/workspace/DataGen/bin/Debug/net8.0/DataGen.pdb
+/home/runner/workspace/DataGen/obj/Debug/net8.0/DataGen.GeneratedMSBuildEditorConfig.editorconfig
+/home/runner/workspace/DataGen/obj/Debug/net8.0/DataGen.AssemblyInfoInputs.cache
+/home/runner/workspace/DataGen/obj/Debug/net8.0/DataGen.AssemblyInfo.cs
+/home/runner/workspace/DataGen/obj/Debug/net8.0/DataGen.csproj.CoreCompileInputs.cache
+/home/runner/workspace/DataGen/obj/Debug/net8.0/DataGen.sourcelink.json
+/home/runner/workspace/DataGen/obj/Debug/net8.0/DataGen.dll
+/home/runner/workspace/DataGen/obj/Debug/net8.0/refint/DataGen.dll
+/home/runner/workspace/DataGen/obj/Debug/net8.0/DataGen.pdb
+/home/runner/workspace/DataGen/obj/Debug/net8.0/DataGen.genruntimeconfig.cache
+/home/runner/workspace/DataGen/obj/Debug/net8.0/ref/DataGen.dll
