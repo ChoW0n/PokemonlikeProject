@@ -11,6 +11,8 @@ public class Pokemon
     public Dictionary<string, int> CurrentPP = new();
     public string SelectedAbility = "";
     public string HeldItem = "없음";
+    public string? ChoiceLockedMove { get; private set; }
+    public bool FlashFireActive { get; private set; }
 
     public StatusCondition Status = StatusCondition.None;
     public int SleepTurnsRemaining;
@@ -95,10 +97,21 @@ public class Pokemon
         }
     }
 
+    private bool IsChoiceItem =>
+        HeldItem == "구애스카프" || HeldItem == "구애머리띠" || HeldItem == "구애안경";
+
+    public bool CanUseMove(string moveName)
+    {
+        if (!CurrentPP.TryGetValue(moveName, out var pp) || pp <= 0) return false;
+        if (IsChoiceItem && ChoiceLockedMove != null && ChoiceLockedMove != moveName) return false;
+        return true;
+    }
+
     public bool TryUseMove(string moveName)
     {
-        if (CurrentPP[moveName] <= 0) return false;
+        if (!CanUseMove(moveName)) return false;
         CurrentPP[moveName]--;
+        if (IsChoiceItem) ChoiceLockedMove ??= moveName;
         return true;
     }
 
@@ -107,6 +120,8 @@ public class Pokemon
         StatStages = new() { ["attack"] = 0, ["defense"] = 0, ["special-attack"] = 0, ["special-defense"] = 0, ["speed"] = 0 };
         IsConfused = false;
         ConfusionTurnsRemaining = 0;
+        ChoiceLockedMove = null;
+        FlashFireActive = false;
     }
 
     public void ChangeStage(string stat, int delta)
@@ -117,7 +132,7 @@ public class Pokemon
 
     public bool IsImmuneToAilment(string ailmentName)
     {
-        if (ailmentName == "sleep" && (SelectedAbility == "불면" || SelectedAbility == "짱짱해짐")) return true;
+        if (ailmentName == "sleep" && (SelectedAbility == "불면" || SelectedAbility == "의기양양")) return true;
         return false;
     }
     public bool IsImmuneToConfusion() => SelectedAbility == "마이페이스";
@@ -224,14 +239,20 @@ public class Pokemon
             CurrentHp = Math.Min(MaxHp, CurrentHp + heal);
             return (true, $"{Data.Name}은(는) 저수로 HP를 회복했다!");
         }
-        if (SelectedAbility == "축전지" && attackType == PokemonType.Electric)
+        if (SelectedAbility == "축전" && attackType == PokemonType.Electric)
         {
             int heal = MaxHp / 4;
             CurrentHp = Math.Min(MaxHp, CurrentHp + heal);
-            return (true, $"{Data.Name}은(는) 축전지로 HP를 회복했다!");
+            return (true, $"{Data.Name}은(는) 축전으로 HP를 회복했다!");
+        }
+        if (SelectedAbility == "피뢰침" && attackType == PokemonType.Electric)
+        {
+            ChangeStage("special-attack", 1);
+            return (true, $"{Data.Name}은(는) 피뢰침으로 특수공격이 올랐다!");
         }
         if (SelectedAbility == "타오르는불꽃" && attackType == PokemonType.Fire)
         {
+            FlashFireActive = true;
             return (true, $"{Data.Name}은(는) 타오르는불꽃으로 불꽃 기술을 무효화했다!");
         }
         return (false, null);

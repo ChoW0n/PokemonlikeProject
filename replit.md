@@ -24,19 +24,22 @@
 
 ## Where things live
 
-- `PokemonBattle/Models/` — extensible Pokémon domain model placeholders
-- `PokemonBattle/Pages/Battle.razor` — interactive battle screen and temporary move-slot controls
-- `PokemonBattle/wwwroot/app.css` — responsive battle UI styling
+- `PokemonBattle/Models/` — Pokémon, moves, abilities, items, type rules, teams, and generated game data
+- `PokemonBattle/Pages/` — login, registration, opponent preview, team building, battle, and result screens
+- `PokemonBattle/Services/` — authentication, unlocks, run persistence, presets, and shared game state
+- `PokemonBattle/Pages/Battle.razor` — turn order, PP, switching, damage, status, ability, and item execution
+- `PokemonBattle/wwwroot/app.css` — responsive game UI styling
 
 ## Architecture decisions
 
 - Domain concepts are split into one C# file per role so Pokémon, type rules, fixed data, and the database can grow independently.
 - The .NET 8 Blazor Web App template runs in Interactive Server mode, which provides the server-side interaction model intended for a Blazor Server game.
-- The first screen intentionally keeps Pokémon and move data empty; the controls only verify the server-interactive shell until domain data is added.
+- `DataGen/` generates Pokémon, move, and ability catalogs from PokeAPI; combat behavior is implemented separately in the runtime models and battle page.
+- Display descriptions do not automatically implement effects. An ability, move, or item only works in battle when its runtime rule is connected.
 
 ## Product
 
-현재는 포켓몬과 기술을 연결하기 전의 배틀 화면 골격입니다. 네 개의 기술 슬롯 버튼, 턴 표시, 선택 메시지, 초기화 버튼으로 프리뷰 상호작용을 확인할 수 있습니다.
+현재는 로그인, 사용자별 진행 저장, 포켓몬 해금, 최대 6마리 팀 구성, 기술·특성·도구 선택, 상대 미리보기, 턴제 배틀, 교체, 승패 및 진화 진행이 연결된 싱글플레이 프로토타입입니다.
 
 ## User preferences
 
@@ -44,7 +47,8 @@
 
 ## Gotchas
 
-- 포켓몬과 기술을 추가할 때는 `PokemonBattle/Models/`의 역할별 파일을 먼저 채운 뒤 `Battle.razor`의 표시와 선택 로직을 연결합니다.
+- 데이터베이스에 이름과 설명이 존재해도 전투 효과가 구현된 것은 아닙니다. 새 특성·기술·도구는 표시 데이터와 런타임 판정을 함께 연결해야 합니다.
+- 구애 도구의 기술 잠금과 PP 사용 가능 여부는 `Pokemon`의 공통 검증을 통해 처리해야 하며, 전투 화면에서 다른 기술로 조용히 대체하면 안 됩니다.
 
 ## Pointers
 

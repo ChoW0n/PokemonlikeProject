@@ -110,11 +110,22 @@
                     int ppLoop = Hero.CurrentPP[moveKey];
                     <button type="button"
                             class="move-name-button @(PendingMoveKey == moveKey ? "is-pending" : "")"
-                            disabled="@(IsBusy || ppLoop <= 0)"
+                            disabled="@(IsBusy || !Hero.CanUseMove(moveKey))"
                             @onclick="() => TapMove(moveKey)">
                         <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
-                        <span class="move-name-text">@move.Name @(move.Priority > 0 ? "⚡" : "")</span>
+                        <span class="move-name-text">@move.Name @(move.Priority > 0 ? "⚡" : "") @(Hero.ChoiceLockedMove != null && Hero.ChoiceLockedMove != moveKey ? "🔒" : "")</span>
                         <span class="move-pp-num">@ppLoop/@move.MaxPP</span>
+                    </button>
+                }
+                @if (!HeroHasUsableMove)
+                {
+                    <button type="button"
+                            class="move-name-button"
+                            disabled="@IsBusy"
+                            @onclick="() => UseMove(null)">
+                        <span class="type-dot" style="background:@TypeColors.GetHex(PokemonType.Normal)"></span>
+                        <span class="move-name-text">몸부림</span>
+                        <span class="move-pp-num">PP 없음</span>
                     </button>
                 }
             </div>
@@ -222,6 +233,7 @@
 
     private List<string> HeroMoveKeys = null!;
     private List<string> EnemyMoveKeys = null!;
+    private bool HeroHasUsableMove => HeroMoveKeys.Any(Hero.CanUseMove);
 
     private int Turn;
     private bool IsBusy;
@@ -409,10 +421,10 @@
         return null;
     }
 
-    private string PickEnemyMoveKey()
+    private string? PickEnemyMoveKey()
     {
-        var usable = EnemyMoveKeys.Where(k => Enemy.CurrentPP.ContainsKey(k) && Enemy.CurrentPP[k] > 0).ToArray();
-        if (usable.Length == 0) return EnemyMoveKeys.FirstOrDefault() ?? MoveDatabase.All.Keys.First();
+        var usable = EnemyMoveKeys.Where(Enemy.CanUseMove).ToArray();
+        if (usable.Length == 0) return null;
 
         double bestScore = -1;
         var bestKeys = new List<string>();
@@ -456,12 +468,6 @@
                 if (p.CurrentHp > before) await ShowMessage($"{p.Data.Name}은(는) {p.HeldItem} 효과로 HP를 회복했다!", 1100);
             }
         }
-    }
-
-    private string EnsureUsableMoveKey(Pokemon attacker, string moveKey)
-    {
-        if (attacker.CurrentPP.ContainsKey(moveKey)) return moveKey;
-        return attacker.CurrentPP.Keys.FirstOrDefault() ?? moveKey;
     }
 
     private PokemonType? TypeBoostItem(string item) => item switch
@@ -539,7 +545,7 @@
             if (attacker.HeldItem == "구애안경" && move.IsSpecial) power *= 1.5;
             bool hasLifeOrb = attacker.HeldItem == "생명의구슬";
             if (hasLifeOrb) power *= 1.3;
-            if (attacker.SelectedAbility == "타오르는불꽃" && move.Type == PokemonType.Fire) power *= 1.5;
+            if (attacker.SelectedAbility == "타오르는불꽃" && attacker.FlashFireActive && move.Type == PokemonType.Fire) power *= 1.5;
             if (attacker.SelectedAbility == "테크니션" && move.Power <= 60) power *= 1.5;
 
             if (BattleWeather.Current == "쾌청")
@@ -667,7 +673,7 @@
         return true;
     }
 
-    private async Task<bool> TakeTurn(Pokemon attacker, Pokemon defender, string moveKey, bool attackerIsHero)
+    private async Task<bool> TakeTurn(Pokemon attacker, Pokemon defender, string? moveKey, bool attackerIsHero)
     {
         if (attacker.Flinched)
         {
@@ -687,12 +693,26 @@
             return false;
         }
 
-        moveKey = EnsureUsableMoveKey(attacker, moveKey);
-        var move = MoveDatabase.All[moveKey];
-        attacker.TryUseMove(moveKey);
-        await ShowMessage($"{attacker.Data.Name}의 {move.Name}!");
+        if (moveKey == null)
+        {
+            await ShowMessage($"{attacker.Data.Name}은(는) 사용할 수 있는 기술이 없어 몸부림쳤다!");
+            int damage = Math.Max(1, (int)(((2.0 * attacker.Level / 5 + 2) * 50 * attacker.EffectiveAtk / Math.Max(defender.EffectiveDef, 1)) / 50) + 2);
+            defender.CurrentHp = Math.Max(0, defender.CurrentHp - damage);
+            defender.LastMultiplier = 1.0;
+            defender.IsFainted = defender.CurrentHp == 0;
+            await PlayEffect(TypeColors.GetEffectKind(PokemonType.Normal, false), attackerIsHero, PokemonType.Normal);
+        }
+        else
+        {
+            if (!MoveDatabase.All.TryGetValue(moveKey, out var move) || !attacker.TryUseMove(moveKey))
+            {
+                await ShowMessage($"{attacker.Data.Name}은(는) 그 기술을 사용할 수 없다!");
+                return false;
+            }
 
-        await ExecuteMove(attacker, defender, move, attackerIsHero);
+            await ShowMessage($"{attacker.Data.Name}의 {move.Name}!");
+            await ExecuteMove(attacker, defender, move, attackerIsHero);
+        }
 
         if (defender.IsFainted)
         {
@@ -737,19 +757,34 @@
         }
     }
 
-    private async void UseMove(string heroMoveKey)
+    private async void UseMove(string? heroMoveKey)
     {
+        if (heroMoveKey == null && HeroHasUsableMove)
+        {
+            await ShowMessage("사용할 수 있는 기술이 남아 있습니다.", 800);
+            return;
+        }
+
+        if (heroMoveKey != null && !Hero.CanUseMove(heroMoveKey))
+        {
+            PendingMoveKey = null;
+            Menu = BattleMenu.Attack;
+            await ShowMessage("이 기술은 PP가 없거나 구애 도구로 잠겨 있어 사용할 수 없습니다.", 800);
+            StateHasChanged();
+            return;
+        }
+
         PendingMoveKey = null;
         IsBusy = true;
         Menu = BattleMenu.Main;
         Turn++;
 
-        string enemyMoveKey = PickEnemyMoveKey();
-        var heroMove = MoveDatabase.All[EnsureUsableMoveKey(Hero, heroMoveKey)];
-        var enemyMove = MoveDatabase.All[EnsureUsableMoveKey(Enemy, enemyMoveKey)];
+        string? enemyMoveKey = PickEnemyMoveKey();
+        var heroMove = heroMoveKey == null ? null : MoveDatabase.All[heroMoveKey];
+        var enemyMove = enemyMoveKey == null ? null : MoveDatabase.All[enemyMoveKey];
 
-        bool heroFirst = heroMove.Priority != enemyMove.Priority
-            ? heroMove.Priority > enemyMove.Priority
+        bool heroFirst = (heroMove?.Priority ?? 0) != (enemyMove?.Priority ?? 0)
+            ? (heroMove?.Priority ?? 0) > (enemyMove?.Priority ?? 0)
             : EffectiveSpeed(Hero) >= EffectiveSpeed(Enemy);
 
         if (heroFirst)
@@ -797,7 +832,7 @@
         HeroMoveKeys = ResolveMoveKeys(Hero);
         await ShowMessage($"{Hero.Data.Name}을(를) 내보냈다!");
 
-        string enemyMoveKey = PickEnemyMoveKey();
+        string? enemyMoveKey = PickEnemyMoveKey();
         if (await TakeTurn(Enemy, Hero, enemyMoveKey, false)) return;
 
         await ApplyEndOfTurnEffects();

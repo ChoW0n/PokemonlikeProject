@@ -36,18 +36,18 @@ public static class ItemDatabase
         new Item("기적의씨", "풀 타입 기술의 위력이 1.2배 상승한다.", Base + "miracle-seed.png"),
         new Item("예리한부리", "비행 타입 기술의 위력이 1.2배 상승한다.", Base + "sharp-beak.png"),
         new Item("자석", "전기 타입 기술의 위력이 1.2배 상승한다.", Base + "magnet.png"),
-        new Item("힘의머리띠", "물리 기술의 위력이 10% 상승한다. (효과 구현 예정)", Base + "muscle-band.png"),
+        new Item("힘의머리띠", "물리 기술의 위력이 10% 상승한다.", Base + "muscle-band.png"),
         new Item("방진고글", "모래바람 등 날씨 데미지와 가루 계열 기술에 면역이 된다. (효과 구현 예정)", Base + "safety-goggles.png"),
     };
 
     public static Dictionary<string, Item> ExclusiveItems = new Dictionary<string, Item>
     {
-        ["피카츄"] = new Item("전기구슬", "피카츄 전용 도구: 전기 타입 기술의 위력이 대폭 상승한다. (효과 구현 예정)", Base + "light-ball.png"),
-        ["텅구리"] = new Item("두꺼운뼈", "텅구리 전용 도구: 물리 방어력이 2배가 된다. (효과 구현 예정)", Base + "thick-club.png"),
+        ["피카츄"] = new Item("전기구슬", "피카츄 전용 도구: 공격과 특수공격이 2배가 된다.", Base + "light-ball.png"),
+        ["텅구리"] = new Item("두꺼운뼈", "텅구리 전용 도구: 공격이 2배가 된다.", Base + "thick-club.png"),
         ["파오리"] = new Item("대파", "파오리 전용 도구: 급소에 맞을 확률이 크게 상승한다. (효과 구현 예정)"),
         ["메타몽"] = new Item("메탈파우더", "메타몽 전용 도구: 회피율이 상승한다. (효과 구현 예정)", Base + "metal-powder.png"),
-        ["라티오스"] = new Item("이슬의구슬", "라티오스 전용 도구: 특수공격과 특수방어가 상승한다. (효과 구현 예정)", Base + "soul-dew.png"),
-        ["라티아스"] = new Item("이슬의구슬", "라티아스 전용 도구: 특수공격과 특수방어가 상승한다. (효과 구현 예정)", Base + "soul-dew.png"),
+        ["라티오스"] = new Item("이슬의구슬", "라티오스 전용 도구: 특수공격과 특수방어가 1.5배가 된다.", Base + "soul-dew.png"),
+        ["라티아스"] = new Item("이슬의구슬", "라티아스 전용 도구: 특수공격과 특수방어가 1.5배가 된다.", Base + "soul-dew.png"),
     };
 
     public static List<Item> GetAvailableItems(string pokemonName)
