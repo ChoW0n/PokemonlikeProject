@@ -3,7 +3,7 @@ modules = ["nodejs-24", "dotnet-8.0", "python-base-3.13"]
 [deployment]
 router = "application"
 deploymentTarget = "autoscale"
-build = ["pnpm", "--filter", "@workspace/pokemon-battle", "run", "build"]
+build = ["pnpm", "run", "verify"]
 run = ["pnpm", "--filter", "@workspace/pokemon-battle", "run", "serve"]
 
 [deployment.postBuild]

@@ -8,6 +8,8 @@
 - `dotnet run --project PokemonBattle/PokemonBattle.csproj --no-launch-profile --urls http://0.0.0.0:3000` — run the Blazor Server preview
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
+- `pnpm run test` — run the PokemonBattle.Tests .NET battle regression suite
+- `pnpm run verify` — build the app, then run the battle regression suite as a separate validation step
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
