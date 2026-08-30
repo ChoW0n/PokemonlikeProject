@@ -8,6 +8,10 @@ namespace PokemonBattle.Services;
 public class RunStore
 {
     private readonly AppDbContext _db;
+    private static readonly JsonSerializerOptions LoadoutJsonOptions = new()
+    {
+        IncludeFields = true
+    };
 
     public RunStore(AppDbContext db)
     {
@@ -19,14 +23,16 @@ public class RunStore
         var run = await _db.PlayerRuns.FirstOrDefaultAsync(r => r.Username == username);
         if (run == null) return (0, new List<PokemonLoadout>(), 0);
 
-        var loadouts = JsonSerializer.Deserialize<List<PokemonLoadout>>(run.LoadoutsJson) ?? new List<PokemonLoadout>();
+        var loadouts = JsonSerializer.Deserialize<List<PokemonLoadout>>(
+            run.LoadoutsJson,
+            LoadoutJsonOptions) ?? new List<PokemonLoadout>();
         return (run.CurrentScore, loadouts, Math.Clamp(run.LegendaryProgressPercent, 0, LegendaryProgression.MaxProgressPercent));
     }
 
     public async Task Save(string username, int score, List<PokemonLoadout> loadouts, int legendaryProgressPercent)
     {
         var run = await _db.PlayerRuns.FirstOrDefaultAsync(r => r.Username == username);
-        string json = JsonSerializer.Serialize(loadouts);
+        string json = JsonSerializer.Serialize(loadouts, LoadoutJsonOptions);
         int safeProgress = Math.Clamp(legendaryProgressPercent, 0, LegendaryProgression.MaxProgressPercent);
 
         if (run == null)

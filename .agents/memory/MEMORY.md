@@ -1,3 +1,4 @@
 - [Blazor artifact publishing](blazor-artifact-publishing.md) — artifact production lacks `dotnet`; publish with a portable self-contained Linux bundle.
 - [.NET test restore](dotnet-test-restore.md) — test assets can temporarily miss xUnit analyzer binaries; force-refresh NuGet restore before rerunning tests.
 - [Blazor EF Core context concurrency](blazor-dbcontext-concurrency.md) — await scoped database saves before navigation; fire-and-forget writes can crash the next component's query.
+- [PostgreSQL persistence tests](postgres-persistence-tests.md) — isolate integration data in a temporary schema and always drop it during cleanup.
