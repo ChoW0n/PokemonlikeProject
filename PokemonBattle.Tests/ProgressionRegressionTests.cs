@@ -55,6 +55,106 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public void DuplicateTeamItemsKeepTheFirstItemAndAllowNoneToRepeat()
+    {
+        var normalized = TeamLoadoutRules.NormalizeUniqueItems(new[]
+        {
+            new PokemonLoadout { PokemonId = 1, ChosenItem = "기합의띠" },
+            new PokemonLoadout { PokemonId = 4, ChosenItem = "기합의띠" },
+            new PokemonLoadout { PokemonId = 7, ChosenItem = "없음" },
+            new PokemonLoadout { PokemonId = 10, ChosenItem = "없음" }
+        });
+
+        Assert.Equal("기합의띠", normalized[0].ChosenItem);
+        Assert.Equal("없음", normalized[1].ChosenItem);
+        Assert.Equal("없음", normalized[2].ChosenItem);
+        Assert.Equal("없음", normalized[3].ChosenItem);
+        Assert.False(TeamLoadoutRules.HasDuplicateItems(normalized));
+        Assert.True(TeamLoadoutRules.CanUseItem(normalized, 1, "기합의띠"));
+        Assert.False(TeamLoadoutRules.CanUseItem(normalized, 4, "기합의띠"));
+    }
+
+    [Fact]
+    public async Task InMemoryPresetsUpdateDeleteAndIsolateUsers()
+    {
+        var currentUser = new CurrentUserService();
+        var store = new InMemoryPresetStore(currentUser);
+        currentUser.SignIn("preset-user-a", isAdmin: false);
+
+        await store.SaveAsync("  팀  ", new List<PokemonLoadout>
+        {
+            new() { PokemonId = 1, ChosenItem = "기합의띠", Level = 9 }
+        });
+        await store.SaveAsync("팀", new List<PokemonLoadout>
+        {
+            new() { PokemonId = 4, ChosenItem = "먹다남은음식", Level = 9 }
+        });
+
+        Assert.Equal(new[] { "팀" }, await store.ListNamesAsync());
+        var updated = await store.LoadAsync("팀");
+        var updatedLoadout = Assert.Single(updated!);
+        Assert.Equal(4, updatedLoadout.PokemonId);
+        Assert.Equal(1, updatedLoadout.Level);
+
+        currentUser.SignIn("preset-user-b", isAdmin: false);
+        Assert.Empty(await store.ListNamesAsync());
+        Assert.Null(await store.LoadAsync("팀"));
+
+        currentUser.SignIn("preset-user-a", isAdmin: false);
+        Assert.True(await store.DeleteAsync("팀"));
+        Assert.Empty(await store.ListNamesAsync());
+        Assert.False(await store.DeleteAsync("팀"));
+    }
+
+    [Fact]
+    public async Task PostgresPresetsSurviveFreshContextAndKeepUsersSeparate()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreateUserPresetsTable(schema);
+            var loadouts = new List<PokemonLoadout>
+            {
+                new() { PokemonId = 1, ChosenItem = "기합의띠", Level = 14 }
+            };
+
+            var firstUser = new CurrentUserService();
+            firstUser.SignIn("preset-persistence-a", isAdmin: false);
+            await using (var db = CreateDbContext(schema))
+            {
+                var store = new PostgresPresetStore(db, firstUser);
+                await store.SaveAsync("팀", loadouts);
+                await store.SaveAsync("팀", new List<PokemonLoadout>
+                {
+                    new() { PokemonId = 4, ChosenItem = "먹다남은음식", Level = 22 }
+                });
+            }
+
+            await using (var freshDb = CreateDbContext(schema))
+            {
+                var store = new PostgresPresetStore(freshDb, firstUser);
+                var restored = await store.LoadAsync("팀");
+                var restoredLoadout = Assert.Single(restored!);
+                Assert.Equal(4, restoredLoadout.PokemonId);
+                Assert.Equal(1, restoredLoadout.Level);
+            }
+
+            var secondUser = new CurrentUserService();
+            secondUser.SignIn("preset-persistence-b", isAdmin: false);
+            await using (var otherDb = CreateDbContext(schema))
+            {
+                var store = new PostgresPresetStore(otherDb, secondUser);
+                Assert.Empty(await store.ListNamesAsync());
+                Assert.False(await store.DeleteAsync("팀"));
+            }
+
+            await using (var deleteDb = CreateDbContext(schema))
+            {
+                Assert.True(await new PostgresPresetStore(deleteDb, firstUser).DeleteAsync("팀"));
+            }
+        });
+    }
+
+    [Fact]
     public void LegendaryProgressClampsAtOneHundred()
     {
         Assert.Equal(100, LegendaryProgression.AddProgress(96, 20));
@@ -258,6 +358,21 @@ public class ProgressionRegressionTests
                 "CurrentScore" INTEGER NOT NULL,
                 "LoadoutsJson" TEXT NOT NULL,
                 "LegendaryProgressPercent" INTEGER NOT NULL DEFAULT 0
+            );
+            """);
+    }
+
+    private static async Task CreateUserPresetsTable(string schema)
+    {
+        await using var db = CreateDbContext(schema);
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE "UserPresets" (
+                "Id" SERIAL PRIMARY KEY,
+                "Username" TEXT NOT NULL,
+                "Name" TEXT NOT NULL,
+                "LoadoutsJson" TEXT NOT NULL,
+                "UpdatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT "UX_UserPresets_Username_Name" UNIQUE ("Username", "Name")
             );
             """);
     }

@@ -88,12 +88,22 @@
 
         var team = EnemyTeamProvider.GetRandomTeam(teamSize, poolSize, firstStageOnly, unlocked, State.LegendaryUnlocked);
 
+        var usedItems = new HashSet<string>(StringComparer.Ordinal);
         EnemyLoadouts = team.Select(e =>
         {
             var moves = EnemyTeamProvider.PickProMoveset(e.Value);
             string ability = e.Value.AbilityNames.Length > 0 ? e.Value.AbilityNames[rng.Next(e.Value.AbilityNames.Length)] : "";
-            var items = ItemDatabase.GetAvailableItems(e.Value.Name);
-            string item = items[rng.Next(items.Count)].Name;
+            var availableItems = ItemDatabase.GetAvailableItems(e.Value.Name)
+                .Where(item => item.Name == TeamLoadoutRules.NoItem || !usedItems.Contains(item.Name))
+                .ToList();
+            string item = availableItems.Count == 0
+                ? TeamLoadoutRules.NoItem
+                : availableItems[rng.Next(availableItems.Count)].Name;
+            if (item != TeamLoadoutRules.NoItem)
+            {
+                usedItems.Add(item);
+            }
+
             return new PokemonLoadout
             {
                 PokemonId = e.Key,
@@ -103,6 +113,7 @@
                 Level = enemyLevel
             };
         }).ToList();
+        EnemyLoadouts = TeamLoadoutRules.NormalizeUniqueItems(EnemyLoadouts);
     }
 
     private void ToggleDetail(int id)
