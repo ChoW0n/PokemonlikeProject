@@ -451,7 +451,7 @@
                 return true;
             }
             await ShowMessage("내 포켓몬이 모두 쓰러졌다... 패배...");
-            State.LoseBattle();
+            await State.LoseBattle();
             Nav.NavigateTo("/result");
             return true;
         }

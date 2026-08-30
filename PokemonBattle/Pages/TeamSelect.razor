@@ -431,11 +431,11 @@
             }).ToList();
     }
 
-    private void ConfirmTeam()
+    private async Task ConfirmTeam()
     {
         if (!CanStart) return;
 
-        State.SetPlayerLoadouts(TeamLoadouts);
+        await State.SetPlayerLoadouts(TeamLoadouts);
         State.GoTo(GameScreen.Battle);
         Nav.NavigateTo("/battle");
     }
