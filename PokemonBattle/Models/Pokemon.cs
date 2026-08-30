@@ -16,6 +16,10 @@ public class Pokemon
     public int DisabledTurnsRemaining { get; private set; }
     public bool FlashFireActive { get; private set; }
     public int TurnsOnField { get; private set; }
+    public bool IsAlternateForm { get; private set; }
+    public bool HasConsumedBerry { get; private set; }
+    public bool LastHitWasCritical { get; private set; }
+    public bool IsProtected { get; private set; }
 
     public StatusCondition Status = StatusCondition.None;
     public int SleepTurnsRemaining;
@@ -46,11 +50,49 @@ public class Pokemon
         return 1.0;
     }
 
-    public int Atk => (int)(StatOther(Data.BaseAtk) * ItemStatMult("attack"));
-    public int Def => StatOther(Data.BaseDef);
-    public int SpAtk => (int)(StatOther(Data.BaseSpAtk) * ItemStatMult("special-attack"));
-    public int SpDef => (int)(StatOther(Data.BaseSpDef) * ItemStatMult("special-defense"));
-    public int Spd => StatOther(Data.BaseSpd);
+    private int BaseStat(string stat)
+    {
+        if (Data.Name == "킬가르도" && IsAlternateForm)
+        {
+            return stat switch
+            {
+                "attack" => 140,
+                "defense" => 50,
+                "special-attack" => 140,
+                "special-defense" => 50,
+                _ => Data.BaseHp
+            };
+        }
+
+        if (Data.Name == "불비달마" && IsAlternateForm)
+        {
+            return stat switch
+            {
+                "attack" => 30,
+                "defense" => 105,
+                "special-attack" => 140,
+                "special-defense" => 105,
+                "speed" => 55,
+                _ => Data.BaseHp
+            };
+        }
+
+        return stat switch
+        {
+            "attack" => Data.BaseAtk,
+            "defense" => Data.BaseDef,
+            "special-attack" => Data.BaseSpAtk,
+            "special-defense" => Data.BaseSpDef,
+            "speed" => Data.BaseSpd,
+            _ => Data.BaseHp
+        };
+    }
+
+    public int Atk => (int)(StatOther(BaseStat("attack")) * ItemStatMult("attack"));
+    public int Def => StatOther(BaseStat("defense"));
+    public int SpAtk => (int)(StatOther(BaseStat("special-attack")) * ItemStatMult("special-attack"));
+    public int SpDef => (int)(StatOther(BaseStat("special-defense")) * ItemStatMult("special-defense"));
+    public int Spd => StatOther(BaseStat("speed"));
 
     private double StageMult(string key)
     {
@@ -146,6 +188,7 @@ public class Pokemon
         if (!CurrentPP.TryGetValue(moveName, out var pp) || pp <= 0) return false;
         if (DisabledMoveKey == moveName) return false;
         if (IsChoiceItem && ChoiceLockedMove != null && ChoiceLockedMove != moveName) return false;
+        if (moveName == "belch" && !HasConsumedBerry) return false;
         return true;
     }
 
@@ -167,6 +210,8 @@ public class Pokemon
         DisabledTurnsRemaining = 0;
         FlashFireActive = false;
         TurnsOnField = 0;
+        IsAlternateForm = false;
+        IsProtected = false;
     }
 
     public bool CanChangeStage(string stat, int delta, bool causedByOpponent = false)
@@ -182,12 +227,14 @@ public class Pokemon
     {
         if (!CanChangeStage(stat, delta, causedByOpponent)) return;
         if (SelectedAbility == "심술꾸러기") delta = -delta;
+        if (SelectedAbility == "단순") delta *= 2;
         StatStages[stat] = Math.Clamp(StatStages[stat] + delta, -6, 6);
     }
 
     public void AdvanceTurn()
     {
         TurnsOnField++;
+        IsProtected = false;
         if (DisabledTurnsRemaining > 0 && --DisabledTurnsRemaining == 0) DisabledMoveKey = null;
     }
 
@@ -212,7 +259,7 @@ public class Pokemon
 
     public bool IsImmuneToAilment(string ailmentName)
     {
-        if (ailmentName == "sleep" && (SelectedAbility == "불면" || SelectedAbility == "의기양양")) return true;
+        if (ailmentName == "sleep" && (SelectedAbility is "불면" or "의기양양")) return true;
         if (ailmentName == "poison" && SelectedAbility == "면역") return true;
         if (ailmentName == "paralysis" && SelectedAbility == "유연") return true;
         if (ailmentName == "burn" && SelectedAbility == "수의베일") return true;
@@ -373,7 +420,7 @@ public class Pokemon
         return (false, null);
     }
 
-    public void TakeDamage(int rawDamage, PokemonType attackType, bool isSpecial = false)
+    public void TakeDamage(int rawDamage, PokemonType attackType, bool isSpecial = false, bool isCritical = false)
     {
         double multiplier = TypeChart.GetMultiplier(attackType, Data.Type1);
         if (Data.Type2 != null)
@@ -385,6 +432,7 @@ public class Pokemon
 
         bool wasFullHp = CurrentHp == MaxHp;
         SurvivedByEndure = false;
+        LastHitWasCritical = isCritical;
 
         double dmgMultiplier = 1.0;
         if ((SelectedAbility is "하드록" or "필터") && multiplier >= 2.0) dmgMultiplier *= 0.75;
@@ -393,6 +441,7 @@ public class Pokemon
         if (SelectedAbility == "내열" && attackType == PokemonType.Fire) dmgMultiplier *= 0.5;
         if (SelectedAbility == "퍼코트" && !isSpecial) dmgMultiplier *= 0.5;
         if (SelectedAbility == "건조피부" && attackType == PokemonType.Fire) dmgMultiplier *= 1.25;
+        if (isCritical) dmgMultiplier *= 1.5;
         if (SelectedAbility == "불가사의부적" && multiplier > 0 && multiplier < 2.0) multiplier = 0;
         LastMultiplier = multiplier;
 
@@ -414,6 +463,95 @@ public class Pokemon
                 CurrentHp = 0;
                 IsFainted = true;
             }
+        }
+    }
+
+    public string? TriggerCriticalHitAbility()
+    {
+        if (!LastHitWasCritical || IsFainted || SelectedAbility != "분노의경혈") return null;
+
+        StatStages["attack"] = 6;
+        return $"{Data.Name}의 분노의경혈로 공격이 최고까지 올랐다!";
+    }
+
+    public bool IsCriticalImmune() => SelectedAbility is "조가비갑옷" or "전투무장";
+
+    public bool UpdateFormForMove(string moveKey, bool isStatus)
+    {
+        if (SelectedAbility != "배틀스위치" || Data.Name != "킬가르도") return false;
+
+        if (isStatus && !MoveRuleMetadata.ChangesToShieldForm(moveKey)) return false;
+        bool shouldBeBladeForm = !isStatus;
+        if (IsAlternateForm == shouldBeBladeForm) return false;
+        IsAlternateForm = shouldBeBladeForm;
+        return true;
+    }
+
+    public void ActivateProtection() => IsProtected = true;
+
+    public bool UpdateFormAtEndOfTurn()
+    {
+        if (SelectedAbility != "달마모드" || Data.Name != "불비달마") return false;
+
+        bool shouldBeAlternateForm = CurrentHp <= MaxHp / 2;
+        if (IsAlternateForm == shouldBeAlternateForm) return false;
+        IsAlternateForm = shouldBeAlternateForm;
+        return true;
+    }
+
+    public static bool IsBerry(string itemName) =>
+        itemName is "오랭열매" or "자뭉열매" or "무화열매" or "리샘열매";
+
+    public bool TryConsumeBerry(out string? message)
+    {
+        message = null;
+        if (!IsBerry(HeldItem)) return false;
+
+        bool shouldEat = HeldItem switch
+        {
+            "리샘열매" => Status != StatusCondition.None,
+            "무화열매" => CurrentHp <= MaxHp / (SelectedAbility == "먹보" ? 2 : 4),
+            _ => CurrentHp <= MaxHp / 2
+        };
+        if (!shouldEat) return false;
+
+        string berry = HeldItem;
+        HeldItem = "없음";
+        HasConsumedBerry = true;
+        ApplyBerryEffect(berry);
+        message = $"{Data.Name}은(는) {berry}을(를) 먹었다!";
+        return true;
+    }
+
+    public bool TryTakeHeldBerry(out string? berryName)
+    {
+        berryName = null;
+        if (!IsBerry(HeldItem)) return false;
+
+        string berry = HeldItem;
+        HeldItem = "없음";
+        berryName = berry;
+        return true;
+    }
+
+    public void ApplyBerryEffect(string berry)
+    {
+        HasConsumedBerry = true;
+        if (berry == "오랭열매")
+        {
+            CurrentHp = Math.Min(MaxHp, CurrentHp + 10);
+        }
+        else if (berry == "자뭉열매")
+        {
+            CurrentHp = Math.Min(MaxHp, CurrentHp + Math.Max(1, MaxHp / 4));
+        }
+        else if (berry == "무화열매")
+        {
+            CurrentHp = Math.Min(MaxHp, CurrentHp + Math.Max(1, MaxHp / 3));
+        }
+        else if (berry == "리샘열매")
+        {
+            ClearPrimaryStatus();
         }
     }
 

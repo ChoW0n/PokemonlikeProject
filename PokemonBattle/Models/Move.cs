@@ -56,6 +56,32 @@ public static class MoveRuleMetadata
         "thousand-waves", "lands-wrath", "diamond-storm", "fusion-bolt", "secret-power"
     };
 
+    private static readonly HashSet<string> HighCriticalRateMoves = new()
+    {
+        "razor-leaf", "slash", "shadow-claw", "razor-wind", "sky-attack", "drill-run",
+        "air-cutter", "cross-poison", "night-slash", "karate-chop", "cross-chop",
+        "psycho-cut", "leaf-blade", "stone-edge", "crabhammer", "blaze-kick",
+        "poison-tail", "aeroblast", "attack-order", "spacial-rend"
+    };
+
+    private static readonly HashSet<string> GuaranteedCriticalMoves = new()
+    {
+        "storm-throw", "frost-breath"
+    };
+
+    private static readonly HashSet<string> ProtectionBypassingMoves = new()
+    {
+        "feint", "phantom-force", "shadow-force", "hyperspace-hole"
+    };
+
     public static bool MakesContact(string moveKey, Move move) =>
         !move.IsStatus && !move.IsSpecial && move.Power > 0 && !NonContactPhysicalMoves.Contains(moveKey);
+
+    public static bool HasHighCriticalRate(string moveKey) => HighCriticalRateMoves.Contains(moveKey);
+
+    public static bool GuaranteesCriticalHit(string moveKey) => GuaranteedCriticalMoves.Contains(moveKey);
+
+    public static bool ChangesToShieldForm(string moveKey) => moveKey == "kings-shield";
+
+    public static bool BypassesProtection(string moveKey) => ProtectionBypassingMoves.Contains(moveKey);
 }

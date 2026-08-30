@@ -499,5 +499,6 @@ public static class MoveDatabase
         All["diamond-storm"] = new Move("다이아스톰", 100, PokemonType.Rock, 5, 95, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "defense", Change = 2, TargetsSelf = false } }, 50, "다이아 폭풍을 일으켜 데미지를 준다. 자신의 방어를 올릴 때가 있다.", 0, 0, 1, 1);
         All["hyperspace-hole"] = new Move("이차원홀", 80, PokemonType.Psychic, 5, 100, true, 0, false, true, "none", 0, 0, new List<StatChangeEntry>(), 0, "다른차원홀로 갑자기 상대 바로 옆에 나타나 공격한다. 방어나 판별도 무시할 수 있다.", 0, 0, 1, 1);
         All["steam-eruption"] = new Move("스팀버스트", 110, PokemonType.Water, 5, 95, false, 0, false, true, "burn", 30, 0, new List<StatChangeEntry>(), 0, "상대에게 굉장히 뜨거운 증기를 뿜는다. 상대는 화상을 입기도 한다.", 0, 0, 1, 1);
+        All["kings-shield"] = new Move("킹실드", 0, PokemonType.Steel, 10, 100, true, 4, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "공격을 막고 접촉한 상대의 공격을 크게 떨어뜨린다.", 0, 0, 1, 1);
     }
 }

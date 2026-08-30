@@ -19,12 +19,40 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
             context.Attacker.CurrentHp = Math.Min(context.Attacker.MaxHp, context.Attacker.CurrentHp + heal);
             await context.ShowMessage($"{context.Attacker.Data.Name}은(는) HP를 흡수했다!");
         }
-        else if (context.Move.DrainPercent < 0 && !context.Attacker.IsFainted)
+        else if (context.Move.DrainPercent < 0 && !context.Attacker.IsFainted
+            && context.Attacker.SelectedAbility != "돌머리")
         {
             int recoilDamage = Math.Max(1, context.TotalDamage * Math.Abs(context.Move.DrainPercent) / 100);
             context.Attacker.CurrentHp = Math.Max(0, context.Attacker.CurrentHp - recoilDamage);
             if (context.Attacker.CurrentHp == 0) context.Attacker.IsFainted = true;
             await context.ShowMessage($"{context.Attacker.Data.Name}은(는) 반동으로 데미지를 입었다!");
+        }
+
+        if (!context.Defender.IsFainted && context.MoveKey == "incinerate"
+            && Pokemon.IsBerry(context.Defender.HeldItem))
+        {
+            string berry = context.Defender.HeldItem;
+            context.Defender.HeldItem = "없음";
+            await context.ShowMessage($"{context.Defender.Data.Name}의 {berry}이(가) 불태워졌다!");
+        }
+
+        if (context.MoveKey is "bug-bite" or "pluck"
+            && context.TotalDamage > 0
+            && context.Defender.TryTakeHeldBerry(out string? berryName))
+        {
+            context.Attacker.ApplyBerryEffect(berryName!);
+            await context.ShowMessage(
+                $"{context.Attacker.Data.Name}은(는) {context.Defender.Data.Name}의 {berryName}을(를) 빼앗아 먹었다!");
+            if (context.Attacker.SelectedAbility == "볼주머니")
+            {
+                int before = context.Attacker.CurrentHp;
+                int heal = Math.Max(1, context.Attacker.MaxHp / 8);
+                context.Attacker.CurrentHp = Math.Min(context.Attacker.MaxHp, context.Attacker.CurrentHp + heal);
+                if (context.Attacker.CurrentHp > before)
+                {
+                    await context.ShowMessage($"{context.Attacker.Data.Name}은(는) 볼주머니로 HP를 회복했다!");
+                }
+            }
         }
     }
 

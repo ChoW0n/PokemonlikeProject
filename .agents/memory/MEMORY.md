@@ -1,1 +1,2 @@
 - [Blazor artifact publishing](blazor-artifact-publishing.md) — artifact production lacks `dotnet`; publish with a portable self-contained Linux bundle.
+- [.NET test restore](dotnet-test-restore.md) — test assets can temporarily miss xUnit analyzer binaries; force-refresh NuGet restore before rerunning tests.

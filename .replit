@@ -1,6 +1,4 @@
-# Blazor development preview requires the .NET SDK.
-# Production publish uses the artifact self-contained executable.
-modules = ["nodejs-24", "dotnet-8.0"]
+modules = ["nodejs-24", "dotnet-8.0", "python-base-3.13"]
 
 [deployment]
 router = "application"

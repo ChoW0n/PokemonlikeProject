@@ -154,6 +154,13 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
             context.Defender.ChangeStage("speed", 2);
             await context.ShowMessage($"{context.Defender.Data.Name}의 깨어진갑옷으로 방어가 떨어지고 속도가 크게 올랐다!");
         }
+
+        if (context.MoveKey is not ("bug-bite" or "pluck"))
+        {
+            await ConsumeBerryAsync(
+                context.Defender,
+                message => context.ShowMessage(message));
+        }
     }
 
     public async Task AfterDamageResultAsync(BattleEffectContext context)
@@ -176,10 +183,29 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
         }
     }
 
+    public async Task AfterMoveAsync(BattleEffectContext context)
+    {
+        await ConsumeBerryAsync(
+            context.Attacker,
+            message => context.ShowMessage(message));
+        await ConsumeBerryAsync(
+            context.Defender,
+            message => context.ShowMessage(message));
+    }
+
     public async Task EndOfTurnAsync(BattleEndOfTurnContext context)
     {
         var pokemon = context.Pokemon;
         if (pokemon.IsFainted) return;
+
+        await ConsumeBerryAsync(
+            pokemon,
+            message => context.ShowMessage(message, 900));
+
+        if (pokemon.UpdateFormAtEndOfTurn())
+        {
+            await context.ShowMessage($"{pokemon.Data.Name}의 달마모드로 모습이 변했다!", 900);
+        }
 
         if (pokemon.SelectedAbility == "가속")
         {
@@ -241,6 +267,22 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
         if (context.Pokemon.CurrentHp == 0) context.Pokemon.IsFainted = true;
         await context.ShowMessage(message, 900);
     }
+
+    private static async Task ConsumeBerryAsync(Pokemon pokemon, Func<string, Task> showMessage)
+    {
+        if (pokemon.IsFainted || !pokemon.TryConsumeBerry(out string? berryMessage)) return;
+
+        await showMessage(berryMessage!);
+        if (pokemon.SelectedAbility != "볼주머니") return;
+
+        int before = pokemon.CurrentHp;
+        int pouchHeal = Math.Max(1, pokemon.MaxHp / 8);
+        pokemon.CurrentHp = Math.Min(pokemon.MaxHp, pokemon.CurrentHp + pouchHeal);
+        if (pokemon.CurrentHp > before)
+        {
+            await showMessage($"{pokemon.Data.Name}은(는) 볼주머니로 HP를 회복했다!");
+        }
+    }
 }
 
 public sealed class ContactReactionEffectHandler : IBattleEffectHandler
@@ -259,7 +301,24 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
             await context.ShowMessage($"{context.Attacker.Data.Name}은(는) {context.Defender.SelectedAbility}에 상처를 입었다!");
         }
 
-        if (context.Defender.IsFainted || context.Attacker.IsFainted || context.Attacker.Status != StatusCondition.None) return;
+        if (context.Defender.SelectedAbility == "미라" && context.Attacker.SelectedAbility != "미라")
+        {
+            context.Attacker.SelectedAbility = "미라";
+            await context.ShowMessage($"{context.Attacker.Data.Name}의 특성이 미라로 변했다!");
+        }
+
+        if (context.Defender.IsFainted && context.Defender.SelectedAbility == "유폭"
+            && !context.Attacker.IsFainted)
+        {
+            int damage = Math.Max(1, context.Attacker.MaxHp / 4);
+            context.Attacker.CurrentHp = Math.Max(0, context.Attacker.CurrentHp - damage);
+            if (context.Attacker.CurrentHp == 0) context.Attacker.IsFainted = true;
+            await context.ShowMessage($"{context.Attacker.Data.Name}은(는) 유폭으로 데미지를 입었다!");
+        }
+
+        if (context.Defender.IsFainted || context.Attacker.IsFainted) return;
+
+        if (context.Attacker.Status != StatusCondition.None) return;
         string? reaction = null;
         if (context.Defender.SelectedAbility == "정전기" && context.Random.Next(100) < 30)
         {

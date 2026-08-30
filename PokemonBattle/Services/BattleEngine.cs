@@ -29,6 +29,20 @@ public sealed class BattleEngine
         return (int)speed;
     }
 
+    public bool CanSwitch(Pokemon active, Pokemon opponent)
+    {
+        bool isGhostType = active.Data.Type1 == PokemonType.Ghost || active.Data.Type2 == PokemonType.Ghost;
+        if (opponent.SelectedAbility == "그림자밟기"
+            && !isGhostType
+            && active.SelectedAbility != "그림자밟기") return false;
+        if (opponent.SelectedAbility == "개미지옥"
+            && active.Data.Type1 != PokemonType.Flying
+            && active.Data.Type2 != PokemonType.Flying
+            && !isGhostType
+            && active.SelectedAbility != "부유") return false;
+        return true;
+    }
+
     public double PreviewMultiplier(Move move, Pokemon target, Pokemon? attacker = null)
     {
         PokemonType attackType = attacker?.ResolveMoveType(move) ?? move.Type;
@@ -259,6 +273,13 @@ public sealed class BattleEngine
         bool attackerIsHero,
         Func<BattleEvent, Task> emit)
     {
+        if (attacker.UpdateFormForMove(moveKey, move.IsStatus))
+        {
+            string form = attacker.IsAlternateForm ? "공격모드" : "방어모드";
+            await emit(BattleEvent.MessageLine(
+                $"{attacker.Data.Name}의 배틀스위치로 {form}로 모습이 변했다!"));
+        }
+
         double effectiveAccuracy = move.Accuracy;
         if (attacker.SelectedAbility == "의욕" && !move.IsStatus && !move.IsSpecial) effectiveAccuracy *= 0.8;
         if (attacker.SelectedAbility == "복안") effectiveAccuracy *= 1.3;
@@ -278,6 +299,33 @@ public sealed class BattleEngine
         string effectKind = TypeColors.GetEffectKind(attackType, move.IsStatus);
         var context = new BattleEffectContext(
             attacker, defender, move, attackerIsHero, rng, emit, moveKey, attackType, makesContact);
+
+        if (MoveRuleMetadata.ChangesToShieldForm(moveKey))
+        {
+            attacker.ActivateProtection();
+            await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) 킹실드로 몸을 지켰다!"));
+            await emit(BattleEvent.Effect(effectKind, attackerIsHero, attackType));
+            return;
+        }
+
+        if (defender.IsProtected
+            && TargetsOpponent(move)
+            && !MoveRuleMetadata.BypassesProtection(moveKey))
+        {
+            await emit(BattleEvent.MessageLine($"{defender.Data.Name}은(는) 킹실드로 기술을 막았다!"));
+            if (makesContact)
+            {
+                int before = attacker.StatStages["attack"];
+                attacker.ChangeStage("attack", -2, causedByOpponent: true);
+                if (attacker.StatStages["attack"] < before)
+                {
+                    await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 공격이 크게 떨어졌다!"));
+                    string? reaction = attacker.TriggerStatDropAbility();
+                    if (reaction != null) await emit(BattleEvent.MessageLine(reaction));
+                }
+            }
+            return;
+        }
 
         if (IsBlockedByAbility(defender, move))
         {
@@ -317,12 +365,20 @@ public sealed class BattleEngine
             {
                 if (defender.IsFainted) break;
 
+                bool isCritical = RollCriticalHit(attacker, defender, moveKey);
+                if (isCritical)
+                {
+                    await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 공격이 급소에 맞았다!"));
+                }
                 int hpBefore = defender.CurrentHp;
                 int scaledPower = (int)(power * ((double)attackStat / Math.Max(defenseStat, 1)));
-                defender.TakeDamage(scaledPower, attackType, move.IsSpecial);
+                if (isCritical && attacker.SelectedAbility == "스나이퍼") scaledPower = (int)(scaledPower * 1.5);
+                defender.TakeDamage(scaledPower, attackType, move.IsSpecial, isCritical);
                 context.LastHitDamage = hpBefore - defender.CurrentHp;
                 context.TotalDamage += context.LastHitDamage;
                 context.ActualHits++;
+                string? criticalReaction = defender.TriggerCriticalHitAbility();
+                if (criticalReaction != null) await emit(BattleEvent.MessageLine(criticalReaction));
                 await emit(BattleEvent.Effect(effectKind, attackerIsHero, attackType));
                 foreach (var handler in effectHandlers) await handler.AfterHitAsync(context);
                 if (attacker.IsFainted) break;
@@ -362,6 +418,32 @@ public sealed class BattleEngine
             return 5;
         }
         return rng.Next(move.MinHits, move.MaxHits + 1);
+    }
+
+    private int CriticalStage(Pokemon attacker, string moveKey)
+    {
+        if (MoveRuleMetadata.GuaranteesCriticalHit(moveKey)) return 3;
+
+        int stage = 0;
+        if (MoveRuleMetadata.HasHighCriticalRate(moveKey)) stage++;
+        if (attacker.SelectedAbility == "대운") stage++;
+        if (attacker.HeldItem == "대파") stage += 2;
+        return Math.Min(stage, 3);
+    }
+
+    private bool RollCriticalHit(Pokemon attacker, Pokemon defender, string moveKey)
+    {
+        if (defender.IsCriticalImmune()) return false;
+
+        int stage = CriticalStage(attacker, moveKey);
+        int denominator = stage switch
+        {
+            3 => 1,
+            2 => 2,
+            1 => 8,
+            _ => 24
+        };
+        return denominator == 1 || rng.Next(denominator) == 0;
     }
 
     private static int MovePriority(Pokemon pokemon, Move? move)
