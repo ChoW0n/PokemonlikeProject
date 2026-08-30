@@ -1,5 +1,6 @@
 @page "/"
 @page "/battle"
+@using PokemonBattle.Models
 
 <PageTitle>포켓몬 배틀</PageTitle>
 
@@ -24,12 +25,14 @@
                     <span class="level-label">LV. 01</span>
                 </div>
                 <div class="fighter-placeholder" aria-hidden="true">?</div>
-                <h2>내 포켓몬</h2>
-                <p class="placeholder-copy">PokemonData를 추가하면 여기에 표시됩니다.</p>
+                <h2>@Hero.Data.Name</h2>
+                <p class="placeholder-copy">속성: @Hero.Data.Type</p>
                 <div class="health-row">
                     <span>HP</span>
-                    <div class="health-track"><span class="health-fill player-health"></span></div>
-                    <strong>— / —</strong>
+                    <div class="health-track">
+                        <span class="health-fill player-health" style="width:@HeroHpPercent%"></span>
+                    </div>
+                    <strong>@Hero.CurrentHp / @Hero.Data.BaseHp</strong>
                 </div>
             </article>
 
@@ -41,12 +44,14 @@
                     <span class="level-label">LV. 01</span>
                 </div>
                 <div class="fighter-placeholder opponent-placeholder" aria-hidden="true">?</div>
-                <h2>상대 포켓몬</h2>
-                <p class="placeholder-copy">PokemonDatabase를 추가하면 여기에 표시됩니다.</p>
+                <h2>@Enemy.Data.Name</h2>
+                <p class="placeholder-copy">속성: @Enemy.Data.Type</p>
                 <div class="health-row">
                     <span>HP</span>
-                    <div class="health-track"><span class="health-fill opponent-health"></span></div>
-                    <strong>— / —</strong>
+                    <div class="health-track">
+                        <span class="health-fill opponent-health" style="width:@EnemyHpPercent%"></span>
+                    </div>
+                    <strong>@Enemy.CurrentHp / @Enemy.Data.BaseHp</strong>
                 </div>
             </article>
         </div>
@@ -66,6 +71,7 @@
             {
                 <button type="button"
                         class="move-button @(SelectedMove == move ? "is-selected" : string.Empty)"
+                        disabled="@(Enemy.IsFainted || Hero.IsFainted)"
                         @onclick="() => SelectMove(move)">
                     <span class="move-index">@((Array.IndexOf(MoveSlots, move) + 1).ToString("D2"))</span>
                     <span>@move</span>
@@ -87,6 +93,7 @@
 </main>
 
 @code {
+    //임시 기술 슬롯 이름 (다음 단계에서 IMoveEffect 기반 실제 기술로 교체 예정)
     private readonly string[] MoveSlots =
     [
         "기술 슬롯 1",
@@ -95,19 +102,40 @@
         "기술 슬롯 4"
     ];
 
+    //배틀에 참가하는 두 포켓몬 인스턴스
+    private Pokemon Hero = new Pokemon(PokemonDatabase.All[1]);
+    private Pokemon Enemy = new Pokemon(PokemonDatabase.All[4]);
+
     private int Turn;
     private string SelectedMove = "선택된 기술 없음";
     private string BattleMessage = "기술 슬롯을 눌러 배틀 커맨드를 선택해 보세요.";
 
-    private void SelectMove(string move)
+    //HP 바 너비(%) 계산용 프로퍼티
+    private int HeroHpPercent => (int)(100.0 * Hero.CurrentHp / Hero.Data.BaseHp);
+    private int EnemyHpPercent => (int)(100.0 * Enemy.CurrentHp / Enemy.Data.BaseHp);
+
+    private void SelectMove(string move) //기술 버튼 클릭 시 실제 데미지 계산 및 반영
     {
         SelectedMove = move;
         Turn++;
-        BattleMessage = $"{move}을(를) 선택했습니다. 실제 효과는 기술 데이터를 추가한 뒤 연결할 수 있습니다.";
+
+        //지금은 4개 슬롯 전부 임시로 플레이어 기본 공격력만큼 데미지 (다음 단계에서 슬롯별 다른 기술로 교체)
+        Enemy.TakeDamage(Hero.Data.BaseAtk, Hero.Data.Type);
+
+        if (Enemy.IsFainted)
+        {
+            BattleMessage = $"{Enemy.Data.Name} 기절! {Hero.Data.Name} 승리!";
+        }
+        else
+        {
+            BattleMessage = $"{move}을(를) 사용해 {Enemy.Data.Name}에게 데미지를 입혔습니다.";
+        }
     }
 
-    private void ResetBattle()
+    private void ResetBattle() //초기화 버튼: 포켓몬 인스턴스와 배틀 상태 전부 리셋
     {
+        Hero = new Pokemon(PokemonDatabase.All[1]);
+        Enemy = new Pokemon(PokemonDatabase.All[4]);
         Turn = 0;
         SelectedMove = "선택된 기술 없음";
         BattleMessage = "배틀 상태를 초기화했습니다. 기술 슬롯을 눌러 시작해 보세요.";
