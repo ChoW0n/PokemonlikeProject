@@ -168,6 +168,151 @@ public sealed class BattleRulesRegressionTests
         Assert.False(normalDefender.FlashFireActive);
     }
 
+    [Fact]
+    public async Task Drain_healing_happens_before_life_orb_recoil()
+    {
+        var attacker = CreatePokemon(1, "giga-drain", ability: "노가드", heldItem: "생명의구슬");
+        var defender = CreatePokemon(7, "tackle");
+        attacker.CurrentHp = 1;
+        var snapshot = new DamageResultSnapshotHandler();
+
+        await CreateFullEngine(snapshot).TakeTurnAsync(
+            attacker,
+            defender,
+            "giga-drain",
+            attackerIsHero: true,
+            emit: _ => Task.CompletedTask);
+
+        Assert.True(snapshot.AttackerHpAfterDamageResult > attacker.CurrentHp);
+        Assert.True(snapshot.AttackerHpAfterDamageResult > 1);
+        Assert.Equal(
+            snapshot.AttackerHpAfterDamageResult - Math.Max(1, attacker.MaxHp / 10),
+            attacker.CurrentHp);
+        Assert.False(attacker.IsFainted);
+    }
+
+    [Fact]
+    public async Task Move_recoil_happens_before_life_orb_recoil()
+    {
+        var attacker = CreatePokemon(25, "take-down", ability: "노가드", heldItem: "생명의구슬");
+        var defender = CreatePokemon(1, "tackle");
+        int hpBefore = attacker.CurrentHp;
+        var snapshot = new DamageResultSnapshotHandler();
+
+        await CreateFullEngine(snapshot).TakeTurnAsync(
+            attacker,
+            defender,
+            "take-down",
+            attackerIsHero: true,
+            emit: _ => Task.CompletedTask);
+
+        int expectedMoveRecoil = Math.Max(1, (hpBefore - snapshot.AttackerHpAfterDamageResult));
+        Assert.Equal(hpBefore - expectedMoveRecoil, snapshot.AttackerHpAfterDamageResult);
+        Assert.Equal(
+            snapshot.AttackerHpAfterDamageResult - Math.Max(1, attacker.MaxHp / 10),
+            attacker.CurrentHp);
+    }
+
+    [Fact]
+    public async Task Multi_hit_contact_reaction_runs_for_each_hit_before_one_life_orb_recoil()
+    {
+        var attacker = CreatePokemon(25, "double-hit", ability: "노가드", heldItem: "생명의구슬");
+        var defender = CreatePokemon(1, "tackle", ability: "철가시");
+        var events = new List<BattleEvent>();
+
+        await CreateFullEngine().TakeTurnAsync(
+            attacker,
+            defender,
+            "double-hit",
+            attackerIsHero: true,
+            emit: battleEvent =>
+            {
+                events.Add(battleEvent);
+                return Task.CompletedTask;
+            });
+
+        int reflectedPerHit = Math.Max(1, defender.MaxHp / 8);
+        int lifeOrbRecoil = Math.Max(1, attacker.MaxHp / 10);
+        Assert.Equal(2, events.Count(battleEvent =>
+            battleEvent.Message?.Contains("철가시", StringComparison.Ordinal) == true));
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("2번 맞았다", StringComparison.Ordinal) == true);
+        Assert.Equal(attacker.MaxHp - reflectedPerHit * 2 - lifeOrbRecoil, attacker.CurrentHp);
+        Assert.False(attacker.IsFainted);
+    }
+
+    [Fact]
+    public async Task Status_and_stat_changes_run_after_damage_result()
+    {
+        const string moveKey = "regression-status-strike";
+        MoveDatabase.All[moveKey] = new Move(
+            "회귀 상태 공격",
+            40,
+            PokemonType.Normal,
+            10,
+            100,
+            true,
+            0,
+            false,
+            false,
+            "poison",
+            100,
+            0,
+            new List<StatChangeEntry>
+            {
+                new() { Stat = "attack", Change = -1, TargetsSelf = false }
+            },
+            100,
+            "회귀 테스트용 기술",
+            0,
+            0,
+            1,
+            1);
+
+        try
+        {
+            var attacker = CreatePokemon(25, moveKey, ability: "노가드");
+            var defender = CreatePokemon(1, "tackle");
+            var snapshot = new DamageResultSnapshotHandler();
+
+            await CreateFullEngine(snapshot).TakeTurnAsync(
+                attacker,
+                defender,
+                moveKey,
+                attackerIsHero: true,
+                emit: _ => Task.CompletedTask);
+
+            Assert.Equal(StatusCondition.None, snapshot.DefenderStatusAfterDamageResult);
+            Assert.Equal(0, snapshot.DefenderAttackStageAfterDamageResult);
+            Assert.Equal(StatusCondition.Poison, snapshot.DefenderStatusAfterMove);
+            Assert.Equal(-1, snapshot.DefenderAttackStageAfterMove);
+        }
+        finally
+        {
+            MoveDatabase.All.Remove(moveKey);
+        }
+    }
+
+    [Fact]
+    public async Task Handler_discovery_order_does_not_override_declared_order()
+    {
+        var calls = new List<string>();
+        var late = new OrderProbeHandler("late", order: 200, calls);
+        var early = new OrderProbeHandler("early", order: 100, calls);
+        var engine = new BattleEngine(
+            new Random(1234),
+            new IBattleEffectHandler[] { late, early });
+
+        await engine.TakeTurnAsync(
+            CreatePokemon(25, "tackle"),
+            CreatePokemon(1, "tackle"),
+            "tackle",
+            attackerIsHero: true,
+            emit: _ => Task.CompletedTask);
+
+        Assert.Equal(new[] { "early", "late" }, calls);
+    }
+
     private static Pokemon CreatePokemon(
         int pokemonId,
         params string[] moves)
@@ -188,11 +333,73 @@ public sealed class BattleRulesRegressionTests
 
     private static BattleEngine CreateEngine() => new(new Random(1234), Array.Empty<IBattleEffectHandler>());
 
+    private static BattleEngine CreateFullEngine(params IBattleEffectHandler[] additionalHandlers)
+    {
+        // Deliberately reverse the normal discovery order: BattleEngine must use Order.
+        var handlers = new List<IBattleEffectHandler>
+        {
+            new DamageModifierEffectHandler(),
+            new AbilityLifecycleEffectHandler(),
+            new ContactReactionEffectHandler(),
+            new MoveEffectHandler()
+        };
+        handlers.AddRange(additionalHandlers);
+        return new BattleEngine(
+            new Random(1234),
+            handlers.AsEnumerable().Reverse());
+    }
+
     private static int ExpectedDamage(Pokemon attacker, Pokemon defender, string moveKey)
     {
         var move = MoveDatabase.All[moveKey];
         int attack = move.IsSpecial ? attacker.EffectiveSpAtk : attacker.EffectiveAtk;
         int defense = move.IsSpecial ? defender.EffectiveSpDef : defender.EffectiveDef;
         return Math.Max(0, (int)(move.Power * ((double)attack / Math.Max(defense, 1))));
+    }
+
+    private sealed class DamageResultSnapshotHandler : IBattleEffectHandler
+    {
+        public int Order => 150;
+        public int AttackerHpAfterDamageResult { get; private set; }
+        public StatusCondition DefenderStatusAfterDamageResult { get; private set; }
+        public int DefenderAttackStageAfterDamageResult { get; private set; }
+        public StatusCondition DefenderStatusAfterMove { get; private set; }
+        public int DefenderAttackStageAfterMove { get; private set; }
+
+        public Task AfterDamageResultAsync(BattleEffectContext context)
+        {
+            AttackerHpAfterDamageResult = context.Attacker.CurrentHp;
+            DefenderStatusAfterDamageResult = context.Defender.Status;
+            DefenderAttackStageAfterDamageResult = context.Defender.StatStages["attack"];
+            return Task.CompletedTask;
+        }
+
+        public Task AfterMoveAsync(BattleEffectContext context)
+        {
+            DefenderStatusAfterMove = context.Defender.Status;
+            DefenderAttackStageAfterMove = context.Defender.StatStages["attack"];
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class OrderProbeHandler : IBattleEffectHandler
+    {
+        private readonly string name;
+        private readonly List<string> calls;
+
+        public OrderProbeHandler(string name, int order, List<string> calls)
+        {
+            this.name = name;
+            Order = order;
+            this.calls = calls;
+        }
+
+        public int Order { get; }
+
+        public Task AfterMoveAsync(BattleEffectContext context)
+        {
+            calls.Add(name);
+            return Task.CompletedTask;
+        }
     }
 }
