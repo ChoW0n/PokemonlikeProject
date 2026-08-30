@@ -7,4 +7,5 @@ public class PlayerRun
     public string Username { get; set; } = "";
     public int CurrentScore { get; set; }
     public string LoadoutsJson { get; set; } = "[]"; //팀 구성 전체를 JSON 문자열로 직렬화해서 저장 (간단하고 안전한 방식)
+    public int LegendaryProgressPercent { get; set; }
 }
