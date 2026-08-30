@@ -12,7 +12,7 @@ public class GameState
 
     public GameScreen CurrentScreen { get; private set; } = GameScreen.Start;
     public int CurrentScore { get; private set; }
-    public int HighScore => _scoreStore.GetHighScore();
+    public int HighScore { get; private set; }
     public int LegendaryProgressPercent { get; private set; }
     public int LastLegendaryProgressReward { get; private set; }
     public bool LegendaryUnlocked => LegendaryProgression.IsUnlocked(LegendaryProgressPercent);
@@ -45,7 +45,7 @@ public class GameState
     {
         if (_runLoaded || !_currentUser.IsLoggedIn) return;
 
-        var (score, loadouts, legendaryProgressPercent) = await _runStore.Load(_currentUser.Username!);
+        var (score, highScore, loadouts, legendaryProgressPercent) = await _runStore.Load(_currentUser.Username!);
 
         //방어 코드: 도감에 없는 포켓몬(예: 크래시로 깨진 PokemonId=0)이 하나라도 섞여있으면
         //전체 데이터를 신뢰할 수 없다고 보고 진행 상황을 완전히 초기화함
@@ -70,6 +70,7 @@ public class GameState
             }
         }
 
+        HighScore = highScore;
         LegendaryProgressPercent = Math.Clamp(legendaryProgressPercent, 0, LegendaryProgression.MaxProgressPercent);
         LastLegendaryProgressReward = 0;
         LegendaryEncounterConsumed = false;
@@ -80,7 +81,7 @@ public class GameState
     private async Task PersistRun()
     {
         if (!_currentUser.IsLoggedIn) return;
-        await _runStore.Save(_currentUser.Username!, CurrentScore, PlayerLoadouts, LegendaryProgressPercent);
+        await _runStore.Save(_currentUser.Username!, CurrentScore, HighScore, PlayerLoadouts, LegendaryProgressPercent);
     }
 
     public void GoTo(GameScreen screen)
@@ -179,6 +180,7 @@ public class GameState
     public async Task LoseBattle()
     {
         _scoreStore.SaveIfHigher(CurrentScore);
+        HighScore = Math.Max(HighScore, _scoreStore.GetHighScore());
         LastBattleWon = false;
         LastLegendaryProgressReward = 0;
         CurrentScore = 0;

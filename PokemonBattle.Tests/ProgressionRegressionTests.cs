@@ -236,7 +236,7 @@ public class ProgressionRegressionTests
 
             await using (var db = CreateDbContext(schema))
             {
-                await new RunStore(db).Save(username, 23, loadouts, 68);
+                await new RunStore(db).Save(username, 23, 31, loadouts, 68);
             }
 
             await using (var freshDb = CreateDbContext(schema))
@@ -244,11 +244,66 @@ public class ProgressionRegressionTests
                 var restored = await new RunStore(freshDb).Load(username);
 
                 Assert.Equal(23, restored.score);
+                Assert.Equal(31, restored.highScore);
                 Assert.Equal(68, restored.legendaryProgressPercent);
                 var restoredLoadout = Assert.Single(restored.loadouts);
                 Assert.Equal(1, restoredLoadout.PokemonId);
                 Assert.Equal(7, restoredLoadout.Level);
                 Assert.Equal(new[] { "tackle" }, restoredLoadout.ChosenMoveNames);
+            }
+        });
+    }
+
+    [Fact]
+    public async Task GameStatePersistsHighScoreAcrossNewRunAndFreshContext()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            const string username = "high-score-regression";
+            await CreatePlayerRunsTable(schema);
+
+            await using (var seedDb = CreateDbContext(schema))
+            {
+                await new RunStore(seedDb).Save(
+                    username,
+                    18,
+                    12,
+                    new List<PokemonLoadout> { new() { PokemonId = 1, Level = 3 } },
+                    0);
+            }
+
+            var currentUser = new CurrentUserService();
+            currentUser.SignIn(username, isAdmin: false);
+
+            await using (var db = CreateDbContext(schema))
+            {
+                var state = new GameState(
+                    new InMemoryScoreStore(),
+                    new InMemoryPresetStore(),
+                    new UnlockService(db, currentUser),
+                    new RunStore(db),
+                    currentUser);
+
+                await state.LoadRunForCurrentUser();
+                Assert.Equal(18, state.CurrentScore);
+                Assert.Equal(12, state.HighScore);
+
+                await state.LoseBattle();
+                Assert.Equal(0, state.CurrentScore);
+                Assert.Equal(18, state.HighScore);
+
+                await state.ResetForNewRun();
+                Assert.Equal(0, state.CurrentScore);
+                Assert.Equal(18, state.HighScore);
+            }
+
+            await using (var freshDb = CreateDbContext(schema))
+            {
+                var restored = await new RunStore(freshDb).Load(username);
+
+                Assert.Equal(0, restored.score);
+                Assert.Equal(18, restored.highScore);
+                Assert.Empty(restored.loadouts);
             }
         });
     }
@@ -265,6 +320,7 @@ public class ProgressionRegressionTests
             {
                 await new RunStore(seedDb).Save(
                     username,
+                    7,
                     7,
                     new List<PokemonLoadout>(),
                     LegendaryProgression.MaxProgressPercent);
@@ -334,6 +390,7 @@ public class ProgressionRegressionTests
                 await new RunStore(seedDb).Save(
                     username,
                     41,
+                    52,
                     new List<PokemonLoadout> { new() { PokemonId = 4, Level = 12 } },
                     82);
             }
@@ -352,6 +409,7 @@ public class ProgressionRegressionTests
 
                 await state.LoadRunForCurrentUser();
                 Assert.Equal(41, state.CurrentScore);
+                Assert.Equal(52, state.HighScore);
                 Assert.Equal(new[] { 4 }, state.PlayerTeamIds);
                 Assert.Equal(82, state.LegendaryProgressPercent);
 
@@ -368,6 +426,7 @@ public class ProgressionRegressionTests
                 var restored = await new RunStore(freshDb).Load(username);
 
                 Assert.Equal(0, restored.score);
+                Assert.Equal(52, restored.highScore);
                 Assert.Empty(restored.loadouts);
                 Assert.Equal(82, restored.legendaryProgressPercent);
             }
@@ -399,6 +458,10 @@ public class ProgressionRegressionTests
                 // This is the same idempotent migration used during application startup.
                 await db.Database.ExecuteSqlRawAsync("""
                     ALTER TABLE "PlayerRuns"
+                        ADD COLUMN IF NOT EXISTS "HighScore" INTEGER NOT NULL DEFAULT 0;
+                    """);
+                await db.Database.ExecuteSqlRawAsync("""
+                    ALTER TABLE "PlayerRuns"
                         ADD COLUMN IF NOT EXISTS "LegendaryProgressPercent" INTEGER NOT NULL DEFAULT 0;
                     """);
                 await db.Database.ExecuteSqlRawAsync("""
@@ -412,6 +475,7 @@ public class ProgressionRegressionTests
                 var restored = await new RunStore(freshDb).Load(username);
 
                 Assert.Equal(19, restored.score);
+                Assert.Equal(0, restored.highScore);
                 Assert.Empty(restored.loadouts);
                 Assert.Equal(0, restored.legendaryProgressPercent);
             }
@@ -458,6 +522,7 @@ public class ProgressionRegressionTests
                 "Id" SERIAL PRIMARY KEY,
                 "Username" TEXT NOT NULL,
                 "CurrentScore" INTEGER NOT NULL,
+                "HighScore" INTEGER NOT NULL DEFAULT 0,
                 "LoadoutsJson" TEXT NOT NULL,
                 "LegendaryProgressPercent" INTEGER NOT NULL DEFAULT 0
             );

@@ -1,9 +1,9 @@
 namespace PokemonBattle.Services;
 
-//IScoreStore의 메모리 기반 구현체: 서버가 켜져있는 동안만 최고 기록 유지
+//IScoreStore의 메모리 기반 구현체: GameState의 현재 회로에서만 최고 기록을 계산하는 보조 저장소
 public class InMemoryScoreStore : IScoreStore
 {
-    private int _highScore; //메모리에만 저장되는 최고 기록 (서버 재시작 시 초기화됨)
+    private int _highScore;
 
     public int GetHighScore() //저장된 최고 기록 반환
     {

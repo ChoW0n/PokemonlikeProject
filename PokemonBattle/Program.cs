@@ -49,6 +49,7 @@ using (var scope = app.Services.CreateScope())
             ""Id"" SERIAL PRIMARY KEY,
             ""Username"" TEXT NOT NULL,
             ""CurrentScore"" INTEGER NOT NULL,
+            ""HighScore"" INTEGER NOT NULL DEFAULT 0,
             ""LoadoutsJson"" TEXT NOT NULL,
             ""LegendaryProgressPercent"" INTEGER NOT NULL DEFAULT 0
         );
@@ -61,6 +62,8 @@ using (var scope = app.Services.CreateScope())
         );
         CREATE UNIQUE INDEX IF NOT EXISTS ""IX_UserPresets_Username_Name""
             ON ""UserPresets"" (""Username"", ""Name"");
+        ALTER TABLE ""PlayerRuns""
+            ADD COLUMN IF NOT EXISTS ""HighScore"" INTEGER NOT NULL DEFAULT 0;
         ALTER TABLE ""PlayerRuns""
             ADD COLUMN IF NOT EXISTS ""LegendaryProgressPercent"" INTEGER NOT NULL DEFAULT 0;
     ");
