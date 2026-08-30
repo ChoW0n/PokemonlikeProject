@@ -28,10 +28,23 @@ public class Pokemon
     private int StatOther(int baseStat) => (2 * baseStat + 31) * Level / 100 + 5;
 
     public int MaxHp => StatHp(Data.BaseHp);
-    public int Atk => StatOther(Data.BaseAtk);
+
+    private double ItemStatMult(string stat)
+    {
+        bool isPikachu = Data.Name == "피카츄";
+        bool isMarowak = Data.Name == "텅구리";
+        bool isLatiosLatias = Data.Name == "라티오스" || Data.Name == "라티아스";
+
+        if (HeldItem == "전기구슬" && isPikachu && (stat == "attack" || stat == "special-attack")) return 2.0;
+        if (HeldItem == "두꺼운뼈" && isMarowak && stat == "attack") return 2.0;
+        if (HeldItem == "이슬의구슬" && isLatiosLatias && (stat == "special-attack" || stat == "special-defense")) return 1.5;
+        return 1.0;
+    }
+
+    public int Atk => (int)(StatOther(Data.BaseAtk) * ItemStatMult("attack"));
     public int Def => StatOther(Data.BaseDef);
-    public int SpAtk => StatOther(Data.BaseSpAtk);
-    public int SpDef => StatOther(Data.BaseSpDef);
+    public int SpAtk => (int)(StatOther(Data.BaseSpAtk) * ItemStatMult("special-attack"));
+    public int SpDef => (int)(StatOther(Data.BaseSpDef) * ItemStatMult("special-defense"));
     public int Spd => StatOther(Data.BaseSpd);
 
     private double StageMult(string key)
@@ -40,11 +53,21 @@ public class Pokemon
         return stage >= 0 ? (2.0 + stage) / 2.0 : 2.0 / (2.0 - stage);
     }
 
-    public int EffectiveAtk => (int)(Atk * StageMult("attack") * (Status == StatusCondition.Burn ? 0.5 : 1.0));
+    public int EffectiveAtk => (int)(Atk * StageMult("attack") * (Status == StatusCondition.Burn ? 0.5 : 1.0) * (SelectedAbility == "의욕" ? 1.5 : 1.0));
     public int EffectiveDef => (int)(Def * StageMult("defense"));
     public int EffectiveSpAtk => (int)(SpAtk * StageMult("special-attack"));
     public int EffectiveSpDef => (int)(SpDef * StageMult("special-defense"));
-    public int EffectiveSpd => (int)(Spd * StageMult("speed") * (Status == StatusCondition.Paralysis ? 0.5 : 1.0));
+
+    //엽록소: 쾌청 날씨에서 속도 2배
+    public int EffectiveSpd
+    {
+        get
+        {
+            double spd = Spd * StageMult("speed") * (Status == StatusCondition.Paralysis ? 0.5 : 1.0);
+            if (SelectedAbility == "엽록소" && BattleWeather.Current == "쾌청") spd *= 2.0;
+            return (int)spd;
+        }
+    }
 
     public Pokemon(PokemonData data, List<string>? chosenMoves = null, string ability = "", string item = "없음", int level = 1)
     {
@@ -56,27 +79,19 @@ public class Pokemon
         HeldItem = item;
 
         var moveList = chosenMoves != null && chosenMoves.Count > 0 ? chosenMoves : data.MoveNames.ToList();
-
         foreach (var moveName in moveList)
         {
-            //방어 코드: 데이터가 갱신되어 더 이상 존재하지 않는 기술 키는 조용히 건너뜀 (예전엔 여기서 크래시가 났음)
             if (MoveDatabase.All.ContainsKey(moveName))
             {
                 CurrentPP[moveName] = MoveDatabase.All[moveName].MaxPP;
             }
         }
 
-        if (CurrentPP.Count == 0) //전부 걸러졌으면 최소 하나는 보장
+        if (CurrentPP.Count == 0)
         {
             var fallback = data.MoveNames.FirstOrDefault(m => MoveDatabase.All.ContainsKey(m));
-            if (fallback != null)
-            {
-                CurrentPP[fallback] = MoveDatabase.All[fallback].MaxPP;
-            }
-            else if (MoveDatabase.All.ContainsKey("tackle"))
-            {
-                CurrentPP["tackle"] = MoveDatabase.All["tackle"].MaxPP;
-            }
+            if (fallback != null) CurrentPP[fallback] = MoveDatabase.All[fallback].MaxPP;
+            else if (MoveDatabase.All.ContainsKey("tackle")) CurrentPP["tackle"] = MoveDatabase.All["tackle"].MaxPP;
         }
     }
 
@@ -100,9 +115,18 @@ public class Pokemon
         StatStages[stat] = Math.Clamp(StatStages[stat] + delta, -6, 6);
     }
 
+    public bool IsImmuneToAilment(string ailmentName)
+    {
+        if (ailmentName == "sleep" && (SelectedAbility == "불면" || SelectedAbility == "짱짱해짐")) return true;
+        return false;
+    }
+    public bool IsImmuneToConfusion() => SelectedAbility == "마이페이스";
+
     public void ApplyAilment(string ailmentName)
     {
         if (Status != StatusCondition.None) return;
+        if (IsImmuneToAilment(ailmentName)) return;
+
         Status = ailmentName switch
         {
             "paralysis" => StatusCondition.Paralysis,
@@ -117,7 +141,7 @@ public class Pokemon
 
     public void ApplyConfusion()
     {
-        if (IsConfused) return;
+        if (IsConfused || IsImmuneToConfusion()) return;
         IsConfused = true;
         ConfusionTurnsRemaining = rng.Next(1, 5);
     }
@@ -192,6 +216,27 @@ public class Pokemon
         return null;
     }
 
+    public (bool absorbed, string? message) TryAbsorb(PokemonType attackType)
+    {
+        if (SelectedAbility == "저수" && attackType == PokemonType.Water)
+        {
+            int heal = MaxHp / 4;
+            CurrentHp = Math.Min(MaxHp, CurrentHp + heal);
+            return (true, $"{Data.Name}은(는) 저수로 HP를 회복했다!");
+        }
+        if (SelectedAbility == "축전지" && attackType == PokemonType.Electric)
+        {
+            int heal = MaxHp / 4;
+            CurrentHp = Math.Min(MaxHp, CurrentHp + heal);
+            return (true, $"{Data.Name}은(는) 축전지로 HP를 회복했다!");
+        }
+        if (SelectedAbility == "타오르는불꽃" && attackType == PokemonType.Fire)
+        {
+            return (true, $"{Data.Name}은(는) 타오르는불꽃으로 불꽃 기술을 무효화했다!");
+        }
+        return (false, null);
+    }
+
     public void TakeDamage(int rawDamage, PokemonType attackType)
     {
         double multiplier = TypeChart.GetMultiplier(attackType, Data.Type1);
@@ -205,9 +250,14 @@ public class Pokemon
 
         LastMultiplier = multiplier;
 
-        int finalDamage = (int)(rawDamage * multiplier);
         bool wasFullHp = CurrentHp == MaxHp;
         SurvivedByEndure = false;
+
+        double dmgMultiplier = 1.0;
+        if (SelectedAbility == "하드록" && multiplier >= 2.0) dmgMultiplier *= 0.75;
+        if (SelectedAbility == "멀티스케일" && wasFullHp) dmgMultiplier *= 0.5;
+
+        int finalDamage = (int)(rawDamage * multiplier * dmgMultiplier);
 
         CurrentHp -= finalDamage;
         if (CurrentHp <= 0)
@@ -226,5 +276,15 @@ public class Pokemon
                 IsFainted = true;
             }
         }
+    }
+
+    //철가시: 물리 접촉기로 나를 때린 공격자가 자기 최대HP의 1/8만큼 반사 데미지를 입음
+    public int? TryReflectDamage(bool moveMakesContact)
+    {
+        if (SelectedAbility == "철가시" && moveMakesContact && !IsFainted)
+        {
+            return Math.Max(1, MaxHp / 8);
+        }
+        return null;
     }
 }

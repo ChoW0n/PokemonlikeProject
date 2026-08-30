@@ -22,20 +22,15 @@ var moveCache = new HashSet<string>();
 var evolutionChainCache = new Dictionary<string, PokeApiEvolutionChain?>();
 var nameToId = new Dictionary<string, int>();
 
-//API가 주는 설명 텍스트에 섞인 줄바꿈/폼피드 문자를 정리하고 큰따옴표를 안전하게 치환
 string CleanText(string raw)
 {
-    string s = raw
-        .Replace("\n", " ")
-        .Replace("\f", " ")
-        .Replace("\r", " ")
-        .Replace("\"", "'")   //곧은 큰따옴표
-        .Replace("“", "'").Replace("”", "'")   //둥근 큰따옴표(스마트 쿼트)
-        .Replace("‘", "'").Replace("’", "'")   //둥근 작은따옴표
-        .Replace("\\", "/");  //역슬래시는 문자열을 깨뜨릴 수 있어 슬래시로 대체
+    string s = raw.Replace("\n", " ").Replace("\f", " ").Replace("\r", " ")
+        .Replace("\"", "'")
+        .Replace("“", "'").Replace("”", "'")
+        .Replace("‘", "'").Replace("’", "'")
+        .Replace("\\", "/");
     return Regex.Replace(s, @"\s+", " ").Trim();
 }
-
 
 moveSb.AppendLine("namespace PokemonBattle.Models;");
 moveSb.AppendLine();
@@ -113,8 +108,10 @@ for (int id = 1; id <= 721; id++)
                 bool hasAilment = ailmentRaw != "none" && ailmentRaw != "unknown" && ailmentRaw != "flinch";
                 bool hasStatChange = moveDetail.stat_changes.Count > 0;
                 bool hasFlinch = (moveDetail.meta?.flinch_chance ?? 0) > 0 || ailmentRaw == "flinch";
+                bool hasHealing = (moveDetail.meta?.healing ?? 0) != 0;
+                bool hasDrain = (moveDetail.meta?.drain ?? 0) != 0;
 
-                if (!hasDamage && !hasAilment && !hasStatChange && !hasFlinch) continue;
+                if (!hasDamage && !hasAilment && !hasStatChange && !hasFlinch && !hasHealing && !hasDrain) continue;
 
                 bool isStatus = moveDetail.damage_class.name == "status";
                 bool isSpecial = moveDetail.damage_class.name == "special";
@@ -122,6 +119,10 @@ for (int id = 1; id <= 721; id++)
                 int accuracy = moveDetail.accuracy ?? 100;
                 int power = moveDetail.power ?? 0;
                 int priority = moveDetail.priority;
+                int healingPercent = moveDetail.meta?.healing ?? 0;
+                int drainPercent = moveDetail.meta?.drain ?? 0;
+                int minHits = moveDetail.meta?.min_hits ?? 1;
+                int maxHits = moveDetail.meta?.max_hits ?? 1;
 
                 string ailmentName2 = hasAilment ? ailmentRaw : "none";
                 int ailmentChance = moveDetail.meta?.ailment_chance ?? 0;
@@ -146,11 +147,10 @@ for (int id = 1; id <= 721; id++)
                     : "new List<StatChangeEntry>()";
 
                 string korMoveName = moveDetail.names.FirstOrDefault(n => n.language.name == "ko")?.name ?? moveDetail.name;
-
                 string koFlavor = moveDetail.flavor_text_entries.FirstOrDefault(f => f.language.name == "ko")?.flavor_text ?? "";
                 string moveDesc = CleanText(koFlavor);
 
-                moveSb.AppendLine($"        All[\"{slug}\"] = new Move(\"{korMoveName}\", {power}, PokemonType.{typeMap[moveDetail.type.name]}, {moveDetail.pp ?? 10}, {accuracy}, {(alwaysHits ? "true" : "false")}, {priority}, {(isStatus ? "true" : "false")}, {(isSpecial ? "true" : "false")}, \"{ailmentName2}\", {ailmentChance}, {flinchChance}, {statChangesCode}, {statChance}, \"{moveDesc}\");");
+                moveSb.AppendLine($"        All[\"{slug}\"] = new Move(\"{korMoveName}\", {power}, PokemonType.{typeMap[moveDetail.type.name]}, {moveDetail.pp ?? 10}, {accuracy}, {(alwaysHits ? "true" : "false")}, {priority}, {(isStatus ? "true" : "false")}, {(isSpecial ? "true" : "false")}, \"{ailmentName2}\", {ailmentChance}, {flinchChance}, {statChangesCode}, {statChance}, \"{moveDesc}\", {healingPercent}, {drainPercent}, {minHits}, {maxHits});");
 
                 moveCache.Add(slug);
             }
@@ -214,6 +214,11 @@ for (int id = 1; id <= 721; id++)
     {
         Console.WriteLine($"[{id}] 실패: {ex.Message}");
     }
+}
+
+if (!moveCache.Contains("tackle"))
+{
+    moveSb.AppendLine("        All[\"tackle\"] = new Move(\"몸통박치기\", 40, PokemonType.Normal, 35, 100, false, 0, false, false, \"none\", 0, 0, new List<StatChangeEntry>(), 0, \"\", 0, 0, 1, 1);");
 }
 
 moveSb.AppendLine("    }");
@@ -304,6 +309,10 @@ public class PokeApiMoveMeta
     public int ailment_chance { get; set; }
     public int flinch_chance { get; set; }
     public int stat_chance { get; set; }
+    public int healing { get; set; }
+    public int drain { get; set; }
+    public int? min_hits { get; set; }
+    public int? max_hits { get; set; }
 }
 public class PokeApiAilmentRef { public string name { get; set; } = "none"; }
 public class PokeApiStatChangeEntry { public int change { get; set; } public PokeApiStatRef stat { get; set; } = new(); }

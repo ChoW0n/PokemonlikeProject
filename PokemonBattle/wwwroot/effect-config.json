@@ -1,5 +1,0 @@
-{
-  "beam": { "windupMs": 180, "mainMs": 420, "tailMs": 120, "shakeMs": 260, "flashMs": 160 },
-  "slash": { "windupMs": 120, "mainMs": 380, "tailMs": 140, "shakeMs": 260, "flashMs": 160 },
-  "sparkle": { "windupMs": 100, "mainMs": 420, "tailMs": 160, "shakeMs": 0, "flashMs": 0 }
-}

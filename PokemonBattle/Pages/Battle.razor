@@ -2,6 +2,7 @@
 @using PokemonBattle.Models
 @using PokemonBattle.Services
 @using PokemonBattle.Components
+@using Microsoft.JSInterop
 @inject GameState State
 @inject NavigationManager Nav
 @inject IJSRuntime JS
@@ -15,10 +16,7 @@
             <h1>포켓몬 배틀</h1>
             <p class="intro">현재 날씨: @BattleWeather.Current</p>
         </div>
-        <div class="header-status">
-            <span class="status-dot"></span>
-            <span>연결됨</span>
-        </div>
+        <button type="button" class="speed-toggle" @onclick="CycleSpeed">재생속도 @SpeedLabel</button>
     </header>
 
     <section class="arena-stage" aria-label="배틀 상태">
@@ -133,6 +131,10 @@
                     }
                     <GaugeBar Label="명중" Percent="@(pmove.AlwaysHits ? 100 : StatBarHelper.AccuracyPercent(pmove.Accuracy))" ColorClass="@(pmove.AlwaysHits ? "gauge-vhigh" : StatBarHelper.AccuracyColor(pmove.Accuracy))" DisplayText="@(pmove.AlwaysHits ? "필중" : $"{pmove.Accuracy}%")" />
                     <GaugeBar Label="PP" Percent="@StatBarHelper.PpPercent(pp, pmove.MaxPP)" ColorClass="@StatBarHelper.PpColor(pp, pmove.MaxPP)" DisplayText="@($"{pp}/{pmove.MaxPP}")" />
+                    @if (pmove.MaxHits > 1)
+                    {
+                        <p class="move-star-line">🔁 @pmove.MinHits~@(pmove.MaxHits)회 연속 타격</p>
+                    }
                     @if (pmult >= 2.0)
                     {
                         <p class="move-star-line">⭐ 효과가 굉장하다!</p>
@@ -194,9 +196,13 @@
             </div>
         }
 
-        <div class="battle-log" role="status" aria-live="polite">
-            <span class="log-marker"></span>
-            <p>@BattleMessage</p>
+        <div class="battle-log-panel" role="status" aria-live="polite">
+            @foreach (var entry in LogHistory)
+            {
+                <p class="log-line @(entry == LogHistory[^1] ? "is-latest" : "is-fading")">
+                    <span class="log-marker"></span><span class="log-text" data-full="@entry">@entry</span>
+                </p>
+            }
         </div>
     </section>
 </main>
@@ -218,8 +224,17 @@
     private List<string> EnemyMoveKeys = null!;
 
     private int Turn;
-    private string BattleMessage = "행동을 선택하세요.";
     private bool IsBusy;
+
+    private List<string> LogHistory = new() { "행동을 선택하세요." };
+
+    private double SpeedMultiplier = 1.0;
+    private string SpeedLabel => SpeedMultiplier == 1.0 ? "x1" : SpeedMultiplier == 1.6 ? "x1.6" : "x2.4";
+
+    private void CycleSpeed()
+    {
+        SpeedMultiplier = SpeedMultiplier == 1.0 ? 1.6 : SpeedMultiplier == 1.6 ? 2.4 : 1.0;
+    }
 
     private Random rng = new Random();
 
@@ -365,14 +380,22 @@
         return multiplier;
     }
 
-    private async Task ShowMessage(string message, int delayMs = 800)
+    //메시지 추가 + 타이핑 재생 + 읽을 시간 대기 (전부 배속 반영)
+    private async Task ShowMessage(string message, int baseDelayMs = 1400)
     {
-        BattleMessage = message;
+        LogHistory.Add(message);
+        if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
+
         StateHasChanged();
-        await Task.Delay(delayMs);
+
+        int typingMs = Math.Max(300, message.Length * 35);
+        double typingActual = typingMs / SpeedMultiplier;
+        await JS.InvokeVoidAsync("battleEffects.typeLastLine", typingActual);
+
+        double readDelay = Math.Max(250, (baseDelayMs - typingMs) / SpeedMultiplier);
+        await Task.Delay((int)readDelay);
     }
 
-    //C#은 "무엇을, 누구에게" 재생할지만 결정하고 실제 그래픽/타이밍은 JS+JSON이 담당
     private async Task PlayEffect(string kind, bool attackerIsHero, PokemonType type)
     {
         await JS.InvokeVoidAsync("battleEffects.play", kind, attackerIsHero ? "hero" : "enemy", TypeColors.GetHex(type));
@@ -405,7 +428,8 @@
             else
             {
                 bool stab = move.Type == Enemy.Data.Type1 || Enemy.Data.Type2 == move.Type;
-                score = move.Power * (stab ? 1.5 : 1.0) * PreviewMultiplier(move, Hero) * ((move.AlwaysHits ? 100 : move.Accuracy) / 100.0);
+                double avgHits = (move.MinHits + move.MaxHits) / 2.0;
+                score = move.Power * avgHits * (stab ? 1.5 : 1.0) * PreviewMultiplier(move, Hero) * ((move.AlwaysHits ? 100 : move.Accuracy) / 100.0);
             }
 
             if (score > bestScore) { bestScore = score; bestKeys.Clear(); bestKeys.Add(key); }
@@ -422,14 +446,14 @@
             if (p.IsFainted) continue;
 
             var statusMsg = p.ApplyEndOfTurnStatusDamage();
-            if (statusMsg != null) await ShowMessage(statusMsg, 700);
+            if (statusMsg != null) await ShowMessage(statusMsg, 1100);
 
             if (p.HeldItem == "먹다남은음식")
             {
                 int heal = Math.Max(1, p.MaxHp / 16);
                 int before = p.CurrentHp;
                 p.CurrentHp = Math.Min(p.MaxHp, p.CurrentHp + heal);
-                if (p.CurrentHp > before) await ShowMessage($"{p.Data.Name}은(는) {p.HeldItem} 효과로 HP를 회복했다!", 700);
+                if (p.CurrentHp > before) await ShowMessage($"{p.Data.Name}은(는) {p.HeldItem} 효과로 HP를 회복했다!", 1100);
             }
         }
     }
@@ -453,20 +477,55 @@
         _ => null
     };
 
+    private int GetAttackStat(Pokemon attacker, bool isSpecial)
+    {
+        if (attacker.SelectedAbility == "근성" && attacker.Status != StatusCondition.None)
+        {
+            return isSpecial ? attacker.SpAtk : (int)(attacker.Atk * 1.5);
+        }
+        return isSpecial ? attacker.EffectiveSpAtk : attacker.EffectiveAtk;
+    }
+
+    private int RollHitCount(Move move)
+    {
+        if (move.MinHits == move.MaxHits) return move.MinHits;
+        if (move.MinHits == 2 && move.MaxHits == 5)
+        {
+            int roll = rng.Next(100);
+            if (roll < 35) return 2;
+            if (roll < 70) return 3;
+            if (roll < 85) return 4;
+            return 5;
+        }
+        return rng.Next(move.MinHits, move.MaxHits + 1);
+    }
+
     private async Task<bool> ExecuteMove(Pokemon attacker, Pokemon defender, Move move, bool attackerIsHero)
     {
-        bool hit = move.AlwaysHits || rng.Next(100) < move.Accuracy;
+        //의욕 특성: 명중률 0.8배 적용 (물리 공격력은 EffectiveAtk에서 이미 1.5배 반영됨)
+        int effectiveAccuracy = attacker.SelectedAbility == "의욕" && !move.AlwaysHits
+            ? (int)(move.Accuracy * 0.8)
+            : move.Accuracy;
+
+        bool hit = move.AlwaysHits || rng.Next(100) < effectiveAccuracy;
         if (!hit)
         {
             await ShowMessage($"{attacker.Data.Name}의 공격이 빗나갔다!");
             return false;
         }
 
-        string fxKind = move.IsStatus ? "sparkle" : (move.IsSpecial ? "beam" : "slash");
+        string fxKind = TypeColors.GetEffectKind(move.Type, move.IsStatus);
 
         if (!move.IsStatus && move.Power > 0)
         {
-            int attackStat = move.IsSpecial ? attacker.EffectiveSpAtk : attacker.EffectiveAtk;
+            var (absorbed, absorbMsg) = defender.TryAbsorb(move.Type);
+            if (absorbed)
+            {
+                if (absorbMsg != null) await ShowMessage(absorbMsg);
+                return true;
+            }
+
+            int attackStat = GetAttackStat(attacker, move.IsSpecial);
             int defenseStat = move.IsSpecial ? defender.EffectiveSpDef : defender.EffectiveDef;
 
             double power = move.Power;
@@ -476,9 +535,12 @@
 
             if (TypeBoostItem(attacker.HeldItem) == move.Type) power *= 1.2;
             if (attacker.HeldItem == "구애머리띠" && !move.IsSpecial) power *= 1.5;
+            if (attacker.HeldItem == "힘의머리띠" && !move.IsSpecial) power *= 1.1;
             if (attacker.HeldItem == "구애안경" && move.IsSpecial) power *= 1.5;
             bool hasLifeOrb = attacker.HeldItem == "생명의구슬";
             if (hasLifeOrb) power *= 1.3;
+            if (attacker.SelectedAbility == "타오르는불꽃" && move.Type == PokemonType.Fire) power *= 1.5;
+            if (attacker.SelectedAbility == "테크니션" && move.Power <= 60) power *= 1.5;
 
             if (BattleWeather.Current == "쾌청")
             {
@@ -491,14 +553,57 @@
                 if (move.Type == PokemonType.Fire) power *= 0.5;
             }
 
-            int scaledPower = (int)(power * ((double)attackStat / Math.Max(defenseStat, 1)));
-            defender.TakeDamage(scaledPower, move.Type);
+            int hitCount = RollHitCount(move);
+            int totalDealt = 0;
+            int actualHits = 0;
 
-            await PlayEffect(fxKind, attackerIsHero, move.Type);
+            for (int i = 0; i < hitCount; i++)
+            {
+                if (defender.IsFainted) break;
+
+                int hpBefore = defender.CurrentHp;
+                int scaledPower = (int)(power * ((double)attackStat / Math.Max(defenseStat, 1)));
+                defender.TakeDamage(scaledPower, move.Type);
+                totalDealt += hpBefore - defender.CurrentHp;
+                actualHits++;
+
+                await PlayEffect(fxKind, attackerIsHero, move.Type);
+            }
+
+            //철가시: 물리 접촉기(특수 기술은 접촉 없음으로 간주)로 때린 공격자가 반사 데미지를 입음
+            if (!move.IsSpecial && !attacker.IsFainted)
+            {
+                int? reflect = defender.TryReflectDamage(true);
+                if (reflect != null)
+                {
+                    attacker.CurrentHp = Math.Max(0, attacker.CurrentHp - reflect.Value);
+                    if (attacker.CurrentHp == 0) attacker.IsFainted = true;
+                    await ShowMessage($"{attacker.Data.Name}은(는) 철가시에 찔렸다!");
+                }
+            }
+
+            if (move.MaxHits > 1)
+            {
+                await ShowMessage($"{actualHits}번 맞았다!", 1000);
+            }
 
             var line = EffectivenessLine(defender.LastMultiplier);
             if (line != null) await ShowMessage(line);
             if (defender.SurvivedByEndure) await ShowMessage($"{defender.Data.Name}은(는) 버텨냈다!");
+
+            if (move.DrainPercent > 0 && !attacker.IsFainted)
+            {
+                int heal = Math.Max(1, totalDealt * move.DrainPercent / 100);
+                attacker.CurrentHp = Math.Min(attacker.MaxHp, attacker.CurrentHp + heal);
+                await ShowMessage($"{attacker.Data.Name}은(는) HP를 흡수했다!");
+            }
+            else if (move.DrainPercent < 0 && !attacker.IsFainted)
+            {
+                int recoilDmg = Math.Max(1, totalDealt * Math.Abs(move.DrainPercent) / 100);
+                attacker.CurrentHp = Math.Max(0, attacker.CurrentHp - recoilDmg);
+                if (attacker.CurrentHp == 0) attacker.IsFainted = true;
+                await ShowMessage($"{attacker.Data.Name}은(는) 반동으로 데미지를 입었다!");
+            }
 
             if (hasLifeOrb && !attacker.IsFainted)
             {
@@ -510,19 +615,26 @@
         else if (move.IsStatus)
         {
             await PlayEffect(fxKind, attackerIsHero, move.Type);
+
+            if (move.HealingPercent > 0)
+            {
+                int heal = attacker.MaxHp * move.HealingPercent / 100;
+                attacker.CurrentHp = Math.Min(attacker.MaxHp, attacker.CurrentHp + heal);
+                await ShowMessage($"{attacker.Data.Name}은(는) HP를 회복했다!");
+            }
         }
 
         if (move.AilmentName != "none" && !defender.IsFainted && rng.Next(100) < move.AilmentChance)
         {
             if (move.AilmentName == "confusion")
             {
-                if (!defender.IsConfused)
+                if (!defender.IsConfused && !defender.IsImmuneToConfusion())
                 {
                     defender.ApplyConfusion();
                     await ShowMessage($"{defender.Data.Name}은(는) 혼란에 빠졌다!");
                 }
             }
-            else if (defender.Status == StatusCondition.None)
+            else if (defender.Status == StatusCondition.None && !defender.IsImmuneToAilment(move.AilmentName))
             {
                 defender.ApplyAilment(move.AilmentName);
                 await ShowMessage($"{defender.Data.Name}은(는) {AilmentKor(move.AilmentName)} 상태가 되었다!");
@@ -598,7 +710,8 @@
             if (PlayerTeam.Any(p => !p.IsFainted))
             {
                 Menu = BattleMenu.ForcedSwitch;
-                BattleMessage = "쓰러진 포켓몬 대신 내보낼 포켓몬을 선택하세요.";
+                LogHistory.Add("쓰러진 포켓몬 대신 내보낼 포켓몬을 선택하세요.");
+                if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
                 IsBusy = false;
                 StateHasChanged();
                 return true;
@@ -661,7 +774,8 @@
         if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }
         if (Enemy.IsFainted) { if (await HandleFaint(Enemy, false)) return; }
 
-        BattleMessage = "행동을 선택하세요.";
+        LogHistory.Add("행동을 선택하세요.");
+        if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
         IsBusy = false;
         StateHasChanged();
     }
@@ -689,7 +803,8 @@
         await ApplyEndOfTurnEffects();
         if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }
 
-        BattleMessage = "행동을 선택하세요.";
+        LogHistory.Add("행동을 선택하세요.");
+        if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
         IsBusy = false;
         StateHasChanged();
     }
@@ -699,7 +814,8 @@
         PlayerTeamIndex = idx;
         HeroMoveKeys = ResolveMoveKeys(Hero);
         Menu = BattleMenu.Main;
-        BattleMessage = $"{Hero.Data.Name}을(를) 내보냈다! 행동을 선택하세요.";
+        LogHistory.Add($"{Hero.Data.Name}을(를) 내보냈다! 행동을 선택하세요.");
+        if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
         StateHasChanged();
     }
 }
