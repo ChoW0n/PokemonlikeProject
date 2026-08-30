@@ -52,7 +52,7 @@ public class GameState
             CurrentScore = 0;
             PlayerLoadouts = new List<PokemonLoadout>();
             PlayerTeamIds = new List<int>();
-            PersistRun(); //깨끗해진 상태를 DB에도 즉시 반영해서 다음부턴 안 재발하게 함
+            await PersistRun(); //깨끗해진 상태를 DB에도 즉시 반영해서 다음부턴 안 재발하게 함
         }
         else
         {
@@ -65,10 +65,10 @@ public class GameState
     }
 
 
-    private void PersistRun()
+    private async Task PersistRun()
     {
         if (!_currentUser.IsLoggedIn) return;
-        _ = _runStore.Save(_currentUser.Username!, CurrentScore, PlayerLoadouts);
+        await _runStore.Save(_currentUser.Username!, CurrentScore, PlayerLoadouts);
     }
 
     public void GoTo(GameScreen screen)
@@ -108,11 +108,11 @@ public class GameState
         NotifyChange();
     }
 
-    public void SetPlayerLoadouts(List<PokemonLoadout> loadouts)
+    public async Task SetPlayerLoadouts(List<PokemonLoadout> loadouts)
     {
         PlayerLoadouts = loadouts;
         PlayerTeamIds = loadouts.Select(l => l.PokemonId).ToList();
-        PersistRun();
+        await PersistRun();
         NotifyChange();
     }
 
@@ -134,29 +134,29 @@ public class GameState
             }
         }
 
-        PersistRun();
+        await PersistRun();
         CurrentScreen = GameScreen.Result;
         NotifyChange();
     }
 
-    public void LoseBattle()
+    public async Task LoseBattle()
     {
         _scoreStore.SaveIfHigher(CurrentScore);
         LastBattleWon = false;
         CurrentScore = 0;
         PlayerLoadouts = new List<PokemonLoadout>();
         PlayerTeamIds = new List<int>();
-        PersistRun();
+        await PersistRun();
         CurrentScreen = GameScreen.Result;
         NotifyChange();
     }
 
-    public void ResetForNewRun()
+    public async Task ResetForNewRun()
     {
         CurrentScore = 0;
         PlayerLoadouts = new List<PokemonLoadout>();
         PlayerTeamIds = new List<int>();
-        PersistRun();
+        await PersistRun();
         CurrentScreen = GameScreen.Start;
         NotifyChange();
     }

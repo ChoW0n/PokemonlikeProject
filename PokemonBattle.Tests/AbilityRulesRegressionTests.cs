@@ -1,0 +1,309 @@
+using PokemonBattle.Models;
+using PokemonBattle.Services;
+using Xunit;
+
+namespace PokemonBattle.Tests;
+
+public sealed class AbilityRulesRegressionTests
+{
+    [Fact]
+    public async Task Critical_hit_rules_apply_sniper_anger_point_and_critical_immunity()
+    {
+        const string moveKey = "frost-breath";
+        var sniper = CreatePokemon(132, moveKey, ability: "스나이퍼");
+        var target = CreatePokemon(202, "tackle");
+        int hpBefore = target.CurrentHp;
+        int scaledPower = (int)(MoveDatabase.All[moveKey].Power
+            * ((double)sniper.EffectiveSpAtk / target.EffectiveSpDef));
+        int expectedSniperDamage = (int)((int)(scaledPower * 1.5) * 1.5);
+        var events = new List<BattleEvent>();
+
+        await CreateFullEngine().TakeTurnAsync(
+            sniper, target, moveKey, true, Capture(events));
+
+        Assert.Equal(expectedSniperDamage, hpBefore - target.CurrentHp);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("급소에 맞았다", StringComparison.Ordinal) == true);
+        Assert.True(MoveRuleMetadata.HasHighCriticalRate("cross-poison"));
+
+        var normalAttacker = CreatePokemon(132, moveKey);
+        var armoredTarget = CreatePokemon(202, "tackle", ability: "조가비갑옷");
+        hpBefore = armoredTarget.CurrentHp;
+        int expectedNormalDamage = (int)(MoveDatabase.All[moveKey].Power
+            * ((double)normalAttacker.EffectiveSpAtk / armoredTarget.EffectiveSpDef));
+        events.Clear();
+
+        await CreateFullEngine().TakeTurnAsync(
+            normalAttacker, armoredTarget, moveKey, true, Capture(events));
+
+        Assert.Equal(expectedNormalDamage, hpBefore - armoredTarget.CurrentHp);
+        Assert.DoesNotContain(events, battleEvent =>
+            battleEvent.Message?.Contains("급소에 맞았다", StringComparison.Ordinal) == true);
+
+        var angerPointTarget = CreatePokemon(202, "tackle", ability: "분노의경혈");
+        events.Clear();
+
+        await CreateFullEngine().TakeTurnAsync(
+            CreatePokemon(132, moveKey), angerPointTarget, moveKey, true, Capture(events));
+
+        Assert.Equal(6, angerPointTarget.StatStages["attack"]);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("분노의경혈", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task Berry_rules_apply_gluttony_cheek_pouch_and_belch_gate()
+    {
+        BattleWeather.Current = "맑음";
+        var glutton = CreatePokemon(132, "belch", ability: "먹보", heldItem: "무화열매");
+        glutton.CurrentHp = glutton.MaxHp / 2;
+        Assert.False(glutton.CanUseMove("belch"));
+
+        var events = new List<BattleEvent>();
+        await CreateFullEngine().ApplyEndOfTurnEffectsAsync(new[] { glutton }, Capture(events));
+
+        Assert.Equal("없음", glutton.HeldItem);
+        Assert.True(glutton.HasConsumedBerry);
+        Assert.True(glutton.CanUseMove("belch"));
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("무화열매", StringComparison.Ordinal) == true);
+
+        var normalEater = CreatePokemon(132, "tackle", heldItem: "무화열매");
+        normalEater.CurrentHp = normalEater.MaxHp / 2;
+        await CreateFullEngine().ApplyEndOfTurnEffectsAsync(new[] { normalEater }, _ => Task.CompletedTask);
+        Assert.Equal("무화열매", normalEater.HeldItem);
+
+        var cheekPouch = CreatePokemon(132, "tackle", ability: "볼주머니", heldItem: "오랭열매");
+        cheekPouch.CurrentHp = cheekPouch.MaxHp / 2;
+        int hpBefore = cheekPouch.CurrentHp;
+        events.Clear();
+
+        await CreateFullEngine().ApplyEndOfTurnEffectsAsync(new[] { cheekPouch }, Capture(events));
+
+        Assert.Equal(
+            hpBefore + 10 + Math.Max(1, cheekPouch.MaxHp / 8),
+            cheekPouch.CurrentHp);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("볼주머니", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task Berry_moves_consume_or_destroy_the_defenders_berry()
+    {
+        var eater = CreatePokemon(132, "bug-bite");
+        eater.CurrentHp = eater.MaxHp / 2;
+        var berryHolder = CreatePokemon(202, "tackle", heldItem: "자뭉열매");
+        berryHolder.CurrentHp = berryHolder.MaxHp / 2 + 1;
+        var events = new List<BattleEvent>();
+        int eaterHpBefore = eater.CurrentHp;
+
+        await CreateFullEngine().TakeTurnAsync(
+            eater, berryHolder, "bug-bite", true, Capture(events));
+
+        Assert.Equal("없음", berryHolder.HeldItem);
+        Assert.True(eater.HasConsumedBerry);
+        Assert.Equal(
+            Math.Min(eater.MaxHp, eaterHpBefore + Math.Max(1, eater.MaxHp / 4)),
+            eater.CurrentHp);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("빼앗아 먹었다", StringComparison.Ordinal) == true);
+
+        var incinerator = CreatePokemon(4, "incinerate");
+        berryHolder = CreatePokemon(132, "tackle", heldItem: "리샘열매");
+        events.Clear();
+
+        await CreateFullEngine().TakeTurnAsync(
+            incinerator, berryHolder, "incinerate", true, Capture(events));
+
+        Assert.Equal("없음", berryHolder.HeldItem);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("불태워졌다", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task Berry_activates_immediately_after_damage_and_status()
+    {
+        var healingBerryHolder = CreatePokemon(132, "tackle", heldItem: "자뭉열매");
+        healingBerryHolder.CurrentHp = healingBerryHolder.MaxHp / 2 + 1;
+        var events = new List<BattleEvent>();
+
+        await CreateFullEngine().TakeTurnAsync(
+            CreatePokemon(132, "tackle"),
+            healingBerryHolder,
+            "tackle",
+            true,
+            Capture(events));
+
+        Assert.Equal("없음", healingBerryHolder.HeldItem);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("자뭉열매", StringComparison.Ordinal) == true);
+
+        const string statusMoveKey = "regression-guaranteed-poison";
+        MoveDatabase.All[statusMoveKey] = new Move(
+            "회귀 독 기술", 0, PokemonType.Poison, 10, 100, true, 0,
+            true, false, "poison", 100, 0, new List<StatChangeEntry>(), 0,
+            "반드시 독 상태로 만든다.", 0, 0, 1, 1);
+        try
+        {
+            var lumHolder = CreatePokemon(132, "tackle", heldItem: "리샘열매");
+            events.Clear();
+
+            await CreateFullEngine().TakeTurnAsync(
+                CreatePokemon(132, statusMoveKey),
+                lumHolder,
+                statusMoveKey,
+                true,
+                Capture(events));
+
+            Assert.Equal(StatusCondition.None, lumHolder.Status);
+            Assert.Equal("없음", lumHolder.HeldItem);
+            Assert.Contains(events, battleEvent =>
+                battleEvent.Message?.Contains("리샘열매", StringComparison.Ordinal) == true);
+        }
+        finally
+        {
+            MoveDatabase.All.Remove(statusMoveKey);
+        }
+    }
+
+    [Fact]
+    public void Trapping_abilities_block_only_eligible_switches()
+    {
+        var engine = CreateFullEngine();
+        var grounded = CreatePokemon(132, "tackle");
+        var flying = CreatePokemon(6, "tackle");
+        var levitating = CreatePokemon(92, "tackle", ability: "부유");
+        var arenaTrap = CreatePokemon(132, "tackle", ability: "개미지옥");
+
+        Assert.False(engine.CanSwitch(grounded, arenaTrap));
+        Assert.True(engine.CanSwitch(flying, arenaTrap));
+        Assert.True(engine.CanSwitch(levitating, arenaTrap));
+        Assert.True(engine.CanSwitch(CreatePokemon(92, "tackle"), arenaTrap));
+
+        var shadowTag = CreatePokemon(202, "tackle", ability: "그림자밟기");
+        Assert.False(engine.CanSwitch(grounded, shadowTag));
+        Assert.True(engine.CanSwitch(CreatePokemon(92, "tackle"), shadowTag));
+        Assert.True(engine.CanSwitch(
+            CreatePokemon(202, "tackle", ability: "그림자밟기"),
+            shadowTag));
+    }
+
+    [Fact]
+    public async Task Form_change_abilities_update_stats_and_emit_logs()
+    {
+        var aegislash = CreatePokemon(681, "tackle", "kings-shield", ability: "배틀스위치");
+        int shieldAttack = aegislash.Atk;
+        var events = new List<BattleEvent>();
+
+        await CreateFullEngine().TakeTurnAsync(
+            aegislash, CreatePokemon(132, "tackle"), "tackle", true, Capture(events));
+
+        Assert.True(aegislash.IsAlternateForm);
+        Assert.True(aegislash.Atk > shieldAttack);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("공격모드", StringComparison.Ordinal) == true);
+
+        await CreateFullEngine().TakeTurnAsync(
+            aegislash, CreatePokemon(132, "tackle"), "kings-shield", true, Capture(events));
+        Assert.False(aegislash.IsAlternateForm);
+        Assert.True(aegislash.IsProtected);
+
+        var contactAttacker = CreatePokemon(132, "tackle");
+        await CreateFullEngine().TakeTurnAsync(
+            contactAttacker, aegislash, "tackle", false, Capture(events));
+        Assert.Equal(-2, contactAttacker.StatStages["attack"]);
+
+        int hpBeforeBypass = aegislash.CurrentHp;
+        Assert.True(MoveRuleMetadata.BypassesProtection("hyperspace-hole"));
+        await CreateFullEngine().TakeTurnAsync(
+            CreatePokemon(132, "hyperspace-hole"),
+            aegislash,
+            "hyperspace-hole",
+            true,
+            Capture(events));
+        Assert.True(aegislash.CurrentHp < hpBeforeBypass);
+
+        var darmanitan = CreatePokemon(555, "tackle", ability: "달마모드");
+        int standardSpecialAttack = darmanitan.SpAtk;
+        darmanitan.CurrentHp = darmanitan.MaxHp / 2;
+        events.Clear();
+
+        await CreateFullEngine().ApplyEndOfTurnEffectsAsync(new[] { darmanitan }, Capture(events));
+
+        Assert.True(darmanitan.IsAlternateForm);
+        Assert.True(darmanitan.SpAtk > standardSpecialAttack);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("달마모드", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public void Simple_uses_existing_stage_rules()
+    {
+        var simple = CreatePokemon(132, "tackle", ability: "단순");
+        simple.ChangeStage("attack", 1);
+        Assert.Equal(2, simple.StatStages["attack"]);
+    }
+
+    [Fact]
+    public async Task Rock_head_mummy_and_aftermath_activate_at_their_documented_timing()
+    {
+        var rockHead = CreatePokemon(132, "take-down", ability: "돌머리");
+        int hpBefore = rockHead.CurrentHp;
+
+        await CreateFullEngine().TakeTurnAsync(
+            rockHead, CreatePokemon(202, "tackle"), "take-down", true, _ => Task.CompletedTask);
+        Assert.Equal(hpBefore, rockHead.CurrentHp);
+
+        var contactAttacker = CreatePokemon(132, "tackle", ability: "유연");
+        var mummy = CreatePokemon(202, "tackle", ability: "미라");
+        var events = new List<BattleEvent>();
+
+        await CreateFullEngine().TakeTurnAsync(
+            contactAttacker, mummy, "tackle", true, Capture(events));
+
+        Assert.Equal("미라", contactAttacker.SelectedAbility);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("특성이 미라", StringComparison.Ordinal) == true);
+
+        var aftermathAttacker = CreatePokemon(132, "tackle");
+        var aftermath = CreatePokemon(132, "tackle", ability: "유폭");
+        aftermath.CurrentHp = 1;
+        hpBefore = aftermathAttacker.CurrentHp;
+        events.Clear();
+
+        await CreateFullEngine().TakeTurnAsync(
+            aftermathAttacker, aftermath, "tackle", true, Capture(events));
+
+        Assert.Equal(hpBefore - Math.Max(1, aftermathAttacker.MaxHp / 4), aftermathAttacker.CurrentHp);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("유폭", StringComparison.Ordinal) == true);
+    }
+
+    private static Pokemon CreatePokemon(
+        int pokemonId,
+        string move,
+        string? secondMove = null,
+        string ability = "",
+        string heldItem = "없음")
+    {
+        var moves = secondMove == null ? new[] { move } : new[] { move, secondMove };
+        return new Pokemon(PokemonDatabase.All[pokemonId], moves.ToList(), ability, heldItem, level: 50);
+    }
+
+    private static BattleEngine CreateFullEngine() => new(
+        new Random(1234),
+        new IBattleEffectHandler[]
+        {
+            new MoveEffectHandler(),
+            new ContactReactionEffectHandler(),
+            new AbilityLifecycleEffectHandler(),
+            new DamageModifierEffectHandler()
+        });
+
+    private static Func<BattleEvent, Task> Capture(List<BattleEvent> events) =>
+        battleEvent =>
+        {
+            events.Add(battleEvent);
+            return Task.CompletedTask;
+        };
+}

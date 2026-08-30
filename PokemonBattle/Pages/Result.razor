@@ -107,9 +107,9 @@
         Nav.NavigateTo("/preview");
     }
 
-    private void RestartGame()
+    private async Task RestartGame()
     {
-        State.ResetForNewRun();
+        await State.ResetForNewRun();
         Nav.NavigateTo("/");
     }
 }

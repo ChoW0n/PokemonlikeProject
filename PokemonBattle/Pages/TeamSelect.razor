@@ -158,7 +158,9 @@
                         <div class="dex-entry @(DraftAbility == ability ? "is-selected" : string.Empty) @(ViewingAbility == ability ? "is-viewing" : "")"
                              @onclick="() => ViewingAbility = ability">
                             <span class="dex-name">@ability</span>
-                            <span class="dex-type">@(AbilityDatabase.IsImplemented(ability) ? "전투 적용" : "설명만 제공")</span>
+                            <span class="dex-type">@(AbilityDatabase.IsImplemented(ability)
+                                ? $"전투 적용 · {AbilityDatabase.GetImplementationGroup(ability)}"
+                                : $"설명만 제공 · {AbilityDatabase.GetImplementationGroup(ability)}")</span>
                         </div>
                     }
                 </div>
@@ -166,7 +168,9 @@
                 {
                     string desc = AbilityDatabase.All.TryGetValue(ViewingAbility, out var info) ? info.Description : "";
                     <div class="info-panel">
-                        <p class="info-desc"><strong>@(AbilityDatabase.IsImplemented(ViewingAbility) ? "전투에서 실제 적용됩니다." : "현재는 설명만 제공되며 전투 효과는 적용되지 않습니다.")</strong></p>
+                        <p class="info-desc"><strong>@(AbilityDatabase.IsImplemented(ViewingAbility)
+                            ? $"전투에서 실제 적용됩니다. 분류: {AbilityDatabase.GetImplementationGroup(ViewingAbility)}"
+                            : $"현재는 설명만 제공되며 전투 효과는 적용되지 않습니다. 우선순위 그룹: {AbilityDatabase.GetImplementationGroup(ViewingAbility)}")</strong></p>
                         <p class="info-desc">@(string.IsNullOrWhiteSpace(desc) ? "설명 없음" : desc)</p>
                         <button type="button" class="info-select-btn @(DraftAbility == ViewingAbility ? "is-active" : "")" @onclick="() => DraftAbility = ViewingAbility">
                             @(DraftAbility == ViewingAbility ? "선택됨" : "이 특성 선택")
@@ -427,11 +431,11 @@
             }).ToList();
     }
 
-    private void ConfirmTeam()
+    private async Task ConfirmTeam()
     {
         if (!CanStart) return;
 
-        State.SetPlayerLoadouts(TeamLoadouts);
+        await State.SetPlayerLoadouts(TeamLoadouts);
         State.GoTo(GameScreen.Battle);
         Nav.NavigateTo("/battle");
     }

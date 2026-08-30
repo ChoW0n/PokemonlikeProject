@@ -168,12 +168,17 @@
         }
         else if (Menu == BattleMenu.Switch)
         {
+            @if (!Rules.CanSwitch(Hero, Enemy))
+            {
+                <p class="move-detail-effect">@($"{Enemy.Data.Name}의 {Enemy.SelectedAbility} 때문에 교체할 수 없습니다.")</p>
+            }
             <div class="move-grid">
                 @for (int i = 0; i < PlayerTeam.Count; i++)
                 {
                     int idx = i;
                     var member = PlayerTeam[idx];
-                    bool canSwitch = !member.IsFainted && idx != PlayerTeamIndex;
+                    bool canSwitch = !member.IsFainted && idx != PlayerTeamIndex
+                        && Rules.CanSwitch(Hero, Enemy);
                     <button type="button"
                             class="move-button"
                             disabled="@(IsBusy || !canSwitch)"
@@ -446,7 +451,7 @@
                 return true;
             }
             await ShowMessage("내 포켓몬이 모두 쓰러졌다... 패배...");
-            State.LoseBattle();
+            await State.LoseBattle();
             Nav.NavigateTo("/result");
             return true;
         }
