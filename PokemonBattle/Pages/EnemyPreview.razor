@@ -22,15 +22,16 @@
     }
     else
     {
-        <div class="enemy-grid">
+        <div class="enemy-grid" role="list" aria-label="상대 포켓몬 목록">
             @foreach (var loadout in EnemyLoadouts)
             {
                 var data = PokemonDatabase.All[loadout.PokemonId];
-                <div class="enemy-card @(SelectedId == loadout.PokemonId ? "is-selected" : string.Empty)"
-                     @onclick="() => ToggleDetail(loadout.PokemonId)">
-                    <img src="@data.ImageUrl" alt="@data.Name" class="enemy-sprite" />
-                    <h3>@data.Name</h3>
-                    <div class="hud-types">
+                <article class="enemy-card @(SelectedId == loadout.PokemonId ? "is-selected" : string.Empty)" role="listitem">
+                    <button type="button" class="enemy-card-toggle" aria-label="@($"{data.Name} 상대 정보 {(SelectedId == loadout.PokemonId ? "접기" : "펼치기")}")" aria-expanded="@(SelectedId == loadout.PokemonId)" @onclick="() => ToggleDetail(loadout.PokemonId)">
+                        <img src="@data.ImageUrl" alt="" class="enemy-sprite" />
+                        <span class="enemy-card-title">@data.Name</span>
+                    </button>
+                    <div class="hud-types" aria-label="@($"{data.Type1}{(data.Type2 != null ? $", {data.Type2}" : "")}")">
                         <img src="@TypeIcons.GetUrl(data.Type1)" class="type-icon-img" alt="@data.Type1" />
                         @if (data.Type2 != null)
                         {
@@ -59,7 +60,7 @@
                             </div>
                         </div>
                     }
-                </div>
+                </article>
             }
         </div>
 
