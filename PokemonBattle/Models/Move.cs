@@ -39,3 +39,23 @@ public class Move
         MinHits = minHits; MaxHits = maxHits;
     }
 }
+
+public static class MoveRuleMetadata
+{
+    // PokeAPI's move payload does not expose the main-series contact flag.
+    // Keep the smaller exception list here so generated move constructors stay stable.
+    private static readonly HashSet<string> NonContactPhysicalMoves = new()
+    {
+        "razor-leaf", "seed-bomb", "petal-blizzard", "poison-sting", "twineedle",
+        "pin-missile", "gunk-shot", "earthquake", "sand-tomb", "bulldoze", "pay-day",
+        "psycho-cut", "self-destruct", "explosion", "rock-slide", "rock-blast",
+        "stone-edge", "smack-down", "magnet-bomb", "ice-shard", "icicle-spear",
+        "spike-cannon", "rock-tomb", "barrage", "bullet-seed", "egg-bomb", "bone-club",
+        "bonemerang", "bone-rush", "sacred-fire", "leafage", "precipice-blades",
+        "attack-order", "rock-wrecker", "aqua-cutter", "thousand-arrows",
+        "thousand-waves", "lands-wrath", "diamond-storm", "fusion-bolt", "secret-power"
+    };
+
+    public static bool MakesContact(string moveKey, Move move) =>
+        !move.IsStatus && !move.IsSpecial && move.Power > 0 && !NonContactPhysicalMoves.Contains(moveKey);
+}

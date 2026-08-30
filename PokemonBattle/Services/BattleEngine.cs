@@ -29,20 +29,77 @@ public sealed class BattleEngine
         return (int)speed;
     }
 
-    public double PreviewMultiplier(Move move, Pokemon target)
+    public double PreviewMultiplier(Move move, Pokemon target, Pokemon? attacker = null)
     {
-        double multiplier = TypeChart.GetMultiplier(move.Type, target.Data.Type1);
-        if (target.Data.Type2 != null) multiplier *= TypeChart.GetMultiplier(move.Type, target.Data.Type2.Value);
-        if (target.SelectedAbility == "부유" && move.Type == PokemonType.Ground) multiplier = 0;
-        if (target.SelectedAbility == "피뢰침" && move.Type == PokemonType.Electric) multiplier = 0;
+        PokemonType attackType = attacker?.ResolveMoveType(move) ?? move.Type;
+        double multiplier = TypeChart.GetMultiplier(attackType, target.Data.Type1);
+        if (target.Data.Type2 != null) multiplier *= TypeChart.GetMultiplier(attackType, target.Data.Type2.Value);
+        if (target.IsImmuneToMoveType(attackType)) multiplier = 0;
+        if (target.SelectedAbility == "불가사의부적" && multiplier > 0 && multiplier < 2.0) multiplier = 0;
         return multiplier;
     }
 
-    public void InitializeWeather(Pokemon hero, Pokemon enemy)
+    public IReadOnlyList<string> InitializeWeather(Pokemon hero, Pokemon enemy)
     {
-        if (hero.SelectedAbility == "가뭄" || enemy.SelectedAbility == "가뭄") BattleWeather.Current = "쾌청";
-        else if (hero.SelectedAbility == "잔비" || enemy.SelectedAbility == "잔비") BattleWeather.Current = "비";
-        else BattleWeather.Current = "맑음";
+        BattleWeather.Current = "맑음";
+        var messages = new List<string>();
+        var entrants = new[] { (Pokemon: hero, Opponent: enemy), (Pokemon: enemy, Opponent: hero) }
+            .OrderByDescending(entry => EffectiveSpeed(entry.Pokemon));
+        foreach (var entry in entrants)
+        {
+            messages.AddRange(ActivateSwitchIn(entry.Pokemon, entry.Opponent));
+        }
+        return messages;
+    }
+
+    public IReadOnlyList<string> ActivateSwitchIn(Pokemon entrant, Pokemon opponent)
+    {
+        var messages = new List<string>();
+        entrant.ResetFieldCounter();
+
+        string? weather = entrant.SelectedAbility switch
+        {
+            "가뭄" => "쾌청",
+            "잔비" => "비",
+            "모래날림" => "모래바람",
+            "눈퍼뜨리기" => "싸라기눈",
+            _ => null
+        };
+        if (weather != null)
+        {
+            BattleWeather.Current = weather;
+            messages.Add($"{entrant.Data.Name}의 {entrant.SelectedAbility}! 날씨가 {weather}(으)로 바뀌었다!");
+        }
+
+        if (entrant.SelectedAbility == "위협")
+        {
+            int before = opponent.StatStages["attack"];
+            opponent.ChangeStage("attack", -1, causedByOpponent: true);
+            if (opponent.StatStages["attack"] < before)
+            {
+                messages.Add($"{entrant.Data.Name}의 위협으로 {opponent.Data.Name}의 공격이 떨어졌다!");
+                string? reaction = opponent.TriggerStatDropAbility();
+                if (reaction != null) messages.Add(reaction);
+            }
+            else
+            {
+                messages.Add($"{opponent.Data.Name}은(는) 위협의 영향을 받지 않았다!");
+            }
+        }
+
+        if (entrant.SelectedAbility == "다운로드")
+        {
+            string stat = opponent.EffectiveDef <= opponent.EffectiveSpDef ? "attack" : "special-attack";
+            entrant.ChangeStage(stat, 1);
+            messages.Add($"{entrant.Data.Name}의 다운로드로 {(stat == "attack" ? "공격" : "특공")}이 올랐다!");
+        }
+
+        if (entrant.SelectedAbility == "슬로스타트")
+        {
+            messages.Add($"{entrant.Data.Name}은(는) 슬로스타트로 힘을 내지 못하고 있다!");
+        }
+
+        return messages;
     }
 
     public void PrepareSwitchOut(Pokemon pokemon)
@@ -51,6 +108,10 @@ public sealed class BattleEngine
         {
             int heal = pokemon.MaxHp / 3;
             pokemon.CurrentHp = Math.Min(pokemon.MaxHp, pokemon.CurrentHp + heal);
+        }
+        if (pokemon.SelectedAbility == "자연회복")
+        {
+            pokemon.ClearPrimaryStatus();
         }
         pokemon.ResetOnSwitchOut();
     }
@@ -64,8 +125,10 @@ public sealed class BattleEngine
         string? enemyMoveKey = PickEnemyMove(enemy, enemyMoveKeys, hero);
         var heroMove = heroMoveKey == null ? null : MoveDatabase.All[heroMoveKey];
         var enemyMove = enemyMoveKey == null ? null : MoveDatabase.All[enemyMoveKey];
-        bool heroFirst = (heroMove?.Priority ?? 0) != (enemyMove?.Priority ?? 0)
-            ? (heroMove?.Priority ?? 0) > (enemyMove?.Priority ?? 0)
+        int heroPriority = MovePriority(hero, heroMove);
+        int enemyPriority = MovePriority(enemy, enemyMove);
+        bool heroFirst = heroPriority != enemyPriority
+            ? heroPriority > enemyPriority
             : EffectiveSpeed(hero) >= EffectiveSpeed(enemy);
         return new BattleTurnPlan(enemyMoveKey, heroFirst);
     }
@@ -90,7 +153,7 @@ public sealed class BattleEngine
                 bool stab = move.Type == enemy.Data.Type1 || enemy.Data.Type2 == move.Type;
                 double averageHits = (move.MinHits + move.MaxHits) / 2.0;
                 score = move.Power * averageHits * (stab ? 1.5 : 1.0)
-                    * PreviewMultiplier(move, hero)
+                    * PreviewMultiplier(move, hero, enemy)
                     * ((move.AlwaysHits ? 100 : move.Accuracy) / 100.0);
             }
 
@@ -122,6 +185,7 @@ public sealed class BattleEngine
 
             var context = new BattleEndOfTurnContext(pokemon, emit);
             foreach (var handler in effectHandlers) await handler.EndOfTurnAsync(context);
+            pokemon.AdvanceTurn();
         }
     }
 
@@ -134,9 +198,20 @@ public sealed class BattleEngine
     {
         var result = new BattleTurnResult();
 
+        if (attacker.ShouldSkipTurn)
+        {
+            await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) 게으름을 피우고 있다!"));
+            return result;
+        }
+
         if (attacker.Flinched)
         {
             attacker.Flinched = false;
+            if (attacker.SelectedAbility == "불굴의마음")
+            {
+                attacker.ChangeStage("speed", 1);
+                await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 불굴의마음으로 속도가 올랐다!"));
+            }
             await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) 움찔해서 움직일 수 없었다!"));
             return result;
         }
@@ -168,10 +243,11 @@ public sealed class BattleEngine
             }
 
             await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 {move.Name}!"));
-            await ExecuteMoveAsync(attacker, defender, move, attackerIsHero, emit);
+            await ExecuteMoveAsync(attacker, defender, move, moveKey, attackerIsHero, emit);
         }
 
-        if (defender.IsFainted) result.FaintedPokemon = defender;
+        if (attacker.IsFainted && !defender.IsFainted) result.FaintedPokemon = attacker;
+        else if (defender.IsFainted) result.FaintedPokemon = defender;
         return result;
     }
 
@@ -179,53 +255,77 @@ public sealed class BattleEngine
         Pokemon attacker,
         Pokemon defender,
         Move move,
+        string moveKey,
         bool attackerIsHero,
         Func<BattleEvent, Task> emit)
     {
-        int effectiveAccuracy = attacker.SelectedAbility == "의욕" && !move.AlwaysHits
-            ? (int)(move.Accuracy * 0.8)
-            : move.Accuracy;
-        bool hit = move.AlwaysHits || rng.Next(100) < effectiveAccuracy;
+        double effectiveAccuracy = move.Accuracy;
+        if (attacker.SelectedAbility == "의욕" && !move.IsStatus && !move.IsSpecial) effectiveAccuracy *= 0.8;
+        if (attacker.SelectedAbility == "복안") effectiveAccuracy *= 1.3;
+        if (attacker.SelectedAbility == "승리의별") effectiveAccuracy *= 1.1;
+        if (defender.SelectedAbility == "모래숨기" && BattleWeather.Current == "모래바람") effectiveAccuracy *= 0.8;
+        if (defender.SelectedAbility == "눈숨기" && BattleWeather.Current == "싸라기눈") effectiveAccuracy *= 0.8;
+        bool hit = move.AlwaysHits || attacker.SelectedAbility == "노가드" || defender.SelectedAbility == "노가드"
+            || rng.Next(100) < Math.Min(100, (int)effectiveAccuracy);
         if (!hit)
         {
             await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 공격이 빗나갔다!"));
             return;
         }
 
-        string effectKind = TypeColors.GetEffectKind(move.Type, move.IsStatus);
-        var context = new BattleEffectContext(attacker, defender, move, attackerIsHero, rng, emit);
+        PokemonType attackType = attacker.ResolveMoveType(move);
+        bool makesContact = MoveRuleMetadata.MakesContact(moveKey, move);
+        string effectKind = TypeColors.GetEffectKind(attackType, move.IsStatus);
+        var context = new BattleEffectContext(
+            attacker, defender, move, attackerIsHero, rng, emit, moveKey, attackType, makesContact);
+
+        if (IsBlockedByAbility(defender, move))
+        {
+            await emit(BattleEvent.MessageLine($"{defender.Data.Name}은(는) {defender.SelectedAbility}으로 기술을 막았다!"));
+            return;
+        }
+
+        if (TargetsOpponent(move) && defender.IsImmuneToMoveType(attackType))
+        {
+            var (absorbed, absorbMessage) = defender.TryAbsorb(attackType);
+            context.WasAbsorbed = absorbed;
+            if (absorbMessage != null)
+            {
+                await emit(BattleEvent.MessageLine(absorbMessage));
+            }
+            else
+            {
+                await emit(BattleEvent.MessageLine($"{defender.Data.Name}은(는) {defender.SelectedAbility}으로 기술을 무효화했다!"));
+            }
+            return;
+        }
 
         if (!move.IsStatus && move.Power > 0)
         {
-            var (absorbed, absorbMessage) = defender.TryAbsorb(move.Type);
-            if (absorbed)
-            {
-                context.WasAbsorbed = true;
-                if (absorbMessage != null) await emit(BattleEvent.MessageLine(absorbMessage));
-                return;
-            }
-
             int attackStat = GetAttackStat(attacker, move.IsSpecial);
             int defenseStat = move.IsSpecial ? defender.EffectiveSpDef : defender.EffectiveDef;
             double power = move.Power;
-            bool stab = move.Type == attacker.Data.Type1 || attacker.Data.Type2 == move.Type;
+            bool stab = attackType == attacker.Data.Type1 || attacker.Data.Type2 == attackType;
             if (stab) power *= 1.5;
 
-            var powerContext = new BattlePowerContext(attacker, defender, move, power);
+            var powerContext = new BattlePowerContext(attacker, defender, move, attackType, makesContact, power);
             foreach (var handler in effectHandlers) handler.ModifyPower(powerContext);
             power = powerContext.Power;
 
-            int hitCount = RollHitCount(move);
+            int hitCount = RollHitCount(attacker, move);
             for (int i = 0; i < hitCount; i++)
             {
                 if (defender.IsFainted) break;
 
                 int hpBefore = defender.CurrentHp;
                 int scaledPower = (int)(power * ((double)attackStat / Math.Max(defenseStat, 1)));
-                defender.TakeDamage(scaledPower, move.Type);
-                context.TotalDamage += hpBefore - defender.CurrentHp;
+                defender.TakeDamage(scaledPower, attackType, move.IsSpecial);
+                context.LastHitDamage = hpBefore - defender.CurrentHp;
+                context.TotalDamage += context.LastHitDamage;
                 context.ActualHits++;
-                await emit(BattleEvent.Effect(effectKind, attackerIsHero, move.Type));
+                await emit(BattleEvent.Effect(effectKind, attackerIsHero, attackType));
+                foreach (var handler in effectHandlers) await handler.AfterHitAsync(context);
+                if (attacker.IsFainted) break;
             }
 
             foreach (var handler in effectHandlers) await handler.AfterDamageAsync(context);
@@ -238,7 +338,7 @@ public sealed class BattleEngine
         }
         else if (move.IsStatus)
         {
-            await emit(BattleEvent.Effect(effectKind, attackerIsHero, move.Type));
+            await emit(BattleEvent.Effect(effectKind, attackerIsHero, attackType));
         }
 
         foreach (var handler in effectHandlers) await handler.AfterMoveAsync(context);
@@ -246,16 +346,13 @@ public sealed class BattleEngine
 
     private int GetAttackStat(Pokemon attacker, bool isSpecial)
     {
-        if (attacker.SelectedAbility == "근성" && attacker.Status != StatusCondition.None)
-        {
-            return isSpecial ? attacker.SpAtk : (int)(attacker.Atk * 1.5);
-        }
         return isSpecial ? attacker.EffectiveSpAtk : attacker.EffectiveAtk;
     }
 
-    private int RollHitCount(Move move)
+    private int RollHitCount(Pokemon attacker, Move move)
     {
         if (move.MinHits == move.MaxHits) return move.MinHits;
+        if (attacker.SelectedAbility == "스킬링크") return move.MaxHits;
         if (move.MinHits == 2 && move.MaxHits == 5)
         {
             int roll = rng.Next(100);
@@ -265,6 +362,34 @@ public sealed class BattleEngine
             return 5;
         }
         return rng.Next(move.MinHits, move.MaxHits + 1);
+    }
+
+    private static int MovePriority(Pokemon pokemon, Move? move)
+    {
+        if (move == null) return 0;
+        int priority = move.Priority;
+        if (pokemon.SelectedAbility == "짓궂은마음" && move.IsStatus) priority++;
+        if (pokemon.SelectedAbility == "질풍날개" && move.Type == PokemonType.Flying && pokemon.CurrentHp == pokemon.MaxHp) priority++;
+        if (pokemon.SelectedAbility == "시간벌기") priority--;
+        return priority;
+    }
+
+    private static bool IsBlockedByAbility(Pokemon defender, Move move)
+    {
+        if (defender.SelectedAbility == "방음"
+            && (move.Name.Contains("소리") || move.Name.Contains("노래") || move.Name is "울음소리" or "하이퍼보이스")) return true;
+        if (defender.SelectedAbility == "방진"
+            && (move.Name.Contains("가루") || move.Name is "버섯포자" or "목화포자")) return true;
+        if (defender.SelectedAbility == "방탄"
+            && (move.Name.Contains("볼") || move.Name.Contains("탄") || move.Name.Contains("폭탄"))) return true;
+        return false;
+    }
+
+    private static bool TargetsOpponent(Move move)
+    {
+        if (!move.IsStatus) return true;
+        if (move.AilmentName != "none") return true;
+        return move.StatChanges.Any(change => !change.TargetsSelf);
     }
 
     private static string? EffectivenessLine(double multiplier)

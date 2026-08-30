@@ -28,10 +28,14 @@ public sealed class BattleEffectContext
     public Pokemon Attacker { get; }
     public Pokemon Defender { get; }
     public Move Move { get; }
+    public string MoveKey { get; }
+    public PokemonType AttackType { get; }
+    public bool MakesContact { get; }
     public bool AttackerIsHero { get; }
     public Random Random { get; }
     public Func<BattleEvent, Task> Emit { get; }
     public int TotalDamage { get; set; }
+    public int LastHitDamage { get; set; }
     public int ActualHits { get; set; }
     public bool WasAbsorbed { get; set; }
 
@@ -41,11 +45,17 @@ public sealed class BattleEffectContext
         Move move,
         bool attackerIsHero,
         Random random,
-        Func<BattleEvent, Task> emit)
+        Func<BattleEvent, Task> emit,
+        string moveKey,
+        PokemonType attackType,
+        bool makesContact)
     {
         Attacker = attacker;
         Defender = defender;
         Move = move;
+        MoveKey = moveKey;
+        AttackType = attackType;
+        MakesContact = makesContact;
         AttackerIsHero = attackerIsHero;
         Random = random;
         Emit = emit;
@@ -60,13 +70,23 @@ public sealed class BattlePowerContext
     public Pokemon Attacker { get; }
     public Pokemon Defender { get; }
     public Move Move { get; }
+    public PokemonType AttackType { get; }
+    public bool MakesContact { get; }
     public double Power { get; set; }
 
-    public BattlePowerContext(Pokemon attacker, Pokemon defender, Move move, double power)
+    public BattlePowerContext(
+        Pokemon attacker,
+        Pokemon defender,
+        Move move,
+        PokemonType attackType,
+        bool makesContact,
+        double power)
     {
         Attacker = attacker;
         Defender = defender;
         Move = move;
+        AttackType = attackType;
+        MakesContact = makesContact;
         Power = power;
     }
 }
@@ -90,6 +110,7 @@ public interface IBattleEffectHandler
 {
     int Order => 0;
     void ModifyPower(BattlePowerContext context) { }
+    Task AfterHitAsync(BattleEffectContext context) => Task.CompletedTask;
     Task AfterDamageAsync(BattleEffectContext context) => Task.CompletedTask;
     Task AfterDamageResultAsync(BattleEffectContext context) => Task.CompletedTask;
     Task AfterMoveAsync(BattleEffectContext context) => Task.CompletedTask;

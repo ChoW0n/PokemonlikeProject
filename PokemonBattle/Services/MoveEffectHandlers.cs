@@ -33,6 +33,9 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         var move = context.Move;
         var attacker = context.Attacker;
         var defender = context.Defender;
+        bool suppressSecondaryEffects = attacker.SelectedAbility == "우격다짐"
+            || (!move.IsStatus && defender.SelectedAbility == "인분");
+        int chanceMultiplier = attacker.SelectedAbility == "하늘의은총" ? 2 : 1;
 
         if (move.IsStatus && move.HealingPercent > 0)
         {
@@ -41,7 +44,8 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
             await context.ShowMessage($"{attacker.Data.Name}은(는) HP를 회복했다!");
         }
 
-        if (move.AilmentName != "none" && !defender.IsFainted && context.Random.Next(100) < move.AilmentChance)
+        if (!suppressSecondaryEffects && move.AilmentName != "none" && !defender.IsFainted
+            && context.Random.Next(100) < Math.Min(100, move.AilmentChance * chanceMultiplier))
         {
             if (move.AilmentName == "confusion")
             {
@@ -55,24 +59,47 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
             {
                 defender.ApplyAilment(move.AilmentName);
                 await context.ShowMessage($"{defender.Data.Name}은(는) {AilmentKor(move.AilmentName)} 상태가 되었다!");
+
+                if (defender.SelectedAbility == "싱크로"
+                    && move.AilmentName is "paralysis" or "poison" or "burn"
+                    && attacker.Status == StatusCondition.None
+                    && !attacker.IsImmuneToAilment(move.AilmentName))
+                {
+                    attacker.ApplyAilment(move.AilmentName);
+                    await context.ShowMessage($"{defender.Data.Name}의 싱크로가 {attacker.Data.Name}에게 상태 이상을 옮겼다!");
+                }
             }
         }
 
-        if (move.FlinchChance > 0 && !defender.IsFainted && context.Random.Next(100) < move.FlinchChance)
+        int flinchChance = move.FlinchChance;
+        if (!move.IsStatus && attacker.SelectedAbility == "악취") flinchChance = Math.Max(flinchChance, 10);
+        if (!suppressSecondaryEffects && flinchChance > 0 && !defender.IsFainted
+            && defender.SelectedAbility != "정신력"
+            && context.Random.Next(100) < Math.Min(100, flinchChance * chanceMultiplier))
         {
             defender.Flinched = true;
         }
 
-        if (move.StatChanges.Count > 0 && context.Random.Next(100) < move.StatChangeChance)
+        if (!suppressSecondaryEffects && move.StatChanges.Count > 0
+            && context.Random.Next(100) < Math.Min(100, move.StatChangeChance * chanceMultiplier))
         {
             foreach (var statChange in move.StatChanges)
             {
                 var target = statChange.TargetsSelf ? attacker : defender;
                 if (target.IsFainted) continue;
 
-                target.ChangeStage(statChange.Stat, statChange.Change);
-                string direction = statChange.Change > 0 ? "상승했다" : "하락했다";
+                int before = target.StatStages[statChange.Stat];
+                target.ChangeStage(statChange.Stat, statChange.Change, causedByOpponent: !statChange.TargetsSelf);
+                int after = target.StatStages[statChange.Stat];
+                if (before == after) continue;
+
+                string direction = after > before ? "상승했다" : "하락했다";
                 await context.ShowMessage($"{target.Data.Name}의 {StatKor(statChange.Stat)}이(가) {direction}!");
+                if (!statChange.TargetsSelf && after < before)
+                {
+                    string? reaction = target.TriggerStatDropAbility();
+                    if (reaction != null) await context.ShowMessage(reaction);
+                }
             }
         }
     }
