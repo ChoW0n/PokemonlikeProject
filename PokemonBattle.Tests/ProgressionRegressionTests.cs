@@ -164,6 +164,39 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public void LegendaryEncounterConsumesOnlyAnUnlockedLegendaryLineup()
+    {
+        var consumed = LegendaryProgression.ConsumeEncounter(
+            currentProgressPercent: 100,
+            containsLegendary: true,
+            alreadyConsumed: false);
+
+        Assert.True(consumed.WasConsumed);
+        Assert.Equal(0, consumed.ProgressPercent);
+    }
+
+    [Fact]
+    public void LegendaryEncounterDoesNotConsumeBeforeUnlockOrWithoutLegendary()
+    {
+        var locked = LegendaryProgression.ConsumeEncounter(99, true, false);
+        var ordinary = LegendaryProgression.ConsumeEncounter(100, false, false);
+
+        Assert.False(locked.WasConsumed);
+        Assert.Equal(99, locked.ProgressPercent);
+        Assert.False(ordinary.WasConsumed);
+        Assert.Equal(100, ordinary.ProgressPercent);
+    }
+
+    [Fact]
+    public void LegendaryEncounterConsumptionIsIdempotentForTheSameLineup()
+    {
+        var repeated = LegendaryProgression.ConsumeEncounter(0, true, true);
+
+        Assert.False(repeated.WasConsumed);
+        Assert.Equal(0, repeated.ProgressPercent);
+    }
+
+    [Fact]
     public void LegendaryPoolOpensOnlyAfterUnlock()
     {
         var excluded = new HashSet<int>();
@@ -216,6 +249,75 @@ public class ProgressionRegressionTests
                 Assert.Equal(1, restoredLoadout.PokemonId);
                 Assert.Equal(7, restoredLoadout.Level);
                 Assert.Equal(new[] { "tackle" }, restoredLoadout.ChosenMoveNames);
+            }
+        });
+    }
+
+    [Fact]
+    public async Task LegendaryEncounterResetsProgressAndKeepsItZeroAfterWinning()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            const string username = "progress-regression-legendary-encounter";
+            await CreatePlayerRunsTable(schema);
+
+            await using (var seedDb = CreateDbContext(schema))
+            {
+                await new RunStore(seedDb).Save(
+                    username,
+                    7,
+                    new List<PokemonLoadout>(),
+                    LegendaryProgression.MaxProgressPercent);
+            }
+
+            var currentUser = new CurrentUserService();
+            currentUser.SignIn(username, isAdmin: false);
+
+            await using (var db = CreateDbContext(schema))
+            {
+                var state = new GameState(
+                    new InMemoryScoreStore(),
+                    new InMemoryPresetStore(),
+                    new UnlockService(db, currentUser),
+                    new RunStore(db),
+                    currentUser);
+
+                await state.LoadRunForCurrentUser();
+                await state.SetEnemyLoadouts(new List<PokemonLoadout>
+                {
+                    new() { PokemonId = 1 }
+                });
+                Assert.Equal(LegendaryProgression.MaxProgressPercent, state.LegendaryProgressPercent);
+                Assert.False(state.LegendaryEncounterConsumed);
+
+                await state.SetEnemyLoadouts(new List<PokemonLoadout>
+                {
+                    new() { PokemonId = 144 }
+                });
+
+                Assert.Equal(0, state.LegendaryProgressPercent);
+                Assert.True(state.LegendaryEncounterConsumed);
+
+                //ConfirmTeamAndGo can submit the same fixed lineup again without a second consumption.
+                await state.SetEnemyLoadouts(new List<PokemonLoadout>
+                {
+                    new() { PokemonId = 144 }
+                });
+                Assert.Equal(0, state.LegendaryProgressPercent);
+
+                await state.WinRound();
+
+                Assert.Equal(0, state.LegendaryProgressPercent);
+                Assert.Equal(0, state.LastLegendaryProgressReward);
+
+                await state.ResetForNewRun();
+                Assert.Equal(0, state.LegendaryProgressPercent);
+            }
+
+            await using (var freshDb = CreateDbContext(schema))
+            {
+                var restored = await new RunStore(freshDb).Load(username);
+                Assert.Equal(0, restored.legendaryProgressPercent);
             }
         });
     }

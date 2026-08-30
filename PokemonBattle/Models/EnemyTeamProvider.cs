@@ -14,6 +14,9 @@ public static class EnemyTeamProvider
 
     public static bool IsLegendary(int pokemonId) => LegendaryIds.Contains(pokemonId);
 
+    public static bool ContainsLegendary(IEnumerable<int> pokemonIds) =>
+        pokemonIds.Any(IsLegendary);
+
     private static readonly HashSet<int> FirstStageIds = new()
     {
         1, 4, 7, 10, 13, 16, 19, 21, 23, 25, 27, 29, 32, 35, 37, 39, 41, 43, 46, 48,

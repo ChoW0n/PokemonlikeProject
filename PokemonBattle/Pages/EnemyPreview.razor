@@ -13,7 +13,22 @@
     <p>클릭하면 스탯과 기술을 확인할 수 있습니다. (현재 라운드: @(State.CurrentScore + 1))</p>
     <p class="config-label">
         전설 출현 진행도: @State.LegendaryProgressPercent%
-        @(State.LegendaryUnlocked ? "· 전설 포켓몬 출현 가능" : "· 스테이지 클리어로 진행도 상승")
+        @if (State.LegendaryEncounterConsumed)
+        {
+            <span>· 이번 라인업에서 전설 출현 완료, 다음 주기 시작</span>
+        }
+        else if (State.LegendaryUnlocked && ContainsLegendary)
+        {
+            <span>· 이번 라인업에 전설이 출현했습니다</span>
+        }
+        else if (State.LegendaryUnlocked)
+        {
+            <span>· 전설 출현 가능 (이번 라인업에는 없어 진행도를 유지합니다)</span>
+        }
+        else
+        {
+            <span>· 스테이지 클리어로 다음 주기 진행</span>
+        }
     </p>
 
     @if (EnemyLoadouts.Count == 0)
@@ -74,6 +89,7 @@
     private List<PokemonLoadout> EnemyLoadouts = new();
     private int? SelectedId;
     private Random rng = new Random();
+    private bool ContainsLegendary => EnemyLoadouts.Any(loadout => EnemyTeamProvider.IsLegendary(loadout.PokemonId));
 
     protected override async Task OnInitializedAsync()
     {
@@ -114,6 +130,7 @@
             };
         }).ToList();
         EnemyLoadouts = TeamLoadoutRules.NormalizeUniqueItems(EnemyLoadouts);
+        await State.SetEnemyLoadouts(EnemyLoadouts);
     }
 
     private void ToggleDetail(int id)
@@ -121,9 +138,9 @@
         SelectedId = SelectedId == id ? null : id;
     }
 
-    private void ConfirmTeamAndGo()
+    private async Task ConfirmTeamAndGo()
     {
-        State.SetEnemyLoadouts(EnemyLoadouts);
+        await State.SetEnemyLoadouts(EnemyLoadouts);
 
         if (State.PlayerLoadouts.Count == 0)
         {

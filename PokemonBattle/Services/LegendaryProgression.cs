@@ -6,6 +6,10 @@ public static class LegendaryProgression
 {
     public const int MaxProgressPercent = 100;
 
+    public readonly record struct EncounterConsumption(
+        int ProgressPercent,
+        bool WasConsumed);
+
     public static bool IsUnlocked(int progressPercent) =>
         progressPercent >= MaxProgressPercent;
 
@@ -34,4 +38,19 @@ public static class LegendaryProgression
 
     public static int AddProgress(int currentProgressPercent, int rewardPercent) =>
         Math.Clamp(currentProgressPercent + Math.Max(0, rewardPercent), 0, MaxProgressPercent);
+
+    public static EncounterConsumption ConsumeEncounter(
+        int currentProgressPercent,
+        bool containsLegendary,
+        bool alreadyConsumed)
+    {
+        int safeProgress = Math.Clamp(currentProgressPercent, 0, MaxProgressPercent);
+
+        if (!containsLegendary || !IsUnlocked(safeProgress) || alreadyConsumed)
+        {
+            return new EncounterConsumption(safeProgress, false);
+        }
+
+        return new EncounterConsumption(0, true);
+    }
 }

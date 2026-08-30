@@ -16,6 +16,7 @@ public class GameState
     public int LegendaryProgressPercent { get; private set; }
     public int LastLegendaryProgressReward { get; private set; }
     public bool LegendaryUnlocked => LegendaryProgression.IsUnlocked(LegendaryProgressPercent);
+    public bool LegendaryEncounterConsumed { get; private set; }
 
     public int SelectedPokemonId { get; private set; } = 1;
     public int EnemyPokemonId { get; private set; } = 4;
@@ -71,6 +72,7 @@ public class GameState
 
         LegendaryProgressPercent = Math.Clamp(legendaryProgressPercent, 0, LegendaryProgression.MaxProgressPercent);
         LastLegendaryProgressReward = 0;
+        LegendaryEncounterConsumed = false;
         _runLoaded = true;
     }
 
@@ -111,10 +113,29 @@ public class GameState
         NotifyChange();
     }
 
-    public void SetEnemyLoadouts(List<PokemonLoadout> loadouts) //상대 미리보기 화면에서 확정된 4개 기술/특성/도구 저장
+    public async Task SetEnemyLoadouts(List<PokemonLoadout> loadouts) //상대 미리보기에서 확정된 라인업 저장 및 전설 출현 소비
     {
-        EnemyLoadouts = TeamLoadoutRules.NormalizeUniqueItems(loadouts);
+        var normalizedLoadouts = TeamLoadoutRules.NormalizeUniqueItems(loadouts);
+        if (!HaveSameLoadouts(EnemyLoadouts, normalizedLoadouts))
+        {
+            LegendaryEncounterConsumed = false;
+        }
+
+        EnemyLoadouts = normalizedLoadouts;
         EnemyTeamIds = EnemyLoadouts.Select(l => l.PokemonId).ToList();
+
+        var consumption = LegendaryProgression.ConsumeEncounter(
+            LegendaryProgressPercent,
+            EnemyTeamProvider.ContainsLegendary(EnemyTeamIds),
+            LegendaryEncounterConsumed);
+
+        if (consumption.WasConsumed)
+        {
+            LegendaryProgressPercent = consumption.ProgressPercent;
+            LegendaryEncounterConsumed = true;
+            await PersistRun();
+        }
+
         NotifyChange();
     }
 
@@ -129,7 +150,9 @@ public class GameState
     public async Task WinRound()
     {
         int progressBefore = LegendaryProgressPercent;
-        int progressReward = LegendaryProgression.CalculateReward(CurrentScore + 1, EnemyLoadouts);
+        int progressReward = LegendaryEncounterConsumed
+            ? 0
+            : LegendaryProgression.CalculateReward(CurrentScore + 1, EnemyLoadouts);
         LegendaryProgressPercent = LegendaryProgression.AddProgress(progressBefore, progressReward);
         LastLegendaryProgressReward = LegendaryProgressPercent - progressBefore;
         CurrentScore++;
@@ -172,6 +195,9 @@ public class GameState
         LastLegendaryProgressReward = 0;
         PlayerLoadouts = new List<PokemonLoadout>();
         PlayerTeamIds = new List<int>();
+        EnemyLoadouts = new List<PokemonLoadout>();
+        EnemyTeamIds = new List<int>();
+        LegendaryEncounterConsumed = false;
         await PersistRun();
         CurrentScreen = GameScreen.Start;
         NotifyChange();
@@ -213,5 +239,28 @@ public class GameState
     private void NotifyChange()
     {
         OnChange?.Invoke();
+    }
+
+    private static bool HaveSameLoadouts(
+        IReadOnlyList<PokemonLoadout> first,
+        IReadOnlyList<PokemonLoadout> second)
+    {
+        if (first.Count != second.Count) return false;
+
+        for (int i = 0; i < first.Count; i++)
+        {
+            var left = first[i];
+            var right = second[i];
+            if (left.PokemonId != right.PokemonId
+                || left.ChosenAbility != right.ChosenAbility
+                || left.ChosenItem != right.ChosenItem
+                || left.Level != right.Level
+                || !left.ChosenMoveNames.SequenceEqual(right.ChosenMoveNames))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
