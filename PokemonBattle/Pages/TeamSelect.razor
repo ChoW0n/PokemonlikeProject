@@ -28,7 +28,7 @@
                        value="@RawSearchText"
                        @oninput="OnSearchChanged" />
 
-                <button type="button" class="lock-toggle" aria-pressed="@ShowLocked" @onclick="() => ShowLocked = !ShowLocked">
+                <button type="button" class="lock-toggle" aria-pressed="@(ShowLocked ? "true" : "false")" @onclick="() => ShowLocked = !ShowLocked">
                     @(ShowLocked ? "🔓 잠긴 포켓몬 숨기기" : "🔒 잠긴 포켓몬 보기")
                 </button>
 
@@ -40,7 +40,7 @@
                         <button type="button" class="dex-entry dex-entry-button @(existingInTeam != null ? "is-selected" : "") @(isUnlocked ? "" : "is-locked")"
                              disabled="@(!isUnlocked)"
                              aria-label="@($"{(isUnlocked ? entry.Value.Name : "잠긴 포켓몬")}, 도감 번호 {entry.Key}{(existingInTeam != null ? $", 현재 팀에 레벨 {existingInTeam.Level}" : "")}")"
-                             aria-pressed="@(existingInTeam != null)"
+                             aria-pressed="@(existingInTeam != null ? "true" : "false")"
                              @onclick="() => StartConfiguring(entry.Key, isUnlocked)">
                             <span class="dex-number">No.@entry.Key.ToString("D3") @(existingInTeam != null ? $"Lv.{existingInTeam.Level}" : "")</span>
                             <img src="@entry.Value.ImageUrl" alt="@entry.Value.Name" class="dex-sprite" />
@@ -133,8 +133,8 @@
                         var move = MoveDatabase.All[moveKey];
                         <button type="button" class="dex-entry dex-entry-button move-tile @(DraftMoves.Contains(moveKey) ? "is-selected" : string.Empty) @(ViewingMoveKey == moveKey ? "is-viewing" : "")"
                              aria-label="@($"{move.Name}, {(move.IsStatus ? "변화기" : "공격기")}{(DraftMoves.Contains(moveKey) ? ", 선택됨" : "")}")"
-                             aria-pressed="@(DraftMoves.Contains(moveKey))"
-                             aria-expanded="@(ViewingMoveKey == moveKey)"
+                             aria-pressed="@(DraftMoves.Contains(moveKey) ? "true" : "false")"
+                             aria-expanded="@(ViewingMoveKey == moveKey ? "true" : "false")"
                              @onclick="() => ViewOrToggleMove(moveKey)">
                             <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
                             <span class="dex-name">@move.Name @(move.Priority > 0 ? "⚡" : "")</span>
@@ -152,7 +152,7 @@
                         }
                         <GaugeBar Label="명중" Percent="@(vmove.AlwaysHits ? 100 : StatBarHelper.AccuracyPercent(vmove.Accuracy))" ColorClass="@(vmove.AlwaysHits ? "gauge-vhigh" : StatBarHelper.AccuracyColor(vmove.Accuracy))" DisplayText="@(vmove.AlwaysHits ? "필중" : $"{vmove.Accuracy}%")" />
                         <p class="info-desc">@(string.IsNullOrWhiteSpace(vmove.Description) ? "설명 없음" : vmove.Description)</p>
-                         <button type="button" class="info-select-btn @(DraftMoves.Contains(ViewingMoveKey) ? "is-active" : "")" aria-pressed="@DraftMoves.Contains(ViewingMoveKey)" @onclick="() => ToggleMove(ViewingMoveKey)">
+                         <button type="button" class="info-select-btn @(DraftMoves.Contains(ViewingMoveKey) ? "is-active" : "")" aria-pressed="@(DraftMoves.Contains(ViewingMoveKey) ? "true" : "false")" @onclick="() => ToggleMove(ViewingMoveKey)">
                             @(DraftMoves.Contains(ViewingMoveKey) ? "선택 해제" : "이 기술 선택")
                         </button>
                     </div>
@@ -164,8 +164,8 @@
                     {
                         <button type="button" class="dex-entry dex-entry-button @(DraftAbility == ability ? "is-selected" : string.Empty) @(ViewingAbility == ability ? "is-viewing" : "")"
                              aria-label="@($"{ability}{(DraftAbility == ability ? ", 선택됨" : "")}")"
-                             aria-pressed="@(DraftAbility == ability)"
-                             aria-expanded="@(ViewingAbility == ability)"
+                             aria-pressed="@(DraftAbility == ability ? "true" : "false")"
+                             aria-expanded="@(ViewingAbility == ability ? "true" : "false")"
                              @onclick="() => ViewingAbility = ability">
                             <span class="dex-name">@ability</span>
                             <span class="dex-type">@(AbilityDatabase.IsImplemented(ability)
@@ -182,7 +182,7 @@
                             ? $"전투에서 실제 적용됩니다. 분류: {AbilityDatabase.GetImplementationGroup(ViewingAbility)}"
                             : $"현재는 설명만 제공되며 전투 효과는 적용되지 않습니다. 우선순위 그룹: {AbilityDatabase.GetImplementationGroup(ViewingAbility)}")</strong></p>
                         <p class="info-desc">@(string.IsNullOrWhiteSpace(desc) ? "설명 없음" : desc)</p>
-                         <button type="button" class="info-select-btn @(DraftAbility == ViewingAbility ? "is-active" : "")" aria-pressed="@(DraftAbility == ViewingAbility)" @onclick="() => DraftAbility = ViewingAbility">
+                        <button type="button" class="info-select-btn @(DraftAbility == ViewingAbility ? "is-active" : "")" aria-pressed="@(DraftAbility == ViewingAbility ? "true" : "false")" @onclick="() => DraftAbility = ViewingAbility">
                             @(DraftAbility == ViewingAbility ? "선택됨" : "이 특성 선택")
                         </button>
                     </div>
@@ -196,8 +196,8 @@
                     {
                         <button type="button" class="dex-entry dex-entry-button @(DraftItem == item.Name ? "is-selected" : string.Empty) @(ViewingItemName == item.Name ? "is-viewing" : "")"
                              aria-label="@($"{item.Name}{(DraftItem == item.Name ? ", 선택됨" : "")}")"
-                             aria-pressed="@(DraftItem == item.Name)"
-                             aria-expanded="@(ViewingItemName == item.Name)"
+                             aria-pressed="@(DraftItem == item.Name ? "true" : "false")"
+                             aria-expanded="@(ViewingItemName == item.Name ? "true" : "false")"
                              @onclick="() => ViewingItemName = item.Name">
                             @if (item.IconUrl != null)
                             {
@@ -212,7 +212,7 @@
                     var vitem = ItemDatabase.GetAvailableItems(picked.Name).First(i => i.Name == ViewingItemName);
                     <div class="info-panel">
                         <p class="info-desc">@vitem.Description</p>
-                         <button type="button" class="info-select-btn @(DraftItem == ViewingItemName ? "is-active" : "")" aria-pressed="@(DraftItem == ViewingItemName)" @onclick="() => DraftItem = ViewingItemName">
+                         <button type="button" class="info-select-btn @(DraftItem == ViewingItemName ? "is-active" : "")" aria-pressed="@(DraftItem == ViewingItemName ? "true" : "false")" @onclick="() => DraftItem = ViewingItemName">
                             @(DraftItem == ViewingItemName ? "선택됨" : "이 도구 선택")
                         </button>
                     </div>

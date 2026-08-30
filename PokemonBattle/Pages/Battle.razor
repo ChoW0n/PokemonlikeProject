@@ -113,7 +113,7 @@
                     <button type="button"
                             class="move-name-button @(PendingMoveKey == moveKey ? "is-pending" : "")"
                             disabled="@(IsBusy || !Hero.CanUseMove(moveKey))"
-                             aria-pressed="@(PendingMoveKey == moveKey)"
+                             aria-pressed="@(PendingMoveKey == moveKey ? "true" : "false")"
                              aria-label="@($"{move.Name}, PP {ppLoop}/{move.MaxPP}{(Hero.CanUseMove(moveKey) ? "" : ", 사용할 수 없음")}")"
                              @onclick="() => TapMove(moveKey)">
                         <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>

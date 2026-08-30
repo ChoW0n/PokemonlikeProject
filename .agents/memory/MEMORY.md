@@ -2,3 +2,4 @@
 - [.NET test restore](dotnet-test-restore.md) — test assets can temporarily miss xUnit analyzer binaries; force-refresh NuGet restore before rerunning tests.
 - [Blazor EF Core context concurrency](blazor-dbcontext-concurrency.md) — await scoped database saves before navigation; fire-and-forget writes can crash the next component's query.
 - [PostgreSQL persistence tests](postgres-persistence-tests.md) — isolate integration data in a temporary schema and always drop it during cleanup.
+- [Blazor ARIA booleans](blazor-aria-boolean-attributes.md) — render dynamic aria-expanded/pressed states as explicit "true"/"false" strings.
