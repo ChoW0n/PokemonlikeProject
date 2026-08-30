@@ -4,6 +4,32 @@ public static class AbilityDatabase
 {
     public static Dictionary<string, AbilityInfo> All = new Dictionary<string, AbilityInfo>();
 
+    // DataGen owns the descriptions, while this set records the runtime rules that
+    // are intentionally supported by the battle simulator.
+    private static readonly HashSet<string> ImplementedAbilities = new()
+    {
+        "심록", "엽록소", "맹화", "선파워", "급류", "젖은접시", "인분", "탈피",
+        "복안", "색안경", "벌레의알림", "근성", "위협", "정전기", "피뢰침",
+        "모래숨기", "모래헤치기", "독가시", "매직가드", "타오르는불꽃", "가뭄",
+        "승기", "정신력", "악취", "포자", "건조피부", "테크니션", "유연",
+        "의기양양", "저수", "싱크로", "노가드", "클리어바디", "옹골참",
+        "마이페이스", "일찍기상", "두꺼운지방", "촉촉바디", "스킬링크", "부유",
+        "저주받은바디", "불면", "괴력집게", "방음", "이판사판", "철주먹",
+        "자연회복", "하늘의은총", "리프가드", "쓱쓱", "수의베일", "필터",
+        "불꽃몸", "자기과신", "적응력", "축전", "속보", "다운로드", "면역",
+        "눈숨기", "이상한비늘", "멀티스케일", "우격다짐", "의욕", "천하장사",
+        "가속", "승리의별", "방진", "마그마의무장", "불굴의마음", "모래날림", "재생력",
+        "잔비", "포이즌힐", "게으름", "불가사의부적", "노말스킨", "시간벌기",
+        "순수한힘", "까칠한피부", "하드록", "하얀연기", "독폭주", "마중물",
+        "아이스바디", "내열", "모래의힘", "눈퍼뜨리기", "전기엔진", "슬로스타트",
+        "심술꾸러기", "부풀린가슴", "깨어진갑옷", "독수", "짓궂은마음", "초식",
+        "철가시", "눈치우기", "오기", "정의의마음", "방탄", "매지션",
+        "질풍날개", "퍼코트", "단단한발톱", "메가런처", "옹골찬턱",
+        "프리즈스킨", "페어리스킨"
+    };
+
+    public static bool IsImplemented(string ability) => ImplementedAbilities.Contains(ability);
+
     static AbilityDatabase()
     {
         All["심록"] = new AbilityInfo("심록", "위급할 때 풀타입의 위력이 올라간다.");
