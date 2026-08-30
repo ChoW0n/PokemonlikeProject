@@ -12,6 +12,13 @@ builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UnlockService>();
 builder.Services.AddScoped<RunStore>();
+builder.Services.AddScoped<BattleEngine>();
+foreach (var handlerType in typeof(BattleEngine).Assembly.GetTypes()
+    .Where(type => type is { IsClass: true, IsAbstract: false }
+        && typeof(IBattleEffectHandler).IsAssignableFrom(type)))
+{
+    builder.Services.AddScoped(typeof(IBattleEffectHandler), handlerType);
+}
 
 builder.Services.AddSingleton<IScoreStore, InMemoryScoreStore>();
 builder.Services.AddSingleton<IPresetStore, InMemoryPresetStore>();
