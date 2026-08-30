@@ -1,0 +1,45 @@
+@page "/continue"
+@using PokemonBattle.Services
+@using PokemonBattle.Models
+@inject GameState State
+@inject NavigationManager Nav
+
+<PageTitle>다음 라운드 준비</PageTitle>
+
+<main class="preview-page">
+    <h1>다음 라운드 준비</h1>
+    <p>현재 팀을 그대로 쓰거나, 기술/특성/도구를 다시 구성할 수 있습니다.</p>
+
+    <div class="enemy-grid">
+        @foreach (var loadout in ValidLoadouts)
+        {
+            var data = PokemonDatabase.All[loadout.PokemonId];
+            <div class="enemy-card">
+                <img src="@data.ImageUrl" alt="@data.Name" class="enemy-sprite" />
+                <h3>@data.Name</h3>
+                <p>Lv.@loadout.Level</p>
+            </div>
+        }
+    </div>
+
+    <button type="button" @onclick="GoChange">🔄 포켓몬 변경 (기술/특성/도구 다시 구성)</button>
+    <button type="button" @onclick="GoKeep">✅ 현재 팀 유지하고 배틀 시작</button>
+</main>
+
+@code {
+    //유효하지 않은(도감에 없는) PokemonId는 화면에서 걸러냄 (예전 데이터 꼬임 방지)
+    private List<PokemonLoadout> ValidLoadouts =>
+        State.PlayerLoadouts.Where(l => PokemonDatabase.All.ContainsKey(l.PokemonId)).ToList();
+
+    private void GoChange()
+    {
+        State.GoTo(GameScreen.TeamSelect);
+        Nav.NavigateTo("/select");
+    }
+
+    private void GoKeep()
+    {
+        State.GoTo(GameScreen.Battle);
+        Nav.NavigateTo("/battle");
+    }
+}

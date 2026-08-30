@@ -1,0 +1,7 @@
+{
+  "pierce": { "windupMs": 150, "mainMs": 320, "tailMs": 100, "shakeMs": 200, "flashMs": 100, "hitstopMs": 60 },
+  "burst": { "windupMs": 180, "mainMs": 380, "tailMs": 140, "shakeMs": 260, "flashMs": 180, "hitstopMs": 70 },
+  "impact": { "windupMs": 100, "mainMs": 360, "tailMs": 160, "shakeMs": 320, "flashMs": 120, "hitstopMs": 80 },
+  "multi": { "windupMs": 100, "mainMs": 420, "tailMs": 140, "shakeMs": 240, "flashMs": 100, "hitstopMs": 50 },
+  "sparkle": { "windupMs": 100, "mainMs": 420, "tailMs": 160, "shakeMs": 0, "flashMs": 0, "hitstopMs": 0 }
+}

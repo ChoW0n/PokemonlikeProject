@@ -1,0 +1,38 @@
+@page "/register"
+@using PokemonBattle.Services
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>회원가입</PageTitle>
+
+<main class="start-page">
+    <h1>회원가입</h1>
+    <p>@Message</p>
+
+    <input class="dex-search" placeholder="아이디" @bind-value="Username" @bind-value:event="oninput" />
+    <input class="dex-search" placeholder="비밀번호" type="password" @bind-value="Password" @bind-value:event="oninput" />
+
+    <button type="button" @onclick="DoRegister">가입하기</button>
+    <button type="button" @onclick="GoLogin">이미 계정이 있어요</button>
+</main>
+
+@code {
+    private string Username = "";
+    private string Password = "";
+    private string Message = "";
+
+    private async Task DoRegister()
+    {
+        var (success, message) = await Auth.Register(Username, Password);
+        Message = message;
+        if (success)
+        {
+            Nav.NavigateTo("/login");
+        }
+    }
+
+    private void GoLogin()
+    {
+        Nav.NavigateTo("/login");
+    }
+}

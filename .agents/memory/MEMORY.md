@@ -1,0 +1,1 @@
+- [Blazor artifact publishing](blazor-artifact-publishing.md) — artifact production lacks `dotnet`; publish with a portable self-contained Linux bundle.

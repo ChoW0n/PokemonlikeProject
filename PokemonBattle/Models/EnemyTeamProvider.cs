@@ -1,0 +1,119 @@
+namespace PokemonBattle.Models;
+
+public static class EnemyTeamProvider
+{
+    private static readonly Random rng = new Random();
+
+    //전설/환상 포켓몬 도감번호. 별도 보스전 시스템이 생기기 전까지는 일반 랜덤 조우에서 제외
+    private static readonly HashSet<int> LegendaryIds = new()
+    {
+        144,145,146,150,151,243,244,245,249,250,251,377,378,379,380,381,382,383,384,385,386,
+        480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,
+        638,639,640,641,642,643,644,645,646,647,648,649,716,717,718
+    };
+
+    private static readonly HashSet<int> FirstStageIds = new()
+    {
+        1, 4, 7, 10, 13, 16, 19, 21, 23, 25, 27, 29, 32, 35, 37, 39, 41, 43, 46, 48,
+        50, 52, 54, 56, 58, 60, 63, 66, 69, 72, 74, 77, 79, 81, 84, 86, 88, 90, 92,
+        95, 96, 98, 100, 102, 104, 108, 109, 111, 116, 118, 120, 129, 133, 138, 140,
+        147, 152, 155, 158, 161, 163, 165, 167, 170, 172, 173, 174, 175, 177, 179,
+        183, 187, 190, 191, 194, 198, 200, 209, 211, 213, 214, 216, 218, 220, 223,
+        225, 227, 228, 231, 234, 236, 238, 239, 240, 246, 252, 255, 258, 261, 263,
+        265, 270, 273, 276, 278, 280, 285, 287, 290, 293, 296, 298, 300, 302, 304,
+        309, 311, 312, 313, 314, 316, 318, 320, 322, 324, 325, 327, 328, 331, 333,
+        335, 336, 337, 338, 339, 341, 343, 345, 347, 349, 351, 352, 353, 355, 357,
+        358, 359, 360, 361, 363, 366, 368, 369, 370, 371, 374, 387, 390, 393, 396,
+        399, 401, 403, 406, 408, 410, 412, 415, 417, 418, 420, 422, 425, 427, 428,
+        431, 433, 434, 436, 438, 439, 440, 443, 446, 447, 449, 451, 453, 455, 456,
+        459, 461, 462, 463, 464, 466, 467, 469, 470, 471, 472, 473, 474, 475, 476,
+        477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491,
+        492, 493, 495, 498, 501, 504, 506, 509, 511, 513, 515, 517, 519, 522, 524,
+        527, 529, 531, 532, 535, 538, 539, 540, 543, 546, 548, 550, 551, 554, 557,
+        559, 562, 564, 566, 568, 570, 572, 574, 577, 580, 582, 585, 587, 588, 590,
+        592, 594, 595, 597, 599, 602, 605, 607, 610, 613, 615, 616, 618, 619, 621,
+        622, 624, 626, 627, 629, 631, 632, 633, 636, 641, 642, 645, 646, 647, 648,
+        649, 650, 653, 656, 659, 661, 664, 667, 669, 672, 674, 677, 679, 682, 684,
+        686, 688, 690, 692, 694, 696, 698, 700, 701, 702, 703, 704, 707, 708, 710,
+        712, 714, 716, 717, 718, 719, 720, 721
+    };
+
+    public static List<KeyValuePair<int, PokemonData>> GetRandomTeam(int count, int poolSize, bool firstStageOnly, HashSet<int> excludeIds)
+    {
+        var candidates = PokemonDatabase.All
+            .Where(p => p.Key <= poolSize)
+            .Where(p => !excludeIds.Contains(p.Key))
+            .Where(p => !LegendaryIds.Contains(p.Key));
+
+        if (firstStageOnly)
+        {
+            candidates = candidates.Where(p => FirstStageIds.Contains(p.Key));
+        }
+
+        var pool = candidates.ToList();
+
+        if (pool.Count < count)
+        {
+            pool = PokemonDatabase.All.Where(p => p.Key <= poolSize && !LegendaryIds.Contains(p.Key)).ToList();
+            if (firstStageOnly) pool = pool.Where(p => FirstStageIds.Contains(p.Key)).ToList();
+        }
+
+        return pool.OrderBy(_ => rng.Next()).Take(count).ToList();
+    }
+
+    //프로급 기술 선택: 자속(STAB) 우선 + 서로 다른 속성으로 커버리지 확보 + 변화기 최소 1개 포함
+    public static List<string> PickProMoveset(PokemonData data)
+    {
+        var candidates = data.MoveNames.Select(k => (Key: k, Move: MoveDatabase.All[k])).ToList();
+
+        double Score((string Key, Move Move) c)
+        {
+            var m = c.Move;
+            bool stab = m.Type == data.Type1 || data.Type2 == m.Type;
+
+            if (m.IsStatus)
+            {
+                double s = 25;
+                if (m.StatChanges.Count > 0) s += 15;
+                if (m.AilmentName != "none") s += 15;
+                if (m.Priority > 0) s += 5;
+                return s;
+            }
+
+            double acc = m.AlwaysHits ? 100 : m.Accuracy;
+            double power = m.Power * (stab ? 1.5 : 1.0) * (acc / 100.0);
+            if (m.Priority > 0) power += 10;
+            return power;
+        }
+
+        var ranked = candidates.OrderByDescending(Score).ToList();
+        var chosen = new List<string>();
+        var usedTypes = new HashSet<PokemonType>();
+
+        //1차: 서로 다른 속성의 강력한 공격기 위주로 최대 3개
+        foreach (var c in ranked)
+        {
+            if (chosen.Count >= 3) break;
+            if (c.Move.IsStatus) continue;
+            if (usedTypes.Contains(c.Move.Type)) continue;
+            chosen.Add(c.Key);
+            usedTypes.Add(c.Move.Type);
+        }
+
+        //2차: 변화기(상태이상/랭크업 등) 하나 확보 시도
+        var statusPick = ranked.FirstOrDefault(c => c.Move.IsStatus && !chosen.Contains(c.Key));
+        if (statusPick.Key != null && chosen.Count < 4)
+        {
+            chosen.Add(statusPick.Key);
+        }
+
+        //3차: 그래도 4개 안 차면 점수순으로 채움
+        foreach (var c in ranked)
+        {
+            if (chosen.Count >= 4) break;
+            if (!chosen.Contains(c.Key)) chosen.Add(c.Key);
+        }
+
+        return chosen.Take(4).ToList();
+    }
+}

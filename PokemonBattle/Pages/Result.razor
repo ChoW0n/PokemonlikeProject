@@ -1,0 +1,115 @@
+@page "/result"
+@using PokemonBattle.Services
+@using PokemonBattle.Models
+@inject GameState State
+@inject UnlockService Unlocks
+@inject NavigationManager Nav
+
+<PageTitle>배틀 결과</PageTitle>
+
+<main class="result-page">
+    @if (State.LastBattleWon)
+    {
+        <h1 class="result-win">승리!</h1>
+        <p>현재 연승 점수: @State.CurrentScore</p>
+        <p>최고 기록: @State.HighScore</p>
+
+        @if (State.EvolutionMessages.Count > 0)
+        {
+            <p class="config-label">🎉 새로운 진화형 해금: @string.Join(", ", State.EvolutionMessages)</p>
+        }
+
+        @if (Candidates.Count > 0 && !Claimed)
+        {
+            <p class="config-label">쓰러뜨린 상대 중 1마리를 데려갈 수 있습니다 (선택은 자유입니다)</p>
+            <div class="enemy-grid">
+                @foreach (var candidate in Candidates)
+                {
+                    bool owned = OwnedIds.Contains(candidate.Key);
+                    <div class="enemy-card @(SelectedCatchId == candidate.Key ? "is-selected" : string.Empty)"
+                         @onclick="() => SelectedCatchId = candidate.Key">
+                        <img src="@candidate.Value.ImageUrl" alt="@candidate.Value.Name" class="enemy-sprite" />
+                        <h3>@candidate.Value.Name</h3>
+                        <p>@(owned ? "보유 중 · 선택 시 추가 레벨" : "미보유 · 선택 시 해금")</p>
+                    </div>
+                }
+            </div>
+            <button type="button" disabled="@(SelectedCatchId == null)" @onclick="ClaimPokemon">이 포켓몬 데려가기</button>
+        }
+        else if (Claimed)
+        {
+            <p>@ClaimMessage</p>
+        }
+
+        <button type="button" @onclick="NextRound">다음 상대와 계속하기</button>
+    }
+    else
+    {
+        <h1 class="result-lose">패배...</h1>
+        <p>이번 판 점수: 0으로 초기화됨</p>
+        <p>최고 기록: @State.HighScore</p>
+        <button type="button" @onclick="RestartGame">처음부터 다시 시작</button>
+    }
+</main>
+
+@code {
+    private List<KeyValuePair<int, PokemonData>> Candidates = new();
+    private HashSet<int> OwnedIds = new();
+    private int? SelectedCatchId;
+    private bool Claimed;
+    private string ClaimMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!State.LastBattleWon) return;
+
+        OwnedIds = await Unlocks.GetUnlockedIds();
+
+        //상대 팀 전체가 후보. 보유 여부와 무관하게 다 보여주고, 선택은 순전히 유저 자유
+        Candidates = State.EnemyTeamIds
+            .Distinct()
+            .Select(id => new KeyValuePair<int, PokemonData>(id, PokemonDatabase.All[id]))
+            .ToList();
+    }
+
+    private async Task ClaimPokemon()
+    {
+        if (SelectedCatchId == null) return;
+
+        int id = SelectedCatchId.Value;
+
+        if (OwnedIds.Contains(id))
+        {
+            //이미 보유한 포켓몬: 지금 팀에 있으면 추가 레벨 지급, 없으면 안내만
+            var teammate = State.PlayerLoadouts.FirstOrDefault(l => l.PokemonId == id);
+            if (teammate != null)
+            {
+                teammate.Level++;
+                ClaimMessage = $"{PokemonDatabase.All[id].Name}이(가) 추가 레벨을 얻었습니다! (Lv.{teammate.Level})";
+            }
+            else
+            {
+                ClaimMessage = $"{PokemonDatabase.All[id].Name}은(는) 이미 보유 중입니다. (현재 팀에는 없어 효과 없음)";
+            }
+        }
+        else
+        {
+            await Unlocks.Unlock(id);
+            ClaimMessage = $"{PokemonDatabase.All[id].Name}을(를) 새로 해금했습니다!";
+        }
+
+        Claimed = true;
+    }
+
+    private void NextRound() //선택 여부와 무관하게 항상 작동
+    {
+        State.GoTo(GameScreen.EnemyPreview);
+        Nav.NavigateTo("/preview");
+    }
+
+    private void RestartGame()
+    {
+        State.ResetForNewRun();
+        Nav.NavigateTo("/");
+    }
+}

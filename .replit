@@ -1,12 +1,17 @@
+# Blazor development preview requires the .NET SDK.
+# Production publish uses the artifact self-contained executable.
 modules = ["nodejs-24", "dotnet-8.0"]
 
 [deployment]
 router = "application"
 deploymentTarget = "autoscale"
+build = ["pnpm", "--filter", "@workspace/pokemon-battle", "run", "build"]
+run = ["pnpm", "--filter", "@workspace/pokemon-battle", "run", "serve"]
 
 [deployment.postBuild]
 args = ["pnpm", "store", "prune"]
 env = { "CI" = "true" }
+
 
 [workflows]
 runButton = "Project"
@@ -27,3 +32,7 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[[ports]]
+localPort = 3000
+externalPort = 80

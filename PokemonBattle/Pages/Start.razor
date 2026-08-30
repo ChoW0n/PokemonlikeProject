@@ -1,0 +1,36 @@
+@page "/"
+@using PokemonBattle.Services
+@using PokemonBattle.Models
+@inject GameState State
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Nav
+
+<PageTitle>포켓몬 배틀</PageTitle>
+
+<main class="start-page">
+    <h1>포켓몬 배틀</h1>
+    <p>@CurrentUser.Username 님, 환영합니다!</p>
+    <p>최고 기록: @State.HighScore</p>
+    <p>현재 점수: @State.CurrentScore</p>
+
+    <button type="button" @onclick="StartGame">시작하기</button>
+</main>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CurrentUser.IsLoggedIn)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        await State.LoadRunForCurrentUser(); //뒤로가기/새로고침 등으로 회선이 새로 열려도 여기서 진행 상황 복구
+    }
+
+    private void StartGame()
+    {
+        State.GoTo(GameScreen.EnemyPreview);
+        Nav.NavigateTo("/preview");
+    }
+}
