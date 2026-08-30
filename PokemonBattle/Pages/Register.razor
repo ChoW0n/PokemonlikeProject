@@ -5,14 +5,18 @@
 
 <PageTitle>회원가입</PageTitle>
 
-<main class="start-page">
+    <main class="start-page auth-page">
     <h1>회원가입</h1>
-    <p>@Message</p>
+        <p class="form-message" role="status" aria-live="polite">@Message</p>
 
-    <input class="dex-search" placeholder="아이디" @bind-value="Username" @bind-value:event="oninput" />
-    <input class="dex-search" placeholder="비밀번호" type="password" @bind-value="Password" @bind-value:event="oninput" />
+        <form class="auth-form" @onsubmit="DoRegister" @onsubmit:preventDefault>
+            <label for="register-username">아이디</label>
+            <input id="register-username" class="dex-search" placeholder="아이디" autocomplete="username" @bind-value="Username" @bind-value:event="oninput" />
+            <label for="register-password">비밀번호</label>
+            <input id="register-password" class="dex-search" placeholder="비밀번호" type="password" autocomplete="new-password" @bind-value="Password" @bind-value:event="oninput" />
 
-    <button type="button" @onclick="DoRegister">가입하기</button>
+            <button type="submit">가입하기</button>
+        </form>
     <button type="button" @onclick="GoLogin">이미 계정이 있어요</button>
 </main>
 

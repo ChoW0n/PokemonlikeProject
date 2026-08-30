@@ -22,12 +22,13 @@
         <div class="pokedex-screen">
             @if (ConfiguringId == null)
             {
-                <input class="dex-search"
+                <label class="visually-hidden" for="pokemon-search">포켓몬 이름 검색</label>
+                <input id="pokemon-search" class="dex-search"
                        placeholder="포켓몬 이름 검색..."
                        value="@RawSearchText"
                        @oninput="OnSearchChanged" />
 
-                <button type="button" class="lock-toggle" @onclick="() => ShowLocked = !ShowLocked">
+                <button type="button" class="lock-toggle" aria-pressed="@(ShowLocked ? "true" : "false")" @onclick="() => ShowLocked = !ShowLocked">
                     @(ShowLocked ? "🔓 잠긴 포켓몬 숨기기" : "🔒 잠긴 포켓몬 보기")
                 </button>
 
@@ -36,26 +37,29 @@
                     {
                         bool isUnlocked = UnlockedIds.Contains(entry.Key);
                         var existingInTeam = TeamLoadouts.FirstOrDefault(l => l.PokemonId == entry.Key);
-                        <div class="dex-entry @(existingInTeam != null ? "is-selected" : "") @(isUnlocked ? "" : "is-locked")"
+                        <button type="button" class="dex-entry dex-entry-button @(existingInTeam != null ? "is-selected" : "") @(isUnlocked ? "" : "is-locked")"
+                             disabled="@(!isUnlocked)"
+                             aria-label="@($"{(isUnlocked ? entry.Value.Name : "잠긴 포켓몬")}, 도감 번호 {entry.Key}{(existingInTeam != null ? $", 현재 팀에 레벨 {existingInTeam.Level}" : "")}")"
+                             aria-pressed="@(existingInTeam != null ? "true" : "false")"
                              @onclick="() => StartConfiguring(entry.Key, isUnlocked)">
                             <span class="dex-number">No.@entry.Key.ToString("D3") @(existingInTeam != null ? $"Lv.{existingInTeam.Level}" : "")</span>
                             <img src="@entry.Value.ImageUrl" alt="@entry.Value.Name" class="dex-sprite" />
                             <span class="dex-name">@(isUnlocked ? entry.Value.Name : "???")</span>
                             @if (isUnlocked)
                             {
-                                <div class="dex-type-icons">
+                                <span class="dex-type-icons">
                                     <img src="@TypeIcons.GetUrl(entry.Value.Type1)" class="type-icon-img small" alt="@entry.Value.Type1" />
                                     @if (entry.Value.Type2 != null)
                                     {
                                         <img src="@TypeIcons.GetUrl(entry.Value.Type2.Value)" class="type-icon-img small" alt="@entry.Value.Type2" />
                                     }
-                                </div>
+                                </span>
                             }
                             else
                             {
                                 <span class="dex-type">🔒 잠김</span>
                             }
-                        </div>
+                        </button>
                     }
                 </div>
                 @if (TotalMatchCount > FilteredPokemon.Count)
@@ -71,14 +75,14 @@
                         {
                             int idx = i;
                             var data = PokemonDatabase.All[TeamLoadouts[idx].PokemonId];
-                            <div class="dex-entry">
+                            <div class="dex-entry team-order-entry">
                                 <span class="dex-number">#@(idx + 1) Lv.@TeamLoadouts[idx].Level</span>
                                 <img src="@data.ImageUrl" alt="@data.Name" class="dex-sprite" />
                                 <span class="dex-name">@data.Name</span>
                                 <div class="order-buttons">
-                                    <button type="button" disabled="@(idx == 0)" @onclick="() => MoveOrderUp(idx)">↑</button>
-                                    <button type="button" disabled="@(idx == TeamLoadouts.Count - 1)" @onclick="() => MoveOrderDown(idx)">↓</button>
-                                    <button type="button" class="remove-btn" @onclick="() => RemoveFromTeam(idx)">✕</button>
+                                     <button type="button" aria-label="@($"{data.Name} 팀 순서 위로 이동")" disabled="@(idx == 0)" @onclick="() => MoveOrderUp(idx)">↑</button>
+                                     <button type="button" aria-label="@($"{data.Name} 팀 순서 아래로 이동")" disabled="@(idx == TeamLoadouts.Count - 1)" @onclick="() => MoveOrderDown(idx)">↓</button>
+                                     <button type="button" class="remove-btn" aria-label="@($"{data.Name} 팀에서 제거")" @onclick="() => RemoveFromTeam(idx)">✕</button>
                                 </div>
                             </div>
                         }
@@ -92,9 +96,9 @@
                 </div>
                 @foreach (var name in State.ListPresetNames())
                 {
-                    <div class="dex-entry" @onclick="() => LoadPresetByName(name)">
+                    <button type="button" class="dex-entry preset-entry" aria-label="@($"{name} 프리셋 불러오기")" @onclick="() => LoadPresetByName(name)">
                         <span class="dex-name">📁 @name</span>
-                    </div>
+                    </button>
                 }
             }
             else
@@ -127,12 +131,15 @@
                     @foreach (var moveKey in picked.MoveNames)
                     {
                         var move = MoveDatabase.All[moveKey];
-                        <div class="dex-entry move-tile @(DraftMoves.Contains(moveKey) ? "is-selected" : string.Empty) @(ViewingMoveKey == moveKey ? "is-viewing" : "")"
+                        <button type="button" class="dex-entry dex-entry-button move-tile @(DraftMoves.Contains(moveKey) ? "is-selected" : string.Empty) @(ViewingMoveKey == moveKey ? "is-viewing" : "")"
+                             aria-label="@($"{move.Name}, {(move.IsStatus ? "변화기" : "공격기")}{(DraftMoves.Contains(moveKey) ? ", 선택됨" : "")}")"
+                             aria-pressed="@(DraftMoves.Contains(moveKey) ? "true" : "false")"
+                             aria-expanded="@(ViewingMoveKey == moveKey ? "true" : "false")"
                              @onclick="() => ViewOrToggleMove(moveKey)">
                             <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
                             <span class="dex-name">@move.Name @(move.Priority > 0 ? "⚡" : "")</span>
                             <span class="dex-type">@(move.IsStatus ? "변화기" : "공격기")</span>
-                        </div>
+                        </button>
                     }
                 </div>
                 @if (ViewingMoveKey != null)
@@ -145,7 +152,7 @@
                         }
                         <GaugeBar Label="명중" Percent="@(vmove.AlwaysHits ? 100 : StatBarHelper.AccuracyPercent(vmove.Accuracy))" ColorClass="@(vmove.AlwaysHits ? "gauge-vhigh" : StatBarHelper.AccuracyColor(vmove.Accuracy))" DisplayText="@(vmove.AlwaysHits ? "필중" : $"{vmove.Accuracy}%")" />
                         <p class="info-desc">@(string.IsNullOrWhiteSpace(vmove.Description) ? "설명 없음" : vmove.Description)</p>
-                        <button type="button" class="info-select-btn @(DraftMoves.Contains(ViewingMoveKey) ? "is-active" : "")" @onclick="() => ToggleMove(ViewingMoveKey)">
+                         <button type="button" class="info-select-btn @(DraftMoves.Contains(ViewingMoveKey) ? "is-active" : "")" aria-pressed="@(DraftMoves.Contains(ViewingMoveKey) ? "true" : "false")" @onclick="() => ToggleMove(ViewingMoveKey)">
                             @(DraftMoves.Contains(ViewingMoveKey) ? "선택 해제" : "이 기술 선택")
                         </button>
                     </div>
@@ -155,13 +162,16 @@
                 <div class="dex-grid">
                     @foreach (var ability in picked.AbilityNames)
                     {
-                        <div class="dex-entry @(DraftAbility == ability ? "is-selected" : string.Empty) @(ViewingAbility == ability ? "is-viewing" : "")"
+                        <button type="button" class="dex-entry dex-entry-button @(DraftAbility == ability ? "is-selected" : string.Empty) @(ViewingAbility == ability ? "is-viewing" : "")"
+                             aria-label="@($"{ability}{(DraftAbility == ability ? ", 선택됨" : "")}")"
+                             aria-pressed="@(DraftAbility == ability ? "true" : "false")"
+                             aria-expanded="@(ViewingAbility == ability ? "true" : "false")"
                              @onclick="() => ViewingAbility = ability">
                             <span class="dex-name">@ability</span>
                             <span class="dex-type">@(AbilityDatabase.IsImplemented(ability)
                                 ? $"전투 적용 · {AbilityDatabase.GetImplementationGroup(ability)}"
                                 : $"설명만 제공 · {AbilityDatabase.GetImplementationGroup(ability)}")</span>
-                        </div>
+                        </button>
                     }
                 </div>
                 @if (ViewingAbility != null)
@@ -172,25 +182,29 @@
                             ? $"전투에서 실제 적용됩니다. 분류: {AbilityDatabase.GetImplementationGroup(ViewingAbility)}"
                             : $"현재는 설명만 제공되며 전투 효과는 적용되지 않습니다. 우선순위 그룹: {AbilityDatabase.GetImplementationGroup(ViewingAbility)}")</strong></p>
                         <p class="info-desc">@(string.IsNullOrWhiteSpace(desc) ? "설명 없음" : desc)</p>
-                        <button type="button" class="info-select-btn @(DraftAbility == ViewingAbility ? "is-active" : "")" @onclick="() => DraftAbility = ViewingAbility">
+                        <button type="button" class="info-select-btn @(DraftAbility == ViewingAbility ? "is-active" : "")" aria-pressed="@(DraftAbility == ViewingAbility ? "true" : "false")" @onclick="() => DraftAbility = ViewingAbility">
                             @(DraftAbility == ViewingAbility ? "선택됨" : "이 특성 선택")
                         </button>
                     </div>
                 }
 
                 <p class="config-label">도구 선택 — 눌러서 설명을 확인할 수 있습니다</p>
-                <input class="dex-search" placeholder="도구 이름 검색..." value="@ItemSearchText" @oninput="OnItemSearchChanged" />
+                <label class="visually-hidden" for="item-search">도구 이름 검색</label>
+                <input id="item-search" class="dex-search" placeholder="도구 이름 검색..." value="@ItemSearchText" @oninput="OnItemSearchChanged" />
                 <div class="dex-grid">
                     @foreach (var item in FilteredItems(picked.Name))
                     {
-                        <div class="dex-entry @(DraftItem == item.Name ? "is-selected" : string.Empty) @(ViewingItemName == item.Name ? "is-viewing" : "")"
+                        <button type="button" class="dex-entry dex-entry-button @(DraftItem == item.Name ? "is-selected" : string.Empty) @(ViewingItemName == item.Name ? "is-viewing" : "")"
+                             aria-label="@($"{item.Name}{(DraftItem == item.Name ? ", 선택됨" : "")}")"
+                             aria-pressed="@(DraftItem == item.Name ? "true" : "false")"
+                             aria-expanded="@(ViewingItemName == item.Name ? "true" : "false")"
                              @onclick="() => ViewingItemName = item.Name">
                             @if (item.IconUrl != null)
                             {
                                 <img src="@item.IconUrl" alt="@item.Name" class="item-icon" />
                             }
                             <span class="dex-name">@item.Name</span>
-                        </div>
+                        </button>
                     }
                 </div>
                 @if (ViewingItemName != null)
@@ -198,7 +212,7 @@
                     var vitem = ItemDatabase.GetAvailableItems(picked.Name).First(i => i.Name == ViewingItemName);
                     <div class="info-panel">
                         <p class="info-desc">@vitem.Description</p>
-                        <button type="button" class="info-select-btn @(DraftItem == ViewingItemName ? "is-active" : "")" @onclick="() => DraftItem = ViewingItemName">
+                         <button type="button" class="info-select-btn @(DraftItem == ViewingItemName ? "is-active" : "")" aria-pressed="@(DraftItem == ViewingItemName ? "true" : "false")" @onclick="() => DraftItem = ViewingItemName">
                             @(DraftItem == ViewingItemName ? "선택됨" : "이 도구 선택")
                         </button>
                     </div>
