@@ -13,6 +13,31 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
 
     public async Task AfterDamageResultAsync(BattleEffectContext context)
     {
+        if (MoveRuleMetadata.IsRampageMove(context.MoveKey)
+            && context.TotalDamage > 0
+            && !context.Attacker.IsFainted)
+        {
+            bool ended = false;
+            if (context.Attacker.RampageMoveKey == null)
+            {
+                context.Attacker.StartRampage(context.MoveKey, context.Random.Next(2, 4));
+            }
+            else
+            {
+                ended = context.Attacker.AdvanceRampageTurn();
+            }
+
+            if (ended)
+            {
+                context.Attacker.ClearRampage();
+                if (!context.Attacker.IsConfused && !context.Attacker.IsImmuneToConfusion())
+                {
+                    context.Attacker.ApplyConfusion(context.Random);
+                    await context.ShowMessage($"{context.Attacker.Data.Name}은(는) 난동이 끝나 혼란에 빠졌다!");
+                }
+            }
+        }
+
         if (context.Move.DrainPercent > 0 && !context.Attacker.IsFainted)
         {
             int heal = Math.Max(1, context.TotalDamage * context.Move.DrainPercent / 100);
