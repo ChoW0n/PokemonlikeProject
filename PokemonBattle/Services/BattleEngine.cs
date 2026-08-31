@@ -624,7 +624,7 @@ public sealed class BattleEngine
         if (!move.IsStatus && move.Power > 0)
         {
             int attackStat = GetAttackStat(attacker, defender, moveKey, move);
-            int defenseStat = GetDefenseStat(defender, moveKey, move);
+            int defenseStat = GetDefenseStat(attacker, defender, moveKey, move);
             double power = MoveRuleMetadata.EffectivePower(moveKey, move, attacker, defender);
             bool stab = attacker.HasType(attackType);
             if (stab) power *= 1.5;
@@ -746,14 +746,18 @@ public sealed class BattleEngine
     private static int GetAttackStat(Pokemon attacker, Pokemon defender, string moveKey, Move move)
     {
         if (moveKey == "body-press") return attacker.EffectiveDef;
-        if (moveKey == "foul-play") return defender.EffectiveAtk;
-        return move.IsSpecial ? attacker.EffectiveSpAtk : attacker.EffectiveAtk;
+        if (moveKey == "foul-play") return defender.EffectiveAtkAgainst(attacker);
+        return move.IsSpecial
+            ? attacker.EffectiveSpAtkAgainst(defender)
+            : attacker.EffectiveAtkAgainst(defender);
     }
 
-    private static int GetDefenseStat(Pokemon defender, string moveKey, Move move)
+    private static int GetDefenseStat(Pokemon attacker, Pokemon defender, string moveKey, Move move)
     {
         if (moveKey is "secret-sword" or "psystrike" or "psyshock") return defender.EffectiveDef;
-        return move.IsSpecial ? defender.EffectiveSpDef : defender.EffectiveDef;
+        return move.IsSpecial
+            ? defender.EffectiveSpDefAgainst(attacker)
+            : defender.EffectiveDef;
     }
 
     private int RollHitCount(Pokemon attacker, Move move)

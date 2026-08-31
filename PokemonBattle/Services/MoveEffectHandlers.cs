@@ -311,8 +311,13 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 break;
 
             case MoveRuleKind.Yawn:
-                defender.SetYawn();
-                await context.ShowMessage($"{defender.Data.Name}은(는) 하품을 했다. 다음 턴 잠들 것 같다!");
+                if (defender.IsImmuneToAilment("sleep"))
+                    await context.ShowMessage($"{defender.Data.Name}은(는) 잠들지 않는다!");
+                else
+                {
+                    defender.SetYawn();
+                    await context.ShowMessage($"{defender.Data.Name}은(는) 하품을 했다. 다음 턴 잠들 것 같다!");
+                }
                 break;
 
             case MoveRuleKind.PerishSong:
@@ -322,7 +327,11 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 break;
 
             case MoveRuleKind.Disable:
-                if (defender.LastMoveKey != null)
+                if (defender.IsImmuneToMentalEffect("disable"))
+                {
+                    await context.ShowMessage($"{defender.Data.Name}은(는) 아로마베일로 기술 봉인을 막았다!");
+                }
+                else if (defender.LastMoveKey != null)
                 {
                     defender.DisableMove(defender.LastMoveKey);
                     await context.ShowMessage($"{defender.Data.Name}의 {defender.LastMoveKey}이(가) 봉인되었다!");
@@ -449,12 +458,22 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         switch (context.MoveKey)
         {
             case "taunt":
-                defender.SetTaunt(3);
-                await context.ShowMessage($"{defender.Data.Name}은(는) 도발에 걸렸다!");
+                if (defender.IsImmuneToMentalEffect("taunt"))
+                    await context.ShowMessage($"{defender.Data.Name}은(는) 아로마베일로 도발을 막았다!");
+                else
+                {
+                    defender.SetTaunt(3);
+                    await context.ShowMessage($"{defender.Data.Name}은(는) 도발에 걸렸다!");
+                }
                 break;
             case "torment":
-                defender.SetTorment(5);
-                await context.ShowMessage($"{defender.Data.Name}은(는) 괴롭힘을 당해 같은 기술을 연속으로 쓸 수 없다!");
+                if (defender.IsImmuneToMentalEffect("torment"))
+                    await context.ShowMessage($"{defender.Data.Name}은(는) 아로마베일로 괴롭힘을 막았다!");
+                else
+                {
+                    defender.SetTorment(5);
+                    await context.ShowMessage($"{defender.Data.Name}은(는) 괴롭힘을 당해 같은 기술을 연속으로 쓸 수 없다!");
+                }
                 break;
             case "throat-chop":
                 defender.SetThroatChop(2);
@@ -465,16 +484,26 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 await context.ShowMessage($"{defender.Data.Name}은(는) 도구를 사용할 수 없게 되었다!");
                 break;
             case "heal-block":
-                defender.SetHealBlock(5);
-                await context.ShowMessage($"{defender.Data.Name}은(는) 회복 기술을 쓸 수 없게 되었다!");
+                if (defender.IsImmuneToMentalEffect("heal-block"))
+                    await context.ShowMessage($"{defender.Data.Name}은(는) 아로마베일로 회복 봉인을 막았다!");
+                else
+                {
+                    defender.SetHealBlock(5);
+                    await context.ShowMessage($"{defender.Data.Name}은(는) 회복 기술을 쓸 수 없게 되었다!");
+                }
                 break;
             case "imprison":
                 defender.AddImprisonedMoves(attacker.CurrentPP.Keys);
                 await context.ShowMessage($"{defender.Data.Name}은(는) 상대가 알고 있는 기술을 쓸 수 없게 되었다!");
                 break;
             case "encore" when defender.LastMoveKey != null:
-                defender.SetEncore(defender.LastMoveKey, 3);
-                await context.ShowMessage($"{defender.Data.Name}은(는) {defender.LastMoveKey}를 계속 사용하게 되었다!");
+                if (defender.IsImmuneToMentalEffect("encore"))
+                    await context.ShowMessage($"{defender.Data.Name}은(는) 아로마베일로 앙코르를 막았다!");
+                else
+                {
+                    defender.SetEncore(defender.LastMoveKey, 3);
+                    await context.ShowMessage($"{defender.Data.Name}은(는) {defender.LastMoveKey}를 계속 사용하게 되었다!");
+                }
                 break;
             case "attract":
                 defender.SetInfatuated();
