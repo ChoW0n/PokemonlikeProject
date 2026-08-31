@@ -500,6 +500,120 @@ public sealed class AbilityRulesRegressionTests
     }
 
     [Fact]
+    public void Ally_support_abilities_have_an_explicit_1v1_boundary()
+    {
+        var supportAbilities = new[]
+        {
+            "플러스", "마이너스", "텔레파시", "치유의마음", "플라워기프트",
+            "프렌드가드", "플라워베일", "공생", "아로마베일", "스위트베일"
+        };
+
+        foreach (var ability in supportAbilities)
+            Assert.True(AbilityDatabase.IsImplemented(ability));
+
+        var plus = CreatePokemon(25, "thunderbolt", ability: "플러스");
+        var minus = CreatePokemon(25, "thunderbolt", ability: "마이너스");
+        var opponent = CreatePokemon(132, "tackle", ability: "마이너스");
+        int unboosted = plus.SpAtk;
+
+        // The 1v1 stat call does not pass an ally, even if the opponent happens
+        // to carry the matching ability.
+        Assert.Equal(unboosted, plus.EffectiveSpAtkAgainst(opponent));
+        Assert.True(plus.HasPlusMinusPartner(minus));
+        Assert.Equal((int)(unboosted * 1.5), plus.EffectiveSpAtkAgainst(null, minus));
+
+        minus.MarkFainted();
+        Assert.False(plus.HasPlusMinusPartner(minus));
+        Assert.Equal(unboosted, plus.EffectiveSpAtkAgainst(null, minus));
+    }
+
+    [Fact]
+    public void Flower_gift_boosts_its_holder_in_sun_but_respects_air_lock()
+    {
+        BattleWeather.Reset();
+        try
+        {
+            var normal = CreatePokemon(670, "tackle");
+            var flowerGift = CreatePokemon(670, "tackle", ability: "플라워기프트");
+            BattleWeather.Set(BattleWeather.Sun);
+
+            Assert.Equal((int)(normal.Atk * 1.5), flowerGift.EffectiveAtkAgainst());
+            Assert.Equal((int)(normal.SpDef * 1.5), flowerGift.EffectiveSpDefAgainst());
+
+            var airLock = CreatePokemon(142, "tackle", ability: "에어록");
+            Assert.Equal(normal.Atk, flowerGift.EffectiveAtkAgainst(airLock));
+            Assert.Equal(normal.SpDef, flowerGift.EffectiveSpDefAgainst(airLock));
+        }
+        finally
+        {
+            BattleWeather.Reset();
+        }
+    }
+
+    [Fact]
+    public async Task Self_protecting_support_abilities_apply_without_inventing_an_ally()
+    {
+        var flowerVeil = CreatePokemon(1, "tackle", ability: "플라워베일");
+        flowerVeil.ChangeStage("attack", -1, causedByOpponent: true);
+        Assert.Equal(0, flowerVeil.StatStages["attack"]);
+
+        var nonGrassFlowerVeil = CreatePokemon(25, "tackle", ability: "플라워베일");
+        nonGrassFlowerVeil.ChangeStage("attack", -1, causedByOpponent: true);
+        Assert.Equal(-1, nonGrassFlowerVeil.StatStages["attack"]);
+
+        var sweetVeil = CreatePokemon(684, "tackle", ability: "스위트베일");
+        sweetVeil.ApplyAilment("sleep", new FixedRandom(0));
+        Assert.Equal(StatusCondition.None, sweetVeil.Status);
+
+        var attacker = CreatePokemon(1, "sleep-powder");
+        var events = new List<BattleEvent>();
+        await CreateFullEngine(new FixedRandom(0)).TakeTurnAsync(
+            attacker, sweetVeil, "sleep-powder", true, Capture(events));
+        Assert.Equal(StatusCondition.None, sweetVeil.Status);
+
+        var aromaVeil = CreatePokemon(682, "tackle", ability: "아로마베일");
+        var statusAttacker = CreatePokemon(132, "torment");
+        await CreateFullEngine(new FixedRandom(0)).TakeTurnAsync(
+            statusAttacker, aromaVeil, "torment", true, Capture(events));
+        Assert.Equal(0, aromaVeil.TauntTurnsRemaining);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("아로마베일", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task Ally_only_support_abilities_do_not_affect_a_1v1_opponent()
+    {
+        var telepathy = CreatePokemon(280, "tackle", ability: "텔레파시");
+        var attacker = CreatePokemon(25, "thunderbolt");
+        int hpBefore = telepathy.CurrentHp;
+        await CreateFullEngine().TakeTurnAsync(
+            attacker, telepathy, "thunderbolt", true, _ => Task.CompletedTask);
+        Assert.True(telepathy.CurrentHp < hpBefore);
+
+        var friendGuard = CreatePokemon(25, "tackle", ability: "프렌드가드");
+        var normalTarget = CreatePokemon(25, "tackle");
+        var damageDealer = CreatePokemon(132, "tackle");
+        int friendGuardHp = friendGuard.CurrentHp;
+        int normalHp = normalTarget.CurrentHp;
+        await CreateFullEngine().TakeTurnAsync(
+            damageDealer, friendGuard, "tackle", true, _ => Task.CompletedTask);
+        await CreateFullEngine().TakeTurnAsync(
+            CreatePokemon(132, "tackle"), normalTarget, "tackle", true, _ => Task.CompletedTask);
+        Assert.Equal(normalHp - (friendGuardHp - friendGuard.CurrentHp), friendGuard.CurrentHp);
+
+        var healingHeart = CreatePokemon(682, "tackle", ability: "치유의마음");
+        healingHeart.ApplyAilment("poison");
+        await CreateFullEngine().ApplyEndOfTurnEffectsAsync(
+            new[] { healingHeart }, _ => Task.CompletedTask);
+        Assert.Equal(StatusCondition.Poison, healingHeart.Status);
+
+        var symbiosis = CreatePokemon(670, "tackle", ability: "공생", heldItem: "자뭉열매");
+        await CreateFullEngine().ApplyEndOfTurnEffectsAsync(
+            new[] { symbiosis }, _ => Task.CompletedTask);
+        Assert.Equal("자뭉열매", symbiosis.HeldItem);
+    }
+
+    [Fact]
     public async Task Rock_head_mummy_and_aftermath_activate_at_their_documented_timing()
     {
         var rockHead = CreatePokemon(132, "take-down", ability: "돌머리");

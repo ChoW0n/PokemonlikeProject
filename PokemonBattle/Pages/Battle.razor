@@ -274,6 +274,7 @@
 
     private double SpeedMultiplier = 1.0;
     private static readonly double[] SpeedOptions = { 1.0, 1.6, 2.4, 3.5, 5.0 };
+    private const int MaxBattleLogLines = 3;
     private string SpeedStorageKey => $"pokemon-battle-speed:{CurrentUser.Username ?? "guest"}";
 
     private string SpeedLabel => SpeedMultiplier switch
@@ -427,10 +428,13 @@
         }
         else
         {
-            int enemyLevel = State.CurrentRunLevel;
-            EnemyTeam = State.EnemyTeamIds.Count > 0
-                ? State.EnemyTeamIds.Select(id => BuildRandomEnemy(id, enemyLevel)).ToList()
-                : new List<Pokemon> { BuildRandomEnemy(State.EnemyPokemonId, enemyLevel) };
+            int enemyLevel = Math.Max(
+                1,
+                State.CurrentRunLevel + State.CurrentRunDifficultyAdjustment);
+            var enemyIds = State.EnemyTeamIds.Count > 0
+                ? State.EnemyTeamIds
+                : new List<int> { State.EnemyPokemonId };
+            EnemyTeam = BuildRandomEnemies(enemyIds, enemyLevel);
         }
 
         HeroMoveKeys = ResolveMoveKeys(Hero);
@@ -440,20 +444,35 @@
         if (initialAbilityMessages.Count > 0)
         {
             LogHistory = initialAbilityMessages
-                .TakeLast(4)
+                .TakeLast(MaxBattleLogLines)
                 .ToList();
         }
         PromptText = "행동을 선택하세요.";
     }
 
-    private Pokemon BuildRandomEnemy(int id, int level)
+    private List<Pokemon> BuildRandomEnemies(IEnumerable<int> ids, int level)
     {
-        var data = PokemonDatabase.All[id];
-        var pool = EnemyTeamProvider.PickProMoveset(data);
-        string ability = EnemyTeamProvider.PickProAbility(data, pool);
-        var items = ItemDatabase.GetAvailableItems(data.Name);
-        string item = EnemyTeamProvider.PickProItem(pool, items);
-        return new Pokemon(data, pool, ability, item, level);
+        var usedItems = new HashSet<string>(StringComparer.Ordinal);
+        var enemies = new List<Pokemon>();
+
+        foreach (int id in ids)
+        {
+            var data = PokemonDatabase.All[id];
+            var moves = EnemyTeamProvider.PickProMoveset(data);
+            string ability = EnemyTeamProvider.PickProAbility(data, moves);
+            var items = ItemDatabase.GetAvailableItems(data.Name)
+                .Where(item => item.Name == TeamLoadoutRules.NoItem || !usedItems.Contains(item.Name))
+                .ToList();
+            string item = EnemyTeamProvider.PickProItem(moves, items, usedItems);
+            if (item != TeamLoadoutRules.NoItem)
+            {
+                usedItems.Add(item);
+            }
+
+            enemies.Add(new Pokemon(data, moves, ability, item, level));
+        }
+
+        return enemies;
     }
 
     private static List<string> ResolveMoveKeys(Pokemon pokemon) => pokemon.CurrentPP.Keys.ToList();
@@ -481,7 +500,7 @@
     {
         PromptText = null;
         LogHistory.Add(message);
-        if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
+        if (LogHistory.Count > MaxBattleLogLines) LogHistory.RemoveAt(0);
 
         StateHasChanged();
 
@@ -629,7 +648,7 @@
                 return true;
             }
             await ShowMessage("내 포켓몬이 모두 쓰러졌다... 패배...");
-            await State.LoseBattle();
+            await State.LoseBattle(Turn, PlayerTeam);
             Nav.NavigateTo("/result");
             return true;
         }
@@ -652,7 +671,7 @@
             }
             await Rules.ApplyEndOfBattleEffectsAsync(PlayerTeam, PlayBattleEvent);
             await ShowMessage("상대 포켓몬을 모두 쓰러뜨렸다! 승리!");
-            await State.WinRound();
+            await State.WinRound(Turn, PlayerTeam);
             Nav.NavigateTo("/result");
             return true;
         }
@@ -660,6 +679,8 @@
 
     private async void UseMove(string? heroMoveKey)
     {
+        if (IsBusy) return;
+
         if (Hero.RampageMoveKey != null)
         {
             heroMoveKey = Hero.RampageMoveKey;
@@ -680,6 +701,7 @@
             return;
         }
 
+        BeginActionLog();
         PendingMoveKey = null;
         IsBusy = true;
         await BeginEffects();
@@ -718,6 +740,9 @@
 
     private async void SwitchTo(int newIndex)
     {
+        if (IsBusy) return;
+
+        BeginActionLog();
         IsBusy = true;
         await BeginEffects();
         Menu = BattleMenu.Main;
@@ -758,9 +783,10 @@
 
     private async void ForcedSwitchTo(int idx)
     {
-        if (idx < 0 || idx >= PlayerTeam.Count || PlayerTeam[idx].IsFainted)
+        if (IsBusy || idx < 0 || idx >= PlayerTeam.Count || PlayerTeam[idx].IsFainted)
             return;
 
+        BeginActionLog();
         IsBusy = true;
         await BeginEffects();
         var outgoing = Hero;
@@ -790,5 +816,11 @@
         IsBusy = false;
         await EndEffects();
         StateHasChanged();
+    }
+
+    private void BeginActionLog()
+    {
+        LogHistory.Clear();
+        PromptText = null;
     }
 }

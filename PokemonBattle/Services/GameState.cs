@@ -9,10 +9,13 @@ public class GameState
     private readonly UnlockService _unlocks;
     private readonly RunStore _runStore;
     private readonly CurrentUserService _currentUser;
+    private readonly SkillRatingService _skillRatings;
 
     public GameScreen CurrentScreen { get; private set; } = GameScreen.Start;
     public int CurrentScore { get; private set; }
     public int CurrentRunLevel => Math.Max(1, CurrentScore + 1);
+    public int CurrentRunDifficultyAdjustment { get; private set; }
+    public double SkillRating { get; private set; } = SkillRatingCalculator.DefaultRating;
     public int HighScore { get; private set; }
     public int LegendaryProgressPercent { get; private set; }
     public int LastLegendaryProgressReward { get; private set; }
@@ -30,16 +33,24 @@ public class GameState
     public List<PokemonLoadout> EnemyLoadouts { get; private set; } = new(); //상대 팀의 확정된 기술/특성/도구 (미리보기와 전투가 항상 일치하도록)
 
     private bool _runLoaded;
+    private readonly List<RunRoundPerformance> _roundPerformances = new();
 
     public event Action? OnChange;
 
-    public GameState(IScoreStore scoreStore, IPresetStore presetStore, UnlockService unlocks, RunStore runStore, CurrentUserService currentUser)
+    public GameState(
+        IScoreStore scoreStore,
+        IPresetStore presetStore,
+        UnlockService unlocks,
+        RunStore runStore,
+        CurrentUserService currentUser,
+        SkillRatingService skillRatings)
     {
         _scoreStore = scoreStore;
         _presetStore = presetStore;
         _unlocks = unlocks;
         _runStore = runStore;
         _currentUser = currentUser;
+        _skillRatings = skillRatings;
     }
 
     public IReadOnlyList<LegendaryEncounterHistoryEntry> LegendaryEncounterHistory =>
@@ -51,26 +62,42 @@ public class GameState
     {
         if (_runLoaded || !_currentUser.IsLoggedIn) return;
 
-        var (score, highScore, loadouts, legendaryProgressPercent, legendaryEncounterHistory) =
+        var (
+            score,
+            highScore,
+            loadouts,
+            legendaryProgressPercent,
+            legendaryEncounterHistory,
+            difficultyAdjustment,
+            roundPerformances) =
             await _runStore.Load(_currentUser.Username!);
         _legendaryEncounterHistory.Clear();
         _legendaryEncounterHistory.AddRange(legendaryEncounterHistory);
+        _roundPerformances.Clear();
+        _roundPerformances.AddRange(roundPerformances);
+        var storedRating = await _skillRatings.GetOrCreateAsync(_currentUser.Username!);
+        SkillRating = storedRating.Rating;
+        CurrentRunDifficultyAdjustment = Math.Clamp(
+            difficultyAdjustment,
+            SkillRatingCalculator.MinimumDifficultyAdjustment,
+            SkillRatingCalculator.MaximumDifficultyAdjustment);
 
         //방어 코드: 도감에 없는 포켓몬(예: 크래시로 깨진 PokemonId=0)이 하나라도 섞여있으면
         //전체 데이터를 신뢰할 수 없다고 보고 진행 상황을 완전히 초기화함
         bool hasCorruptedEntry = loadouts.Any(l => !PokemonDatabase.All.ContainsKey(l.PokemonId));
+        bool hadDuplicateItems = false;
 
         if (hasCorruptedEntry)
         {
             CurrentScore = 0;
             PlayerLoadouts = new List<PokemonLoadout>();
             PlayerTeamIds = new List<int>();
-            await PersistRun(); //깨끗해진 상태를 DB에도 즉시 반영해서 다음부턴 안 재발하게 함
+            _roundPerformances.Clear();
         }
         else
         {
             CurrentScore = score;
-            bool hadDuplicateItems = TeamLoadoutRules.HasDuplicateItems(loadouts);
+            hadDuplicateItems = TeamLoadoutRules.HasDuplicateItems(loadouts);
             PlayerLoadouts = TeamLoadoutRules.NormalizeUniqueItems(loadouts);
             PlayerTeamIds = PlayerLoadouts.Select(l => l.PokemonId).ToList();
             if (hadDuplicateItems)
@@ -83,6 +110,20 @@ public class GameState
         LegendaryProgressPercent = Math.Clamp(legendaryProgressPercent, 0, LegendaryProgression.MaxProgressPercent);
         LastLegendaryProgressReward = 0;
         LegendaryEncounterConsumed = false;
+
+        bool isNewRun = CurrentScore == 0
+            && PlayerLoadouts.Count == 0
+            && _roundPerformances.Count == 0;
+        if (hasCorruptedEntry || isNewRun)
+        {
+            CurrentRunDifficultyAdjustment = SkillRatingCalculator.CalculateDifficultyAdjustment(SkillRating);
+            await PersistRun(); //깨끗해진 상태와 현재 런의 고정 보정을 DB에도 즉시 반영
+        }
+        else if (hadDuplicateItems)
+        {
+            await PersistRun();
+        }
+
         _runLoaded = true;
     }
 
@@ -102,7 +143,9 @@ public class GameState
             HighScore,
             PlayerLoadouts,
             LegendaryProgressPercent,
-            _legendaryEncounterHistory);
+            _legendaryEncounterHistory,
+            CurrentRunDifficultyAdjustment,
+            _roundPerformances);
     }
 
     public void GoTo(GameScreen screen)
@@ -179,8 +222,9 @@ public class GameState
         NotifyChange();
     }
 
-    public async Task WinRound()
+    public async Task WinRound(int turns = 0, IEnumerable<Pokemon>? playerTeam = null)
     {
+        RecordRoundPerformance(turns, playerTeam, cleared: true);
         int progressBefore = LegendaryProgressPercent;
         int progressReward = LegendaryEncounterConsumed
             ? 0
@@ -208,8 +252,10 @@ public class GameState
         NotifyChange();
     }
 
-    public async Task LoseBattle()
+    public async Task LoseBattle(int turns = 0, IEnumerable<Pokemon>? playerTeam = null)
     {
+        RecordRoundPerformance(turns, playerTeam, cleared: false);
+        await UpdateSkillRatingForCurrentRun();
         _scoreStore.SaveIfHigher(CurrentScore);
         HighScore = Math.Max(HighScore, _scoreStore.GetHighScore());
         LastBattleWon = false;
@@ -217,6 +263,7 @@ public class GameState
         CurrentScore = 0;
         PlayerLoadouts = new List<PokemonLoadout>();
         PlayerTeamIds = new List<int>();
+        _roundPerformances.Clear();
         await PersistRun();
         CurrentScreen = GameScreen.Result;
         NotifyChange();
@@ -224,6 +271,12 @@ public class GameState
 
     public async Task ResetForNewRun()
     {
+        //승리한 런을 사용자가 새 런으로 넘길 때도 같은 집계 경로로 평점을 갱신한다.
+        if (_roundPerformances.Count > 0)
+        {
+            await UpdateSkillRatingForCurrentRun(won: true);
+        }
+
         CurrentScore = 0;
         LastLegendaryProgressReward = 0;
         PlayerLoadouts = new List<PokemonLoadout>();
@@ -231,6 +284,9 @@ public class GameState
         EnemyLoadouts = new List<PokemonLoadout>();
         EnemyTeamIds = new List<int>();
         LegendaryEncounterConsumed = false;
+        CurrentRunDifficultyAdjustment =
+            SkillRatingCalculator.CalculateDifficultyAdjustment(SkillRating);
+        _roundPerformances.Clear();
         await PersistRun();
         CurrentScreen = GameScreen.StarterSelect;
         NotifyChange();
@@ -272,6 +328,42 @@ public class GameState
     private void NotifyChange()
     {
         OnChange?.Invoke();
+    }
+
+    private void RecordRoundPerformance(
+        int turns,
+        IEnumerable<Pokemon>? playerTeam,
+        bool cleared)
+    {
+        var team = playerTeam?.ToList() ?? new List<Pokemon>();
+        double hpRatio = team.Count == 0
+            ? (cleared ? 1 : 0)
+            : team.Average(pokemon => pokemon.MaxHp <= 0
+                ? 0
+                : Math.Clamp((double)pokemon.CurrentHp / pokemon.MaxHp, 0, 1));
+
+        _roundPerformances.Add(new RunRoundPerformance
+        {
+            Cleared = cleared,
+            PlayerHpRatio = hpRatio,
+            Turns = Math.Max(0, turns)
+        });
+    }
+
+    private async Task UpdateSkillRatingForCurrentRun(bool won = false)
+    {
+        if (!_currentUser.IsLoggedIn || _roundPerformances.Count == 0) return;
+
+        var summary = new RunPerformanceSummary(
+            _roundPerformances.Count(performance => performance.Cleared),
+            _roundPerformances.Count,
+            _roundPerformances.Average(performance => performance.PlayerHpRatio),
+            _roundPerformances.Average(performance => performance.Turns),
+            won);
+        SkillRating = await _skillRatings.UpdateForRunAsync(
+            _currentUser.Username!,
+            summary);
+        _roundPerformances.Clear();
     }
 
     private static bool HaveSameLoadouts(

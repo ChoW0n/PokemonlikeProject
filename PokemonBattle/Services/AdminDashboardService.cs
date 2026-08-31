@@ -278,6 +278,9 @@ public sealed class AdminDashboardService
         await _db.PlayerRuns
             .Where(item => item.Username == username)
             .ExecuteDeleteAsync();
+        await _db.PlayerSkillRatings
+            .Where(item => item.Username == username)
+            .ExecuteDeleteAsync();
         await _db.UserPresets
             .Where(item => item.Username == username)
             .ExecuteDeleteAsync();
@@ -336,6 +339,8 @@ public sealed class AdminDashboardService
         var run = await GetOrCreateRunAsync(username);
         run.CurrentScore = 0;
         run.LoadoutsJson = "[]";
+        run.DifficultyAdjustment = 0;
+        run.RoundPerformancesJson = "[]";
         await _db.SaveChangesAsync();
         return Success($"{username} 계정의 현재 런을 초기화했습니다.");
     }

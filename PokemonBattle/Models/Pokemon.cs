@@ -165,18 +165,22 @@ public class Pokemon
         return stage >= 0 ? (2.0 + stage) / 2.0 : 2.0 / (2.0 - stage);
     }
 
-    public int EffectiveAtk
+    public int EffectiveAtk => EffectiveAtkAgainst();
+
+    public int EffectiveAtkAgainst(Pokemon? opponent = null)
     {
-        get
+        double value = Atk * StageMult("attack");
+        if (Status == StatusCondition.Burn && SelectedAbility != "근성") value *= 0.5;
+        if (SelectedAbility == "근성" && Status != StatusCondition.None) value *= 1.5;
+        if (SelectedAbility is "의욕") value *= 1.5;
+        if (SelectedAbility is "천하장사" or "순수한힘") value *= 2.0;
+        if (!BattleWeather.AreEffectsSuppressed(this, opponent)
+            && SelectedAbility == "플라워기프트" && BattleWeather.Current == "쾌청")
         {
-            double value = Atk * StageMult("attack");
-            if (Status == StatusCondition.Burn && SelectedAbility != "근성") value *= 0.5;
-            if (SelectedAbility == "근성" && Status != StatusCondition.None) value *= 1.5;
-            if (SelectedAbility is "의욕") value *= 1.5;
-            if (SelectedAbility is "천하장사" or "순수한힘") value *= 2.0;
-            if (SelectedAbility == "슬로스타트" && TurnsOnField < 5) value *= 0.5;
-            return (int)value;
+            value *= 1.5;
         }
+        if (SelectedAbility == "슬로스타트" && TurnsOnField < 5) value *= 0.5;
+        return (int)value;
     }
 
     public int EffectiveDef
@@ -192,15 +196,36 @@ public class Pokemon
 
     public int EffectiveSpAtk => EffectiveSpAtkAgainst();
 
-    public int EffectiveSpAtkAgainst(Pokemon? opponent = null)
+    public int EffectiveSpAtkAgainst(Pokemon? opponent = null, Pokemon? ally = null)
     {
         double value = SpAtk * StageMult("special-attack");
-        if (SelectedAbility is "플러스" or "마이너스") value *= 1.5;
+        if (HasPlusMinusPartner(ally)) value *= 1.5;
         if (!BattleWeather.AreEffectsSuppressed(this, opponent)
             && SelectedAbility == "선파워" && BattleWeather.Current == "쾌청") value *= 1.5;
         return (int)value;
     }
-    public int EffectiveSpDef => (int)(SpDef * StageMult("special-defense"));
+
+    public int EffectiveSpDef => EffectiveSpDefAgainst();
+
+    public int EffectiveSpDefAgainst(Pokemon? opponent = null)
+    {
+        double value = SpDef * StageMult("special-defense");
+        if (!BattleWeather.AreEffectsSuppressed(this, opponent)
+            && SelectedAbility == "플라워기프트" && BattleWeather.Current == "쾌청")
+        {
+            value *= 1.5;
+        }
+        return (int)value;
+    }
+
+    // The current battle is 1v1, so callers intentionally pass no ally. A future
+    // double-battle side can pass the actual living partner without treating the
+    // opposing Pokémon as a partner.
+    public bool HasPlusMinusPartner(Pokemon? ally) =>
+        ally != null
+        && !ally.IsFainted
+        && ((SelectedAbility == "플러스" && ally.SelectedAbility == "마이너스")
+            || (SelectedAbility == "마이너스" && ally.SelectedAbility == "플러스"));
 
     //엽록소·쓱쓱·모래헤치기·눈치우기: 날씨에서 속도 2배
     public int EffectiveSpd => EffectiveSpdAgainst();
@@ -362,6 +387,8 @@ public class Pokemon
         if (causedByOpponent && delta < 0 && (SelectedAbility is "클리어바디" or "하얀연기")) return false;
         if (causedByOpponent && delta < 0 && SelectedAbility == "괴력집게" && stat == "attack") return false;
         if (causedByOpponent && delta < 0 && SelectedAbility == "부풀린가슴" && stat == "defense") return false;
+        if (causedByOpponent && delta < 0 && SelectedAbility == "플라워베일"
+            && HasType(PokemonType.Grass)) return false;
         return true;
     }
 
@@ -425,6 +452,7 @@ public class Pokemon
             }
         }
         if (ailmentName == "sleep" && (SelectedAbility is "불면" or "의기양양")) return true;
+        if (ailmentName == "sleep" && SelectedAbility == "스위트베일") return true;
         if (ailmentName == "poison" && SelectedAbility == "면역") return true;
         if (ailmentName == "paralysis" && SelectedAbility == "유연") return true;
         if (ailmentName == "burn" && SelectedAbility == "수의베일") return true;
@@ -435,6 +463,10 @@ public class Pokemon
     }
     public bool IsImmuneToConfusion() =>
         SelectedAbility == "마이페이스" || BattleField.Current == BattleField.Misty;
+
+    public bool IsImmuneToMentalEffect(string effectName) =>
+        SelectedAbility == "아로마베일"
+        && effectName is "disable" or "encore" or "heal-block" or "taunt" or "torment";
 
     public void ApplyAilment(string ailmentName, Random? random = null, Pokemon? opponent = null)
     {

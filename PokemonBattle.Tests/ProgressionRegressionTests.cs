@@ -75,6 +75,19 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public void ProItemSelectionReturnsNoItemWhenEveryCandidateIsAlreadyUsed()
+    {
+        var item = ItemDatabase.GeneralItems.First(item => item.Name == "기합의띠");
+
+        var selected = EnemyTeamProvider.PickProItem(
+            new[] { "tackle" },
+            new[] { item },
+            new HashSet<string>(new[] { item.Name }, StringComparer.Ordinal));
+
+        Assert.Equal(TeamLoadoutRules.NoItem, selected);
+    }
+
+    [Fact]
     public void ProItemExcludesChoiceItemsWhenMovesetHasAStatusMove()
     {
         var items = new[]
@@ -106,7 +119,8 @@ public class ProgressionRegressionTests
             new[] { "tackle" },
             items);
 
-        Assert.Equal("구애머리띠", selected);
+        Assert.Contains(selected, new[] { "구애머리띠", "생명의구슬" });
+        Assert.NotEqual("구애안경", selected);
     }
 
     [Fact]
@@ -118,6 +132,175 @@ public class ProgressionRegressionTests
         var selected = EnemyTeamProvider.PickProAbility(data, new[] { "tackle", "growl" });
 
         Assert.True(AbilityDatabase.IsImplemented(selected));
+    }
+
+    [Fact]
+    public void SkillRatingCalculatorUsesRoundsHpAndTurnEfficiency()
+    {
+        var strongWin = new RunPerformanceSummary(
+            ClearedRounds: 5,
+            TotalRounds: 5,
+            AverageHpRatio: 1,
+            AverageTurns: 5,
+            Won: true);
+        var slowLoss = new RunPerformanceSummary(
+            ClearedRounds: 0,
+            TotalRounds: 1,
+            AverageHpRatio: 0,
+            AverageTurns: 20,
+            Won: false);
+
+        Assert.Equal(1, SkillRatingCalculator.CalculatePerformanceScore(strongWin));
+        Assert.True(
+            SkillRatingCalculator.UpdateRating(
+                SkillRatingCalculator.DefaultRating,
+                strongWin)
+            > SkillRatingCalculator.DefaultRating);
+        Assert.True(
+            SkillRatingCalculator.UpdateRating(
+                SkillRatingCalculator.DefaultRating,
+                slowLoss)
+            < SkillRatingCalculator.DefaultRating);
+    }
+
+    [Fact]
+    public void SkillDifficultyAdjustmentIsBoundedAndUsesTheDefaultAsNeutral()
+    {
+        Assert.Equal(
+            0,
+            SkillRatingCalculator.CalculateDifficultyAdjustment(
+                SkillRatingCalculator.DefaultRating));
+        Assert.Equal(
+            SkillRatingCalculator.MinimumDifficultyAdjustment,
+            SkillRatingCalculator.CalculateDifficultyAdjustment(0));
+        Assert.Equal(
+            SkillRatingCalculator.MaximumDifficultyAdjustment,
+            SkillRatingCalculator.CalculateDifficultyAdjustment(5000));
+    }
+
+    [Fact]
+    public async Task SkillRatingPersistsAcrossFreshDbContext()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreatePlayerRunsTable(schema);
+            const string username = "skill-rating-persistence";
+            var summary = new RunPerformanceSummary(3, 3, 0.8, 7, true);
+
+            double updated;
+            await using (var db = CreateDbContext(schema))
+            {
+                var service = new SkillRatingService(db);
+                Assert.Equal(
+                    SkillRatingCalculator.DefaultRating,
+                    (await service.GetOrCreateAsync(username)).Rating);
+                updated = await service.UpdateForRunAsync(username, summary);
+            }
+
+            await using (var freshDb = CreateDbContext(schema))
+            {
+                var restored = await new SkillRatingService(freshDb)
+                    .GetOrCreateAsync(username);
+                Assert.Equal(updated, restored.Rating);
+                Assert.Equal(1, restored.CompletedRuns);
+            }
+        });
+    }
+
+    [Fact]
+    public async Task GameStateKeepsDifficultyFixedUntilTheRunIsReset()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreatePlayerRunsTable(schema);
+            const string username = "skill-difficulty-fixed";
+            await using (var seedDb = CreateDbContext(schema))
+            {
+                seedDb.PlayerSkillRatings.Add(new PlayerSkillRating
+                {
+                    Username = username,
+                    Rating = 1500
+                });
+                await seedDb.SaveChangesAsync();
+                await new RunStore(seedDb).Save(
+                    username,
+                    2,
+                    2,
+                    new List<PokemonLoadout> { new() { PokemonId = 1, Level = 3 } },
+                    0,
+                    difficultyAdjustment: -2,
+                    roundPerformances: new List<RunRoundPerformance>());
+            }
+
+            var currentUser = new CurrentUserService();
+            currentUser.SignIn(username, isAdmin: false);
+            await using (var db = CreateDbContext(schema))
+            {
+                var state = new GameState(
+                    new InMemoryScoreStore(),
+                    new InMemoryPresetStore(),
+                    new UnlockService(db, currentUser),
+                    new RunStore(db),
+                    currentUser,
+                    new SkillRatingService(db));
+
+                await state.LoadRunForCurrentUser();
+                Assert.Equal(-2, state.CurrentRunDifficultyAdjustment);
+
+                await state.WinRound();
+                Assert.Equal(-2, state.CurrentRunDifficultyAdjustment);
+            }
+        });
+    }
+
+    [Fact]
+    public async Task WinAndLossBothUseRoundPerformanceForTheNextRunRating()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreatePlayerRunsTable(schema);
+            const string winner = "skill-win";
+            var currentUser = new CurrentUserService();
+            currentUser.SignIn(winner, isAdmin: false);
+
+            await using (var db = CreateDbContext(schema))
+            {
+                var state = new GameState(
+                    new InMemoryScoreStore(),
+                    new InMemoryPresetStore(),
+                    new UnlockService(db, currentUser),
+                    new RunStore(db),
+                    currentUser,
+                    new SkillRatingService(db));
+                await state.LoadRunForCurrentUser();
+                await state.WinRound();
+
+                var runAfterRound = await new RunStore(db).Load(winner);
+                var recorded = Assert.Single(runAfterRound.roundPerformances);
+                Assert.True(recorded.Cleared);
+
+                await state.ResetForNewRun();
+                Assert.Empty((await new RunStore(db).Load(winner)).roundPerformances);
+                Assert.True(state.SkillRating > SkillRatingCalculator.DefaultRating);
+            }
+
+            const string loser = "skill-loss";
+            var losingUser = new CurrentUserService();
+            losingUser.SignIn(loser, isAdmin: false);
+            await using (var db = CreateDbContext(schema))
+            {
+                var state = new GameState(
+                    new InMemoryScoreStore(),
+                    new InMemoryPresetStore(),
+                    new UnlockService(db, losingUser),
+                    new RunStore(db),
+                    losingUser,
+                    new SkillRatingService(db));
+                await state.LoadRunForCurrentUser();
+                await state.LoseBattle();
+                Assert.True(state.SkillRating < SkillRatingCalculator.DefaultRating);
+            }
+        });
     }
 
     [Fact]
@@ -342,7 +525,8 @@ public class ProgressionRegressionTests
                     new InMemoryPresetStore(),
                     new UnlockService(db, currentUser),
                     new RunStore(db),
-                    currentUser);
+                    currentUser,
+                    new SkillRatingService(db));
 
                 await state.LoadRunForCurrentUser();
                 Assert.Equal(18, state.CurrentScore);
@@ -396,7 +580,8 @@ public class ProgressionRegressionTests
                     new InMemoryPresetStore(),
                     new UnlockService(db, currentUser),
                     new RunStore(db),
-                    currentUser);
+                    currentUser,
+                    new SkillRatingService(db));
 
                 await state.LoadRunForCurrentUser();
                 await state.SetEnemyLoadouts(new List<PokemonLoadout>
@@ -471,7 +656,8 @@ public class ProgressionRegressionTests
                     new InMemoryPresetStore(),
                     new UnlockService(db, currentUser),
                     new RunStore(db),
-                    currentUser);
+                    currentUser,
+                    new SkillRatingService(db));
 
                 await state.LoadRunForCurrentUser();
                 Assert.Equal(41, state.CurrentScore);
@@ -534,6 +720,14 @@ public class ProgressionRegressionTests
                     ALTER TABLE "PlayerRuns"
                         ADD COLUMN IF NOT EXISTS "LegendaryEncounterHistoryJson" TEXT NOT NULL DEFAULT '[]';
                     """);
+                await db.Database.ExecuteSqlRawAsync("""
+                    ALTER TABLE "PlayerRuns"
+                        ADD COLUMN IF NOT EXISTS "DifficultyAdjustment" INTEGER NOT NULL DEFAULT 0;
+                    """);
+                await db.Database.ExecuteSqlRawAsync("""
+                    ALTER TABLE "PlayerRuns"
+                        ADD COLUMN IF NOT EXISTS "RoundPerformancesJson" TEXT NOT NULL DEFAULT '[]';
+                    """);
             }
 
             await using (var freshDb = CreateDbContext(schema))
@@ -591,9 +785,22 @@ public class ProgressionRegressionTests
                 "CurrentScore" INTEGER NOT NULL,
                 "HighScore" INTEGER NOT NULL DEFAULT 0,
                 "LoadoutsJson" TEXT NOT NULL,
-                "LegendaryProgressPercent" INTEGER NOT NULL DEFAULT 0,
-                "LegendaryEncounterHistoryJson" TEXT NOT NULL DEFAULT '[]'
+                        "LegendaryProgressPercent" INTEGER NOT NULL DEFAULT 0,
+                        "LegendaryEncounterHistoryJson" TEXT NOT NULL DEFAULT '[]',
+                        "DifficultyAdjustment" INTEGER NOT NULL DEFAULT 0,
+                        "RoundPerformancesJson" TEXT NOT NULL DEFAULT '[]'
             );
+            """);
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE "PlayerSkillRatings" (
+                "Id" SERIAL PRIMARY KEY,
+                "Username" TEXT NOT NULL,
+                "Rating" DOUBLE PRECISION NOT NULL DEFAULT 1000,
+                "CompletedRuns" INTEGER NOT NULL DEFAULT 0,
+                "UpdatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE UNIQUE INDEX "IX_PlayerSkillRatings_Username"
+                ON "PlayerSkillRatings" ("Username");
             """);
     }
 

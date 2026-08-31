@@ -1,9 +1,11 @@
 @page "/collection"
 @using PokemonBattle.Models
 @using PokemonBattle.Services
+@using Microsoft.JSInterop
 @inject CurrentUserService CurrentUser
 @inject UnlockService Unlocks
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>획득한 포켓몬</PageTitle>
 
@@ -53,8 +55,7 @@
             }
 
             <div class="collection-actions">
-                <button type="button" @onclick="GoHome">홈으로</button>
-                <button type="button" @onclick="GoTeamSelect">팀 편성하기</button>
+                <button type="button" @onclick="GoBack">돌아가기</button>
             </div>
         </div>
     </div>
@@ -79,6 +80,5 @@
             .ToList();
     }
 
-    private void GoHome() => Nav.NavigateTo("/");
-    private void GoTeamSelect() => Nav.NavigateTo("/select");
+    private async Task GoBack() => await JS.InvokeVoidAsync("history.back");
 }
