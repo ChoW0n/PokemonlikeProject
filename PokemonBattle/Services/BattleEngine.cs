@@ -246,7 +246,11 @@ public sealed class BattleEngine
             defender.CurrentHp = Math.Max(0, defender.CurrentHp - damage);
             defender.LastMultiplier = 1.0;
             defender.IsFainted = defender.CurrentHp == 0;
-            await emit(BattleEvent.Effect(TypeColors.GetEffectKind(PokemonType.Normal, false), attackerIsHero, PokemonType.Normal));
+            await emit(BattleEvent.Effect(
+                TypeColors.GetEffectKind(PokemonType.Normal, false),
+                attackerIsHero,
+                PokemonType.Normal,
+                "몸부림"));
         }
         else
         {
@@ -304,7 +308,7 @@ public sealed class BattleEngine
         {
             attacker.ActivateProtection();
             await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) 킹실드로 몸을 지켰다!"));
-            await emit(BattleEvent.Effect(effectKind, attackerIsHero, attackType));
+            await emit(BattleEvent.Effect(effectKind, attackerIsHero, attackType, move.Name));
             return;
         }
 
@@ -379,7 +383,7 @@ public sealed class BattleEngine
                 context.ActualHits++;
                 string? criticalReaction = defender.TriggerCriticalHitAbility();
                 if (criticalReaction != null) await emit(BattleEvent.MessageLine(criticalReaction));
-                await emit(BattleEvent.Effect(effectKind, attackerIsHero, attackType));
+                await emit(BattleEvent.Effect(effectKind, attackerIsHero, attackType, move.Name));
                 foreach (var handler in effectHandlers) await handler.AfterHitAsync(context);
                 if (attacker.IsFainted) break;
             }
@@ -394,7 +398,7 @@ public sealed class BattleEngine
         }
         else if (move.IsStatus)
         {
-            await emit(BattleEvent.Effect(effectKind, attackerIsHero, attackType));
+            await emit(BattleEvent.Effect(effectKind, attackerIsHero, attackType, move.Name));
         }
 
         foreach (var handler in effectHandlers) await handler.AfterMoveAsync(context);

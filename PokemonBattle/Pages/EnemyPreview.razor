@@ -43,7 +43,7 @@
                 var data = PokemonDatabase.All[loadout.PokemonId];
                 <article class="enemy-card @(SelectedId == loadout.PokemonId ? "is-selected" : string.Empty)" role="listitem">
                     <button type="button" class="enemy-card-toggle" aria-label="@($"{data.Name} 상대 정보 {(SelectedId == loadout.PokemonId ? "접기" : "펼치기")}")" aria-expanded="@(SelectedId == loadout.PokemonId ? "true" : "false")" @onclick="() => ToggleDetail(loadout.PokemonId)">
-                        <img src="@data.ImageUrl" alt="" class="enemy-sprite" />
+                        <img src="@data.EffectiveImageUrl" alt="" class="enemy-sprite" />
                         <span class="enemy-card-title">@data.Name</span>
                     </button>
                     <div class="hud-types" aria-label="@($"{data.Type1}{(data.Type2 != null ? $", {data.Type2}" : "")}")">

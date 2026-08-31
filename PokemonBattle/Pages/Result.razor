@@ -43,7 +43,7 @@
                     bool owned = OwnedIds.Contains(candidate.Key);
                     <article class="enemy-card @(SelectedCatchId == candidate.Key ? "is-selected" : string.Empty)" role="listitem">
                         <button type="button" class="enemy-card-toggle" aria-label="@($"{candidate.Value.Name}, {(owned ? "보유 중 · 선택 시 추가 레벨" : "미보유 · 선택 시 해금")}")" aria-pressed="@(SelectedCatchId == candidate.Key ? "true" : "false")" @onclick="() => SelectedCatchId = candidate.Key">
-                            <img src="@candidate.Value.ImageUrl" alt="" class="enemy-sprite" />
+                            <img src="@candidate.Value.EffectiveImageUrl" alt="" class="enemy-sprite" />
                             <span class="enemy-card-title">@candidate.Value.Name</span>
                             <span class="enemy-card-status">@(owned ? "보유 중 · 선택 시 추가 레벨" : "미보유 · 선택 시 해금")</span>
                         </button>

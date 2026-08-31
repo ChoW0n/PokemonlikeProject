@@ -79,7 +79,7 @@
             int idx = i;
             var member = PlayerTeam[idx];
             <div class="order-slot @(idx == PlayerTeamIndex ? "is-active" : "") @(member.IsFainted ? "is-fainted" : "")" role="listitem" aria-label="@($"{idx + 1}번 {member.Data.Name}{(idx == PlayerTeamIndex ? ", 현재 출전 중" : "")}{(member.IsFainted ? ", 기절" : "")}")">
-                <img src="@member.Data.ImageUrl" alt="@member.Data.Name" />
+                <img src="@member.Data.EffectiveImageUrl" alt="@member.Data.Name" />
             </div>
         }
     </div>
@@ -418,13 +418,44 @@
     {
         if (battleEvent.EffectKind != null && battleEvent.EffectType != null)
         {
-            await PlayEffect(battleEvent.EffectKind, battleEvent.AttackerIsHero, battleEvent.EffectType.Value);
+            string attackerName = battleEvent.AttackerIsHero ? Hero.Data.Name : Enemy.Data.Name;
+            await JS.InvokeVoidAsync(
+                "battleEffects.play",
+                battleEvent.EffectKind,
+                battleEvent.AttackerIsHero ? "hero" : "enemy",
+                TypeColors.GetHex(battleEvent.EffectType.Value),
+                battleEvent.MoveName ?? "기술",
+                attackerName,
+                TypeKor(battleEvent.EffectType.Value));
         }
         else if (battleEvent.Message != null)
         {
             await ShowMessage(battleEvent.Message, battleEvent.BaseDelayMs);
         }
     }
+
+    private static string TypeKor(PokemonType type) => type switch
+    {
+        PokemonType.Normal => "노말",
+        PokemonType.Fire => "불꽃",
+        PokemonType.Water => "물",
+        PokemonType.Electric => "전기",
+        PokemonType.Grass => "풀",
+        PokemonType.Ice => "얼음",
+        PokemonType.Fighting => "격투",
+        PokemonType.Poison => "독",
+        PokemonType.Ground => "땅",
+        PokemonType.Flying => "비행",
+        PokemonType.Psychic => "에스퍼",
+        PokemonType.Bug => "벌레",
+        PokemonType.Rock => "바위",
+        PokemonType.Ghost => "고스트",
+        PokemonType.Dragon => "드래곤",
+        PokemonType.Dark => "악",
+        PokemonType.Steel => "강철",
+        PokemonType.Fairy => "페어리",
+        _ => type.ToString()
+    };
 
     private async Task<bool> RunTurn(Pokemon attacker, Pokemon defender, string? moveKey, bool attackerIsHero)
     {
