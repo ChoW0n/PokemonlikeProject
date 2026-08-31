@@ -53,7 +53,11 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
         if (attacker.SelectedAbility == "단단한발톱" && context.MakesContact) context.Power *= 1.3;
         if (attacker.SelectedAbility == "메가런처" && PulseMoves.Contains(move.Name)) context.Power *= 1.5;
         if (attacker.SelectedAbility == "모래의힘" && BattleWeather.Current == "모래바람"
+            && !BattleWeather.AreEffectsSuppressed(attacker, context.Defender)
             && (attackType is PokemonType.Rock or PokemonType.Ground or PokemonType.Steel)) context.Power *= 1.3;
+
+        context.Power *= MoveRuleMetadata.AuraMultiplier(
+            attackType, attacker, context.Defender);
 
         if (BattleField.Current == BattleField.Grassy)
         {
@@ -73,12 +77,14 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
             context.Power *= 0.5;
         }
 
-        if (BattleWeather.Current == "쾌청")
+        if (!BattleWeather.AreEffectsSuppressed(attacker, context.Defender)
+            && BattleWeather.Current == "쾌청")
         {
             if (attackType == PokemonType.Fire) context.Power *= 1.5;
             if (attackType == PokemonType.Water) context.Power *= 0.5;
         }
-        else if (BattleWeather.Current == "비")
+        else if (!BattleWeather.AreEffectsSuppressed(attacker, context.Defender)
+            && BattleWeather.Current == "비")
         {
             if (attackType == PokemonType.Water) context.Power *= 1.5;
             if (attackType == PokemonType.Fire) context.Power *= 0.5;
@@ -247,7 +253,10 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
             await context.ShowMessage($"{pokemon.Data.Name}의 가속으로 속도가 올랐다!", 900);
         }
 
-        if (pokemon.SelectedAbility == "촉촉바디" && BattleWeather.Current == "비"
+        bool weatherSuppressed = BattleWeather.AreEffectsSuppressed(pokemon, context.Opponent);
+        if (pokemon.SelectedAbility == "촉촉바디"
+            && !weatherSuppressed
+            && BattleWeather.Current == "비"
             && pokemon.Status != StatusCondition.None)
         {
             pokemon.ClearPrimaryStatus();
@@ -261,9 +270,13 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
         }
 
         int heal = 0;
-        if (pokemon.SelectedAbility == "젖은접시" && BattleWeather.Current == "비") heal = pokemon.MaxHp / 16;
-        if (pokemon.SelectedAbility == "건조피부" && BattleWeather.Current == "비") heal = pokemon.MaxHp / 8;
-        if (pokemon.SelectedAbility == "아이스바디" && BattleWeather.Current == "싸라기눈") heal = pokemon.MaxHp / 16;
+        if (!weatherSuppressed && pokemon.SelectedAbility == "젖은접시" && BattleWeather.Current == "비")
+            heal = pokemon.MaxHp / 16;
+        if (!weatherSuppressed && pokemon.SelectedAbility == "건조피부" && BattleWeather.Current == "비")
+            heal = pokemon.MaxHp / 8;
+        if (!weatherSuppressed && pokemon.SelectedAbility == "아이스바디"
+            && BattleWeather.Current == "싸라기눈")
+            heal = pokemon.MaxHp / 16;
         if (heal > 0)
         {
             int before = pokemon.CurrentHp;
@@ -284,8 +297,9 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
             }
         }
 
-        bool takesAbilityDamage = (pokemon.SelectedAbility == "선파워" && BattleWeather.Current == "쾌청")
-            || (pokemon.SelectedAbility == "건조피부" && BattleWeather.Current == "쾌청");
+        bool takesAbilityDamage = !weatherSuppressed
+            && ((pokemon.SelectedAbility == "선파워" && BattleWeather.Current == "쾌청")
+                || (pokemon.SelectedAbility == "건조피부" && BattleWeather.Current == "쾌청"));
         if (takesAbilityDamage && pokemon.SelectedAbility != "매직가드")
         {
             await DamageAsync(context, Math.Max(1, pokemon.MaxHp / 8),
@@ -293,11 +307,13 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
         }
 
         if (pokemon.IsFainted || pokemon.SelectedAbility is "매직가드" or "방진") return;
-        bool sandDamage = BattleWeather.Current == "모래바람"
+        bool sandDamage = !weatherSuppressed
+            && BattleWeather.Current == "모래바람"
             && !pokemon.HasType(PokemonType.Rock)
             && !pokemon.HasType(PokemonType.Ground)
             && !pokemon.HasType(PokemonType.Steel);
-        bool hailDamage = BattleWeather.Current == "싸라기눈"
+        bool hailDamage = !weatherSuppressed
+            && BattleWeather.Current == "싸라기눈"
             && !pokemon.HasType(PokemonType.Ice);
         if (sandDamage || hailDamage)
         {

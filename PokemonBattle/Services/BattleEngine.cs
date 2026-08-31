@@ -22,9 +22,9 @@ public sealed class BattleEngine
         effectHandlers = handlers.OrderBy(handler => handler.Order).ToArray();
     }
 
-    public int EffectiveSpeed(Pokemon pokemon)
+    public int EffectiveSpeed(Pokemon pokemon, Pokemon? opponent = null)
     {
-        double speed = pokemon.EffectiveSpd;
+        double speed = pokemon.EffectiveSpdAgainst(opponent);
         if (pokemon.HeldItem == "구애스카프") speed *= 1.5;
         return (int)speed;
     }
@@ -61,7 +61,7 @@ public sealed class BattleEngine
 
     public double PreviewMultiplier(Move move, Pokemon target, Pokemon? attacker = null)
     {
-        PokemonType attackType = attacker?.ResolveMoveType(move) ?? move.Type;
+        PokemonType attackType = attacker?.ResolveMoveType(move, target) ?? move.Type;
         double multiplier = TypeChart.GetMultiplier(attackType, target.CurrentType1);
         if (target.CurrentType2 != null) multiplier *= TypeChart.GetMultiplier(attackType, target.CurrentType2.Value);
         if (target.IsImmuneToMoveType(attackType)) multiplier = 0;
@@ -75,7 +75,7 @@ public sealed class BattleEngine
         BattleField.Reset();
         var messages = new List<string>();
         var entrants = new[] { (Pokemon: hero, Opponent: enemy), (Pokemon: enemy, Opponent: hero) }
-            .OrderByDescending(entry => EffectiveSpeed(entry.Pokemon));
+            .OrderByDescending(entry => EffectiveSpeed(entry.Pokemon, entry.Opponent));
         foreach (var entry in entrants)
         {
             messages.AddRange(ActivateSwitchIn(entry.Pokemon, entry.Opponent));
@@ -166,7 +166,7 @@ public sealed class BattleEngine
         int enemyPriority = MovePriority(enemy, enemyMove);
         bool heroFirst = heroPriority != enemyPriority
             ? heroPriority > enemyPriority
-            : EffectiveSpeed(hero) >= EffectiveSpeed(enemy);
+            : EffectiveSpeed(hero, enemy) >= EffectiveSpeed(enemy, hero);
         return new BattleTurnPlan(enemyMoveKey, heroFirst);
     }
 
@@ -187,10 +187,11 @@ public sealed class BattleEngine
             }
             else
             {
-                PokemonType attackType = MoveRuleMetadata.ResolveMoveType(key, move, enemy);
+                PokemonType attackType = MoveRuleMetadata.ResolveMoveType(key, move, enemy, hero);
                 double averageHits = (move.MinHits + move.MaxHits) / 2.0;
                 bool stab = enemy.HasType(attackType);
-                score = MoveRuleMetadata.EffectivePower(key, move) * averageHits * (stab ? 1.5 : 1.0)
+                score = MoveRuleMetadata.EffectivePower(key, move, enemy, hero) * averageHits
+                    * (stab ? 1.5 : 1.0)
                     * PreviewMultiplier(move, hero, enemy)
                     * ((move.AlwaysHits
                         ? 100
@@ -334,7 +335,8 @@ public sealed class BattleEngine
             }
 
             attacker.MarkMoveUsed(executingMoveKey);
-            var announceType = MoveRuleMetadata.ResolveMoveType(executingMoveKey, move, attacker);
+            var announceType = MoveRuleMetadata.ResolveMoveType(
+                executingMoveKey, move, attacker, defender);
             if (attacker.TryChangeTypeForMove(announceType))
             {
                 await emit(BattleEvent.MessageLine(
@@ -450,7 +452,8 @@ public sealed class BattleEngine
                 $"{attacker.Data.Name}의 배틀스위치로 {form}로 모습이 변했다!"));
         }
 
-        PokemonType attackType = MoveRuleMetadata.ResolveMoveType(moveKey, move, attacker);
+        PokemonType attackType = MoveRuleMetadata.ResolveMoveType(
+            moveKey, move, attacker, defender);
         bool makesContact = MoveRuleMetadata.MakesContact(moveKey, move);
         string effectKind = TypeColors.GetEffectKind(attackType, move.IsStatus);
         string presentationKey = MovePresentationCatalog.Resolve(moveKey, move);

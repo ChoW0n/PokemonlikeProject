@@ -281,6 +281,29 @@ public static class MoveRuleMetadata
         return resolvedType;
     }
 
+    public static double AuraMultiplier(
+        PokemonType attackType,
+        Pokemon? attacker,
+        Pokemon? defender)
+    {
+        if (attackType is not (PokemonType.Fairy or PokemonType.Dark)) return 1.0;
+
+        bool auraActive = HasActiveAbility(attacker, attackType == PokemonType.Fairy
+                ? "페어리오라"
+                : "다크오라")
+            || HasActiveAbility(defender, attackType == PokemonType.Fairy
+                ? "페어리오라"
+                : "다크오라");
+        if (!auraActive) return 1.0;
+
+        bool auraBroken = HasActiveAbility(attacker, "오라브레이크")
+            || HasActiveAbility(defender, "오라브레이크");
+        return auraBroken ? 0.75 : 4.0 / 3.0;
+    }
+
+    private static bool HasActiveAbility(Pokemon? pokemon, string ability) =>
+        pokemon != null && !pokemon.IsFainted && pokemon.SelectedAbility == ability;
+
     public static double EffectivePower(string moveKey, Move move)
         => EffectivePowerBase(moveKey, move, weatherSuppressed: false);
 

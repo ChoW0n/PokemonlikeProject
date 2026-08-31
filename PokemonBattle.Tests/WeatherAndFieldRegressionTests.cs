@@ -46,6 +46,141 @@ public sealed class WeatherAndFieldRegressionTests
     }
 
     [Fact]
+    public async Task Weather_nullification_matches_air_lock_for_all_weather_effect_paths()
+    {
+        var cloudNine = CreatePokemon(55, "tackle", ability: "날씨부정");
+        var airLock = CreatePokemon(384, "tackle", ability: "에어록");
+        var normal = CreatePokemon(132, "tackle");
+
+        try
+        {
+            Assert.True(BattleWeather.AreEffectsSuppressed(cloudNine, normal));
+            Assert.True(BattleWeather.AreEffectsSuppressed(airLock, normal));
+
+            BattleWeather.Set(BattleWeather.Rain);
+            var weatherBall = MoveDatabase.All["weather-ball"];
+            Assert.Equal(
+                PokemonType.Normal,
+                MoveRuleMetadata.ResolveMoveType("weather-ball", weatherBall, cloudNine, normal));
+            Assert.Equal(
+                weatherBall.Power,
+                MoveRuleMetadata.EffectivePower("weather-ball", weatherBall, cloudNine, normal));
+            Assert.Equal(
+                weatherBall.Accuracy,
+                MoveRuleMetadata.EffectiveAccuracy(
+                    "weather-ball", weatherBall, cloudNine, normal));
+
+            var swiftSwimmer = CreatePokemon(25, "tackle", ability: "쓱쓱");
+            Assert.Equal(swiftSwimmer.Spd, swiftSwimmer.EffectiveSpdAgainst(cloudNine));
+
+            var rainDish = CreatePokemon(270, "tackle", ability: "젖은접시");
+            rainDish.CurrentHp = rainDish.MaxHp / 2;
+            int beforeHealing = rainDish.CurrentHp;
+            await CreateEngine().ApplyEndOfTurnEffectsAsync(
+                new[] { rainDish, cloudNine }, _ => Task.CompletedTask);
+            Assert.Equal(beforeHealing, rainDish.CurrentHp);
+
+            BattleWeather.Set(BattleWeather.Sun);
+            var synthesis = MoveDatabase.All["synthesis"];
+            Assert.Equal(
+                50,
+                MoveRuleMetadata.RecoveryAmount(
+                    "synthesis", synthesis, 100, cloudNine, normal));
+
+            var sunPower = CreatePokemon(670, "tackle", ability: "선파워");
+            sunPower.CurrentHp = sunPower.MaxHp;
+            int beforeSunDamage = sunPower.CurrentHp;
+            await CreateEngine().ApplyEndOfTurnEffectsAsync(
+                new[] { sunPower, cloudNine }, _ => Task.CompletedTask);
+            Assert.Equal(beforeSunDamage, sunPower.CurrentHp);
+
+            BattleWeather.Set(BattleWeather.Sand);
+            var sandTarget = CreatePokemon(132, "tackle");
+            int beforeSandDamage = sandTarget.CurrentHp;
+            await CreateEngine().ApplyEndOfTurnEffectsAsync(
+                new[] { sandTarget, cloudNine }, _ => Task.CompletedTask);
+            Assert.Equal(beforeSandDamage, sandTarget.CurrentHp);
+
+            var sandForce = CreatePokemon(25, "earthquake", ability: "모래의힘");
+            var sandForceContext = new BattlePowerContext(
+                sandForce, cloudNine, MoveDatabase.All["earthquake"],
+                PokemonType.Ground, false, MoveDatabase.All["earthquake"].Power, "earthquake");
+            new DamageModifierEffectHandler().ModifyPower(sandForceContext);
+            Assert.Equal(MoveDatabase.All["earthquake"].Power, sandForceContext.Power);
+        }
+        finally
+        {
+            BattleWeather.Reset();
+            BattleField.Reset();
+        }
+    }
+
+    [Fact]
+    public void Weather_nullification_does_not_disable_terrain_effects()
+    {
+        var cloudNine = CreatePokemon(55, "tackle", ability: "날씨부정");
+        var attacker = CreatePokemon(25, "seed-bomb");
+        var move = MoveDatabase.All["seed-bomb"];
+
+        try
+        {
+            BattleWeather.Set(BattleWeather.Sun);
+            BattleField.Current = BattleField.Grassy;
+            var context = new BattlePowerContext(
+                attacker, cloudNine, move, PokemonType.Grass, false, move.Power, "seed-bomb");
+
+            new DamageModifierEffectHandler().ModifyPower(context);
+
+            Assert.Equal(move.Power * 1.3, context.Power, 2);
+        }
+        finally
+        {
+            BattleWeather.Reset();
+            BattleField.Reset();
+        }
+    }
+
+    [Fact]
+    public void Aura_abilities_boost_both_sides_and_aura_break_reverses_them()
+    {
+        var fairyMove = MoveDatabase.All["moonblast"];
+        var darkMove = MoveDatabase.All["dark-pulse"];
+        var fairyAura = CreatePokemon(716, "moonblast", ability: "페어리오라");
+        var darkAura = CreatePokemon(717, "dark-pulse", ability: "다크오라");
+        var auraBreak = CreatePokemon(718, "tackle", ability: "오라브레이크");
+        var normal = CreatePokemon(132, "tackle");
+        var handler = new DamageModifierEffectHandler();
+
+        try
+        {
+            var fairyContext = new BattlePowerContext(
+                normal, fairyAura, fairyMove, PokemonType.Fairy, false, fairyMove.Power, "moonblast");
+            handler.ModifyPower(fairyContext);
+            Assert.Equal(fairyMove.Power * (4.0 / 3.0), fairyContext.Power, 2);
+
+            var darkContext = new BattlePowerContext(
+                darkAura, normal, darkMove, PokemonType.Dark, false, darkMove.Power, "dark-pulse");
+            handler.ModifyPower(darkContext);
+            Assert.Equal(darkMove.Power * (4.0 / 3.0), darkContext.Power, 2);
+
+            var reversedFairyContext = new BattlePowerContext(
+                fairyAura, auraBreak, fairyMove, PokemonType.Fairy, false, fairyMove.Power, "moonblast");
+            handler.ModifyPower(reversedFairyContext);
+            Assert.Equal(fairyMove.Power * 0.75, reversedFairyContext.Power, 2);
+
+            var reversedDarkContext = new BattlePowerContext(
+                darkAura, auraBreak, darkMove, PokemonType.Dark, false, darkMove.Power, "dark-pulse");
+            handler.ModifyPower(reversedDarkContext);
+            Assert.Equal(darkMove.Power * 0.75, reversedDarkContext.Power, 2);
+        }
+        finally
+        {
+            BattleWeather.Reset();
+            BattleField.Reset();
+        }
+    }
+
+    [Fact]
     public async Task Weather_move_updates_the_shared_battle_weather()
     {
         try
