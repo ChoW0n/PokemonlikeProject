@@ -41,11 +41,19 @@ public class GameState
         _currentUser = currentUser;
     }
 
+    public IReadOnlyList<LegendaryEncounterHistoryEntry> LegendaryEncounterHistory =>
+        _legendaryEncounterHistory;
+
+    private readonly List<LegendaryEncounterHistoryEntry> _legendaryEncounterHistory = new();
+
     public async Task LoadRunForCurrentUser()
     {
         if (_runLoaded || !_currentUser.IsLoggedIn) return;
 
-        var (score, highScore, loadouts, legendaryProgressPercent) = await _runStore.Load(_currentUser.Username!);
+        var (score, highScore, loadouts, legendaryProgressPercent, legendaryEncounterHistory) =
+            await _runStore.Load(_currentUser.Username!);
+        _legendaryEncounterHistory.Clear();
+        _legendaryEncounterHistory.AddRange(legendaryEncounterHistory);
 
         //방어 코드: 도감에 없는 포켓몬(예: 크래시로 깨진 PokemonId=0)이 하나라도 섞여있으면
         //전체 데이터를 신뢰할 수 없다고 보고 진행 상황을 완전히 초기화함
@@ -81,7 +89,13 @@ public class GameState
     private async Task PersistRun()
     {
         if (!_currentUser.IsLoggedIn) return;
-        await _runStore.Save(_currentUser.Username!, CurrentScore, HighScore, PlayerLoadouts, LegendaryProgressPercent);
+        await _runStore.Save(
+            _currentUser.Username!,
+            CurrentScore,
+            HighScore,
+            PlayerLoadouts,
+            LegendaryProgressPercent,
+            _legendaryEncounterHistory);
     }
 
     public void GoTo(GameScreen screen)
@@ -132,6 +146,16 @@ public class GameState
 
         if (consumption.WasConsumed)
         {
+            _legendaryEncounterHistory.Add(new LegendaryEncounterHistoryEntry
+            {
+                CycleNumber = _legendaryEncounterHistory.Count + 1,
+                Stage = Math.Max(1, CurrentScore + 1),
+                PokemonIds = EnemyTeamIds
+                    .Where(EnemyTeamProvider.IsLegendary)
+                    .Distinct()
+                    .ToList(),
+                EncounteredAtUtc = DateTimeOffset.UtcNow
+            });
             LegendaryProgressPercent = consumption.ProgressPercent;
             LegendaryEncounterConsumed = true;
             await PersistRun();

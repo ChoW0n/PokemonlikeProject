@@ -32,6 +32,8 @@
             <p class="config-label">🎉 새로운 진화형 해금: @string.Join(", ", State.EvolutionMessages)</p>
         }
 
+        <LegendaryHistory />
+
         @if (Candidates.Count > 0 && !Claimed)
         {
             <p class="config-label">쓰러뜨린 상대 중 1마리를 데려갈 수 있습니다 (선택은 자유입니다)</p>
@@ -67,6 +69,7 @@
         {
             <p class="config-label">전설 출현을 소비했습니다. 현재 진행도 0%에서 다음 주기를 시작합니다.</p>
         }
+        <LegendaryHistory />
         <button type="button" @onclick="RestartGame">처음부터 다시 시작</button>
     }
 </main>

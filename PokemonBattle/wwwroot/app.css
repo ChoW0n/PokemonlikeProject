@@ -616,6 +616,61 @@ h1 {
 .result-win { color: #8ff7ac; }
 .result-lose { color: #fca5a5; }
 
+.legendary-history {
+    margin: var(--sp-5) 0;
+    padding: var(--sp-4);
+    border: 1px solid rgba(255, 204, 51, 0.18);
+    border-radius: 16px;
+    background: rgba(255, 204, 51, 0.05);
+    text-align: left;
+}
+
+.legendary-history h2 {
+    margin: 0 0 var(--sp-3);
+    color: var(--accent);
+    font-size: 0.92rem;
+}
+
+.legendary-history p {
+    margin: 0;
+}
+
+.legendary-history-list {
+    display: grid;
+    gap: var(--sp-2);
+    margin: 0;
+    padding-left: 1.5rem;
+    color: #dfe5ff;
+}
+
+.legendary-history-list li {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0 var(--sp-2);
+    padding: var(--sp-2) 0;
+    border-bottom: 1px solid rgba(140, 150, 200, 0.12);
+}
+
+.legendary-history-list li:last-child {
+    border-bottom: 0;
+}
+
+.legendary-history-list strong {
+    color: #fff1a8;
+}
+
+.legendary-history-list span,
+.legendary-history-list time {
+    color: #aeb8dc;
+    font-size: 0.78rem;
+    line-height: 1.6;
+}
+
+.legendary-history-list time {
+    grid-column: 2;
+    color: #7782aa;
+}
+
 #blazor-error-ui {
     position: fixed; right: 0; bottom: 0; left: 0; z-index: 1000; display: none;
     padding: var(--sp-3) var(--sp-4); color: #fff; background: #a91e45; text-align: center; font-size: 0.82rem;
