@@ -25,7 +25,9 @@ public static class MovePresentationCatalog
         ["razor-leaf"] = "slash", ["leaf-blade"] = "slash", ["pin-missile"] = "multi",
         ["bullet-seed"] = "multi", ["fury-swipes"] = "multi", ["double-slap"] = "multi",
         ["recover"] = "heal", ["roost"] = "heal", ["rest"] = "heal", ["soft-boiled"] = "heal",
-        ["protect"] = "shield", ["detect"] = "shield", ["kings-shield"] = "shield",
+        ["protect"] = "shield", ["detect"] = "shield", ["endure"] = "shield",
+        ["kings-shield"] = "shield", ["baneful-bunker"] = "shield",
+        ["spiky-shield"] = "shield", ["obstruct"] = "shield", ["silk-guard"] = "shield",
         ["solar-beam"] = "charge", ["skull-bash"] = "charge", ["fly"] = "charge",
         ["bounce"] = "charge", ["future-sight"] = "delayed", ["doom-desire"] = "delayed",
         ["self-destruct"] = "recoil", ["explosion"] = "recoil", ["memento"] = "recoil"

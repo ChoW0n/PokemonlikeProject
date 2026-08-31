@@ -19,6 +19,7 @@ public sealed class MoveEffectsRegressionTests
                     or MoveRuleKind.Yawn or MoveRuleKind.PerishSong
                     or MoveRuleKind.Disable or MoveRuleKind.MoveRestriction
                     or MoveRuleKind.ForcedSwitch or MoveRuleKind.SelfDestruct
+                    or MoveRuleKind.Rampage
                     or MoveRuleKind.VariablePower or MoveRuleKind.VariableType
                     or MoveRuleKind.SpecialDefenseCalculation
                     or MoveRuleKind.DualTypeDamage or MoveRuleKind.HazardRemoval));
@@ -61,6 +62,34 @@ public sealed class MoveEffectsRegressionTests
     }
 
     [Fact]
+    public async Task Rampage_locks_the_move_without_extra_pp_and_confuses_when_it_ends()
+    {
+        var attacker = CreatePokemon(1, "outrage", level: 1);
+        var defender = CreatePokemon(202, "tackle", level: 100);
+        int ppBefore = attacker.CurrentPP["outrage"];
+        var events = new List<BattleEvent>();
+        var engine = CreateEngine();
+
+        await engine.TakeTurnAsync(attacker, defender, "outrage", true, Capture(events));
+        Assert.Equal(ppBefore - 1, attacker.CurrentPP["outrage"]);
+        Assert.Equal("outrage", attacker.RampageMoveKey);
+
+        await engine.TakeTurnAsync(attacker, defender, "tackle", true, Capture(events));
+        Assert.Equal(ppBefore - 1, attacker.CurrentPP["outrage"]);
+        Assert.DoesNotContain(events, battleEvent =>
+            battleEvent.Message?.Contains("그 기술을 사용할 수 없다", StringComparison.Ordinal) == true);
+
+        while (attacker.RampageMoveKey != null)
+        {
+            await engine.TakeTurnAsync(attacker, defender, "tackle", true, Capture(events));
+        }
+
+        Assert.True(attacker.IsConfused);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("난동이 끝나 혼란", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
     public async Task Self_targeted_stat_effects_do_not_lower_the_opponent()
     {
         var attacker = CreatePokemon(4, "fiery-dance");
@@ -94,12 +123,23 @@ public sealed class MoveEffectsRegressionTests
         Assert.Same(attacker, defenderResult.ForcedSwitchPokemon);
     }
 
-    private static Pokemon CreatePokemon(int id, string move, string? secondMove = null)
+    private static Pokemon CreatePokemon(
+        int id,
+        string move,
+        string? secondMove = null,
+        int level = 50)
     {
         var moves = secondMove == null ? new[] { move } : new[] { move, secondMove };
-        return new Pokemon(PokemonDatabase.All[id], moves.ToList(), "", "없음", level: 50);
+        return new Pokemon(PokemonDatabase.All[id], moves.ToList(), "", "없음", level);
     }
 
     private static BattleEngine CreateEngine() =>
         new(new Random(1234), new IBattleEffectHandler[] { new MoveEffectHandler() });
+
+    private static Func<BattleEvent, Task> Capture(List<BattleEvent> events) =>
+        battleEvent =>
+        {
+            events.Add(battleEvent);
+            return Task.CompletedTask;
+        };
 }

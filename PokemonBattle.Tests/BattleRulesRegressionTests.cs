@@ -214,6 +214,42 @@ public sealed class BattleRulesRegressionTests
     }
 
     [Fact]
+    public async Task Protection_moves_apply_only_their_declared_contact_effect()
+    {
+        var engine = CreateFullEngine();
+
+        var kingsShield = CreatePokemon(1, "kings-shield");
+        var kingsShieldAttacker = CreatePokemon(25, "tackle");
+        var kingsShieldEvents = new List<BattleEvent>();
+        await engine.TakeTurnAsync(
+            kingsShield, kingsShieldAttacker, "kings-shield", false, Capture(kingsShieldEvents));
+        await engine.TakeTurnAsync(
+            kingsShieldAttacker, kingsShield, "tackle", true, Capture(kingsShieldEvents));
+        Assert.Equal(-2, kingsShieldAttacker.StatStages["attack"]);
+        Assert.Contains(kingsShieldEvents, battleEvent =>
+            battleEvent.Message?.Contains("킹실드", StringComparison.Ordinal) == true);
+
+        var obstruct = CreatePokemon(1, "obstruct");
+        var obstructAttacker = CreatePokemon(25, "tackle");
+        await engine.TakeTurnAsync(obstruct, obstructAttacker, "obstruct", false, _ => Task.CompletedTask);
+        await engine.TakeTurnAsync(obstructAttacker, obstruct, "tackle", true, _ => Task.CompletedTask);
+        Assert.Equal(-2, obstructAttacker.StatStages["defense"]);
+
+        var spikyShield = CreatePokemon(1, "spiky-shield");
+        var spikyShieldAttacker = CreatePokemon(25, "tackle");
+        int spikyHpBefore = spikyShieldAttacker.CurrentHp;
+        await engine.TakeTurnAsync(spikyShield, spikyShieldAttacker, "spiky-shield", false, _ => Task.CompletedTask);
+        await engine.TakeTurnAsync(spikyShieldAttacker, spikyShield, "tackle", true, _ => Task.CompletedTask);
+        Assert.Equal(spikyHpBefore - Math.Max(1, spikyShieldAttacker.MaxHp / 8), spikyShieldAttacker.CurrentHp);
+
+        var banefulBunker = CreatePokemon(1, "baneful-bunker");
+        var banefulAttacker = CreatePokemon(25, "tackle");
+        await engine.TakeTurnAsync(banefulBunker, banefulAttacker, "baneful-bunker", false, _ => Task.CompletedTask);
+        await engine.TakeTurnAsync(banefulAttacker, banefulBunker, "tackle", true, _ => Task.CompletedTask);
+        Assert.Equal(StatusCondition.Poison, banefulAttacker.Status);
+    }
+
+    [Fact]
     public async Task Multi_hit_contact_reaction_runs_for_each_hit_before_one_life_orb_recoil()
     {
         var attacker = CreatePokemon(25, "double-hit", ability: "노가드", heldItem: "생명의구슬");
@@ -348,6 +384,13 @@ public sealed class BattleRulesRegressionTests
             new Random(1234),
             handlers.AsEnumerable().Reverse());
     }
+
+    private static Func<BattleEvent, Task> Capture(List<BattleEvent> events) =>
+        battleEvent =>
+        {
+            events.Add(battleEvent);
+            return Task.CompletedTask;
+        };
 
     private static int ExpectedDamage(Pokemon attacker, Pokemon defender, string moveKey)
     {

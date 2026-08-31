@@ -438,7 +438,7 @@ public class Pokemon
             {
                 int selfDamage = Math.Max(1, (int)(((2.0 * Level / 5 + 2) * 40 * ((double)Atk / Math.Max(Def, 1))) / 50) + 2);
                 CurrentHp = Math.Max(0, CurrentHp - selfDamage);
-                if (CurrentHp == 0) IsFainted = true;
+                if (CurrentHp == 0) MarkFainted();
                 return (false, $"{Data.Name}은(는) 혼란해서 자기 자신을 공격했다!");
             }
         }
@@ -494,7 +494,7 @@ public class Pokemon
         {
             int dmg = Math.Max(1, MaxHp / 16);
             CurrentHp = Math.Max(0, CurrentHp - dmg);
-            if (CurrentHp == 0) IsFainted = true;
+            if (CurrentHp == 0) MarkFainted();
             return $"{Data.Name}은(는) 화상으로 데미지를 입었다!";
         }
         if (Status == StatusCondition.Poison)
@@ -503,7 +503,7 @@ public class Pokemon
                 ? Math.Max(1, MaxHp * Math.Min(16, Math.Max(1, ToxicTurns++)) / 16)
                 : Math.Max(1, MaxHp / 8);
             CurrentHp = Math.Max(0, CurrentHp - dmg);
-            if (CurrentHp == 0) IsFainted = true;
+            if (CurrentHp == 0) MarkFainted();
             return $"{Data.Name}은(는) 독으로 데미지를 입었다!";
         }
         return null;
@@ -627,8 +627,9 @@ public class Pokemon
         {
             bool sturdySave = (SelectedAbility == "옹골참" || HeldItem == "기합의띠") && wasFullHp;
             bool focusBandSave = HeldItem == "기합의머리띠" && rng.Next(100) < 10;
+            bool endureSave = ActiveProtectionMoveKey == "endure";
 
-            if (sturdySave || focusBandSave)
+            if (sturdySave || focusBandSave || endureSave)
             {
                 CurrentHp = 1;
                 SurvivedByEndure = true;
@@ -636,8 +637,7 @@ public class Pokemon
             else
             {
                 CurrentHp = 0;
-                IsFainted = true;
-                ClearRampage();
+                MarkFainted();
             }
         }
     }

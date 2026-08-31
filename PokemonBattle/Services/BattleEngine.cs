@@ -310,7 +310,7 @@ public sealed class BattleEngine
                 / Math.Max(defender.EffectiveDef, 1)) / 50) + 2);
             defender.CurrentHp = Math.Max(0, defender.CurrentHp - damage);
             defender.LastMultiplier = 1.0;
-            defender.IsFainted = defender.CurrentHp == 0;
+            if (defender.CurrentHp == 0) defender.MarkFainted();
             await emit(BattleEvent.Effect(
                 TypeColors.GetEffectKind(PokemonType.Normal, false),
                 attackerIsHero,

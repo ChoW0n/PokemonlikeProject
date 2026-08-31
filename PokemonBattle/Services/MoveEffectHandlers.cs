@@ -49,7 +49,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         {
             int recoilDamage = Math.Max(1, context.TotalDamage * Math.Abs(context.Move.DrainPercent) / 100);
             context.Attacker.CurrentHp = Math.Max(0, context.Attacker.CurrentHp - recoilDamage);
-            if (context.Attacker.CurrentHp == 0) context.Attacker.IsFainted = true;
+            if (context.Attacker.CurrentHp == 0) context.Attacker.MarkFainted();
             await context.ShowMessage($"{context.Attacker.Data.Name}은(는) 반동으로 데미지를 입었다!");
         }
 
