@@ -40,55 +40,29 @@ Unity 없이 순수 C#/.NET 8 Blazor Server로 만든 싱글플레이 포켓몬 
 - 관리자 작업 감사 로그
 - 워글 스프라이트 매칭 수정 및 포켓로그 스타일 기술 연출
 
-## 최근 작업: 날씨와 필드 전투 규칙
+## 최근 작업: 모든 기술 효과 완성
 
-현재 작업은 `#10 - 날씨와 필드 특성이 실제 전투 규칙에 반영되게 하기`입니다.
+Task #13 `모든 기술 효과 완성`은 커밋 `a5475ac`에서 완료·병합되었습니다.
 
-### 날씨
+- 모든 기술을 타입화된 전투 규칙 분류 체계로 연결했습니다.
+- 기술 데이터의 규칙이 공통 효과 핸들러와 배틀 엔진 실행 경로에서 처리됩니다.
+- 지속 효과, 지연 행동, 충전 및 재충전, 강제 교체를 구현했습니다.
+- 기술별 조건부 위력·타입·대상 처리와 특수 피해 계산을 연결했습니다.
+- 결정적 회귀 테스트 56개가 추가되었고 모두 통과했습니다.
 
-- `BattleWeather`가 맑음·쾌청·비·모래바람·싸라기눈을 표현합니다.
-- 특성 기반 날씨는 교체 등장 시 적용되고 영구 유지됩니다.
-- 기술 기반 날씨는 5턴 유지 후 맑음으로 돌아갑니다.
-- 웨더볼의 타입·위력이 날씨에 따라 바뀝니다.
-- 솔라빔은 비·모래바람·싸라기눈에서 약해집니다.
-- 번개·폭풍·눈보라는 날씨별 명중률 규칙을 사용합니다.
-- 광합성·아침햇살·달빛의 회복량이 날씨에 따라 달라집니다.
-
-### 필드
-
-- 날씨와 분리된 `BattleField`가 그래스·일렉트릭·사이코·미스트필드를 표현합니다.
-- 필드 기술은 5턴 유지 후 필드 없음으로 돌아갑니다.
-- 그래스필드: 풀 기술 강화, 지진·땅고르기·매그니튜드 약화, 턴 종료 회복
-- 일렉트릭필드: 전기 기술 강화, 주요 상태 이상 방지
-- 사이코필드: 에스퍼 기술 강화, 상대를 향한 우선도 기술 차단
-- 미스트필드: 드래곤 기술 약화, 주요 상태 이상과 혼란 방지
-- `풀모피`의 그래스필드 방어 보정이 실제 필드 상태를 참조합니다.
-- 배틀 헤더에 현재 날씨와 필드를 표시합니다.
+Task #14 `포켓로그식 기술 연출`은 Task #13의 선행 작업이 끝난 상태입니다. 이번 문서 갱신에서는 Task #14를 새로 시작하지 않습니다.
 
 ## 현재 변경 파일
 
-현재 작업 트리에서 기능 변경과 관련된 파일은 다음 영역입니다.
+Task #13의 기능 변경은 커밋 `a5475ac`에 병합되어 현재 미커밋 기능 소스 변경은 없습니다.
 
-- 전투 상태: `PokemonBattle/Models/BattleWeather.cs`,
-  `PokemonBattle/Models/BattleField.cs`
-- 기술 규칙·기술 데이터: `PokemonBattle/Models/Move.cs`,
-  `PokemonBattle/Models/MoveDatabase.cs`
-- 포켓몬 계산: `PokemonBattle/Models/Pokemon.cs`
-- 전투 실행·이벤트: `PokemonBattle/Services/BattleEngine.cs`,
-  `PokemonBattle/Services/BattleEffects.cs`
-- 효과 적용: `PokemonBattle/Services/MoveEffectHandlers.cs`,
-  `PokemonBattle/Services/AbilityItemEffectHandlers.cs`
-- 화면: `PokemonBattle/Pages/Battle.razor`
-- 회귀 테스트: `PokemonBattle.Tests/WeatherAndFieldRegressionTests.cs`,
-  `PokemonBattle.Tests/XunitSettings.cs`
-
-생성 산출물인 `bin/`·`obj/`는 기능 변경으로 간주하지 말고 소스 diff만 검토하세요.
+빌드 과정에서 갱신될 수 있는 `bin/`·`obj/` 생성 산출물은 기능 변경으로 간주하지 말고 소스 diff만 검토하세요.
 
 ## 검증된 상태
 
 - `dotnet build PokemonBattle/PokemonBattle.csproj --no-restore` 성공
 - `dotnet test PokemonBattle.Tests/PokemonBattle.Tests.csproj --no-restore` 성공
-- 현재 회귀 테스트 총 49개 통과
+- 현재 회귀 테스트 총 56개 통과
 - Replit 워크플로 `artifacts/pokemon-battle: web` 정상 실행
 - `/healthz` 응답 200
 - Blazor 브라우저 연결 및 로그인 화면 프리뷰 확인
