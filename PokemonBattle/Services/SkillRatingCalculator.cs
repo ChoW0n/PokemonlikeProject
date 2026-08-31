@@ -46,6 +46,25 @@ public static class SkillRatingCalculator
             2000);
     }
 
+    public static RunPerformanceSummary SummarizeRun(
+        IEnumerable<RunRoundPerformance> performances,
+        bool won)
+    {
+        var rounds = performances.ToList();
+        return new RunPerformanceSummary(
+            rounds.Count(performance => performance.Cleared),
+            rounds.Count,
+            rounds.Count == 0 ? 0 : rounds.Average(performance => performance.PlayerHpRatio),
+            rounds.Count == 0 ? 0 : rounds.Average(performance => performance.Turns),
+            won);
+    }
+
+    public static double PreviewRating(
+        double currentRating,
+        IEnumerable<RunRoundPerformance> performances,
+        bool won) =>
+        UpdateRating(currentRating, SummarizeRun(performances, won));
+
     public static int CalculateDifficultyAdjustment(double rating)
     {
         int adjustment = (int)Math.Floor((rating - DefaultRating) / 100);
