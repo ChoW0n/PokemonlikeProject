@@ -460,7 +460,8 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         {
             case "taunt":
                 if (defender.IsImmuneToMentalEffect("taunt"))
-                    await context.ShowMessage($"{defender.Data.Name}은(는) 아로마베일로 도발을 막았다!");
+                    await context.ShowMessage(
+                        $"{defender.Data.Name}은(는) {defender.SelectedAbility}으로 도발을 막았다!");
                 else
                 {
                     defender.SetTaunt(3);
@@ -507,8 +508,20 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 }
                 break;
             case "attract":
-                defender.SetInfatuated();
-                await context.ShowMessage($"{defender.Data.Name}은(는) 헤롱헤롱 상태가 되었다!");
+                if (defender.IsImmuneToMentalEffect("infatuation"))
+                {
+                    await context.ShowMessage(
+                        $"{defender.Data.Name}은(는) {defender.SelectedAbility}으로 헤롱헤롱을 막았다!");
+                }
+                else if (!attacker.HasOppositeKnownGenderTo(defender))
+                {
+                    await context.ShowMessage($"{defender.Data.Name}에게는 헤롱헤롱이 통하지 않았다!");
+                }
+                else if (!defender.IsInfatuated)
+                {
+                    defender.SetInfatuated();
+                    await context.ShowMessage($"{defender.Data.Name}은(는) 헤롱헤롱 상태가 되었다!");
+                }
                 break;
         }
     }

@@ -500,6 +500,109 @@ public sealed class AbilityRulesRegressionTests
     }
 
     [Fact]
+    public void Gender_conditioned_abilities_apply_only_with_known_gender_pairs()
+    {
+        Assert.True(AbilityDatabase.IsImplemented("투쟁심"));
+        Assert.True(AbilityDatabase.IsImplemented("헤롱헤롱바디"));
+        Assert.True(AbilityDatabase.IsImplemented("둔감"));
+
+        var move = MoveDatabase.All["tackle"];
+        var sameGenderAttacker = CreatePokemon(
+            132, "tackle", ability: "투쟁심", gender: PokemonGender.Male);
+        var sameGenderTarget = CreatePokemon(
+            132, "tackle", gender: PokemonGender.Male);
+        var sameContext = new BattlePowerContext(
+            sameGenderAttacker, sameGenderTarget, move, PokemonType.Normal, true, move.Power, "tackle");
+        new DamageModifierEffectHandler().ModifyPower(sameContext);
+
+        var oppositeGenderAttacker = CreatePokemon(
+            132, "tackle", ability: "투쟁심", gender: PokemonGender.Male);
+        var oppositeGenderTarget = CreatePokemon(
+            132, "tackle", gender: PokemonGender.Female);
+        var oppositeContext = new BattlePowerContext(
+            oppositeGenderAttacker, oppositeGenderTarget, move, PokemonType.Normal, true, move.Power, "tackle");
+        new DamageModifierEffectHandler().ModifyPower(oppositeContext);
+
+        var unknownGenderAttacker = CreatePokemon(
+            132, "tackle", ability: "투쟁심", gender: PokemonGender.Unknown);
+        var unknownGenderTarget = CreatePokemon(
+            132, "tackle", gender: PokemonGender.Male);
+        var unknownContext = new BattlePowerContext(
+            unknownGenderAttacker, unknownGenderTarget, move, PokemonType.Normal, true, move.Power, "tackle");
+        new DamageModifierEffectHandler().ModifyPower(unknownContext);
+
+        Assert.Equal(move.Power * 1.25, sameContext.Power);
+        Assert.Equal(move.Power * 0.75, oppositeContext.Power);
+        Assert.Equal(move.Power, unknownContext.Power);
+        Assert.Equal(PokemonGender.Female, CreatePokemon(29, "tackle").Gender);
+        Assert.Equal(PokemonGender.Male, CreatePokemon(32, "tackle").Gender);
+        Assert.Equal(PokemonGender.Unknown, CreatePokemon(132, "tackle").Gender);
+    }
+
+    [Fact]
+    public async Task Cute_charm_requires_contact_and_opposite_known_gender()
+    {
+        var cuteCharm = CreatePokemon(
+            700, "tackle", ability: "헤롱헤롱바디", gender: PokemonGender.Female);
+        var contactAttacker = CreatePokemon(
+            132, "tackle", gender: PokemonGender.Male);
+        var events = new List<BattleEvent>();
+
+        await CreateFullEngine(new FixedRandom(1)).TakeTurnAsync(
+            contactAttacker, cuteCharm, "tackle", true, Capture(events));
+
+        Assert.True(contactAttacker.IsInfatuated);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("헤롱헤롱바디", StringComparison.Ordinal) == true);
+
+        var nonContactAttacker = CreatePokemon(
+            25, "thunderbolt", gender: PokemonGender.Male);
+        var nonContactCuteCharm = CreatePokemon(
+            700, "tackle", ability: "헤롱헤롱바디", gender: PokemonGender.Female);
+        await CreateFullEngine(new FixedRandom(1)).TakeTurnAsync(
+            nonContactAttacker, nonContactCuteCharm, "thunderbolt", true, _ => Task.CompletedTask);
+        Assert.False(nonContactAttacker.IsInfatuated);
+
+        var sameGenderAttacker = CreatePokemon(
+            132, "tackle", gender: PokemonGender.Female);
+        var sameGenderCuteCharm = CreatePokemon(
+            700, "tackle", ability: "헤롱헤롱바디", gender: PokemonGender.Female);
+        await CreateFullEngine(new FixedRandom(1)).TakeTurnAsync(
+            sameGenderAttacker, sameGenderCuteCharm, "tackle", true, _ => Task.CompletedTask);
+        Assert.False(sameGenderAttacker.IsInfatuated);
+    }
+
+    [Fact]
+    public async Task Oblivious_blocks_attract_and_taunt_but_not_unrelated_effects()
+    {
+        var oblivious = CreatePokemon(
+            35, "tackle", ability: "둔감", gender: PokemonGender.Female);
+        var maleAttractor = CreatePokemon(
+            668, "attract", gender: PokemonGender.Male);
+        var events = new List<BattleEvent>();
+
+        Assert.True(oblivious.IsImmuneToMentalEffect("infatuation"));
+        Assert.True(oblivious.IsImmuneToMentalEffect("taunt"));
+        await CreateFullEngine(new FixedRandom(1)).TakeTurnAsync(
+            maleAttractor, oblivious, "attract", true, Capture(events));
+
+        Assert.False(oblivious.IsInfatuated);
+        Assert.Equal(0, oblivious.TauntTurnsRemaining);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("둔감", StringComparison.Ordinal) == true);
+
+        var tauntUser = CreatePokemon(132, "taunt");
+        await CreateFullEngine(new FixedRandom(1)).TakeTurnAsync(
+            tauntUser, oblivious, "taunt", true, _ => Task.CompletedTask);
+        Assert.Equal(0, oblivious.TauntTurnsRemaining);
+
+        var normalTarget = CreatePokemon(132, "tackle");
+        await CreateFullEngine(new FixedRandom(1)).TakeTurnAsync(
+            tauntUser, normalTarget, "taunt", true, _ => Task.CompletedTask);
+        Assert.Equal(3, normalTarget.TauntTurnsRemaining);
+    }
+
+    [Fact]
     public void Accuracy_and_evasion_stages_apply_in_the_expected_order()
     {
         Assert.True(AbilityDatabase.IsImplemented("날카로운눈"));
@@ -754,10 +857,12 @@ public sealed class AbilityRulesRegressionTests
         string move,
         string? secondMove = null,
         string ability = "",
-        string heldItem = "없음")
+        string heldItem = "없음",
+        PokemonGender? gender = null)
     {
         var moves = secondMove == null ? new[] { move } : new[] { move, secondMove };
-        return new Pokemon(PokemonDatabase.All[pokemonId], moves.ToList(), ability, heldItem, level: 50);
+        return new Pokemon(
+            PokemonDatabase.All[pokemonId], moves.ToList(), ability, heldItem, level: 50, gender: gender);
     }
 
     private static BattleEngine CreateFullEngine(Random? random = null) => new(

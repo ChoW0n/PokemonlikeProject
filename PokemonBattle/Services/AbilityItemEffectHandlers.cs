@@ -37,6 +37,13 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
         {
             context.Power *= 2.0;
         }
+        if (attacker.SelectedAbility == "투쟁심")
+        {
+            if (attacker.HasSameKnownGenderAs(context.Defender))
+                context.Power *= 1.25;
+            else if (attacker.HasOppositeKnownGenderTo(context.Defender))
+                context.Power *= 0.75;
+        }
         if ((attacker.SelectedAbility is "심록" or "맹화" or "급류" or "벌레의알림")
             && attacker.CurrentHp <= attacker.MaxHp / 3
             && ((attacker.SelectedAbility == "심록" && attackType == PokemonType.Grass)
@@ -398,6 +405,17 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
         }
 
         if (context.Defender.IsFainted || context.Attacker.IsFainted) return;
+
+        if (context.Defender.SelectedAbility == "헤롱헤롱바디"
+            && !context.Attacker.IsInfatuated
+            && context.Defender.HasOppositeKnownGenderTo(context.Attacker)
+            && !context.Attacker.IsImmuneToMentalEffect("infatuation")
+            && context.Random.Next(100) < 30)
+        {
+            context.Attacker.SetInfatuated();
+            await context.ShowMessage(
+                $"{context.Attacker.Data.Name}은(는) 헤롱헤롱바디 때문에 헤롱헤롱 상태가 되었다!");
+        }
 
         if (context.Attacker.Status != StatusCondition.None) return;
         string? reaction = null;
