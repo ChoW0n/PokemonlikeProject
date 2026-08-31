@@ -625,6 +625,7 @@
                 StateHasChanged();
                 return true;
             }
+            await Rules.ApplyEndOfBattleEffectsAsync(PlayerTeam, PlayBattleEvent);
             await ShowMessage("상대 포켓몬을 모두 쓰러뜨렸다! 승리!");
             await State.WinRound();
             Nav.NavigateTo("/result");

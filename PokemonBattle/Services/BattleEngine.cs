@@ -193,14 +193,17 @@ public sealed class BattleEngine
         IEnumerable<Pokemon> activePokemon,
         Func<BattleEvent, Task> emit)
     {
-        foreach (var pokemon in activePokemon)
+        var active = activePokemon.ToArray();
+        foreach (var pokemon in active)
         {
             if (pokemon.IsFainted) continue;
 
             var statusMessage = pokemon.ApplyEndOfTurnStatusDamage();
             if (statusMessage != null) await emit(BattleEvent.TurnEnd(statusMessage, 1100));
 
-            var context = new BattleEndOfTurnContext(pokemon, emit);
+            var opponent = active.FirstOrDefault(candidate =>
+                !ReferenceEquals(candidate, pokemon) && !candidate.IsFainted);
+            var context = new BattleEndOfTurnContext(pokemon, emit, opponent, rng);
             foreach (var handler in effectHandlers) await handler.EndOfTurnAsync(context);
             pokemon.AdvanceTurn();
         }
@@ -212,6 +215,19 @@ public sealed class BattleEngine
         if (BattleField.AdvanceTurn())
         {
             await emit(BattleEvent.TurnEnd("필드의 효과가 사라졌다!", 900));
+        }
+    }
+
+    public async Task ApplyEndOfBattleEffectsAsync(
+        IEnumerable<Pokemon> pokemon,
+        Func<BattleEvent, Task> emit)
+    {
+        foreach (var participant in pokemon)
+        {
+            if (participant.IsFainted) continue;
+
+            var context = new BattleEndOfBattleContext(participant, rng, emit);
+            foreach (var handler in effectHandlers) await handler.AfterBattleAsync(context);
         }
     }
 

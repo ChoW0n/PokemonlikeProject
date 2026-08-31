@@ -66,6 +66,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
 
         if (context.MoveKey is "bug-bite" or "pluck"
             && context.TotalDamage > 0
+            && !context.Attacker.IsBerryEatingBlockedBy(context.Defender)
             && context.Defender.TryTakeHeldBerry(out string? berryName))
         {
             context.Attacker.ApplyBerryEffect(berryName!);
@@ -81,6 +82,13 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                     await context.ShowMessage($"{context.Attacker.Data.Name}은(는) 볼주머니로 HP를 회복했다!");
                 }
             }
+        }
+        else if (context.MoveKey is "bug-bite" or "pluck"
+            && context.TotalDamage > 0
+            && context.Attacker.IsBerryEatingBlockedBy(context.Defender))
+        {
+            await context.ShowMessage(
+                $"{context.Attacker.Data.Name}은(는) 상대의 긴장감 때문에 나무열매를 먹을 수 없다!");
         }
     }
 

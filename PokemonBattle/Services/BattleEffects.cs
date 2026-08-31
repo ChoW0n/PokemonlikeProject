@@ -217,15 +217,38 @@ public sealed class BattleEndOfTurnContext
 {
     public Pokemon Pokemon { get; }
     public Pokemon? Opponent { get; }
+    public Random Random { get; }
     public Func<BattleEvent, Task> Emit { get; }
 
     public BattleEndOfTurnContext(
         Pokemon pokemon,
         Func<BattleEvent, Task> emit,
-        Pokemon? opponent = null)
+        Pokemon? opponent = null,
+        Random? random = null)
     {
         Pokemon = pokemon;
         Opponent = opponent;
+        Random = random ?? System.Random.Shared;
+        Emit = emit;
+    }
+
+    public Task ShowMessage(string message, int baseDelayMs = 1400) =>
+        Emit(BattleEvent.MessageLine(message, baseDelayMs));
+}
+
+public sealed class BattleEndOfBattleContext
+{
+    public Pokemon Pokemon { get; }
+    public Random Random { get; }
+    public Func<BattleEvent, Task> Emit { get; }
+
+    public BattleEndOfBattleContext(
+        Pokemon pokemon,
+        Random random,
+        Func<BattleEvent, Task> emit)
+    {
+        Pokemon = pokemon;
+        Random = random;
         Emit = emit;
     }
 
@@ -242,4 +265,5 @@ public interface IBattleEffectHandler
     Task AfterDamageResultAsync(BattleEffectContext context) => Task.CompletedTask;
     Task AfterMoveAsync(BattleEffectContext context) => Task.CompletedTask;
     Task EndOfTurnAsync(BattleEndOfTurnContext context) => Task.CompletedTask;
+    Task AfterBattleAsync(BattleEndOfBattleContext context) => Task.CompletedTask;
 }

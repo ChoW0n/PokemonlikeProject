@@ -177,6 +177,7 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
         {
             await ConsumeBerryAsync(
                 context.Defender,
+                context.Attacker,
                 message => context.ShowMessage(message));
         }
     }
@@ -205,9 +206,11 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
     {
         await ConsumeBerryAsync(
             context.Attacker,
+            context.Defender,
             message => context.ShowMessage(message));
         await ConsumeBerryAsync(
             context.Defender,
+            context.Attacker,
             message => context.ShowMessage(message));
     }
 
@@ -218,7 +221,13 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
 
         await ConsumeBerryAsync(
             pokemon,
+            context.Opponent,
             message => context.ShowMessage(message, 900));
+
+        if (pokemon.TryHarvest(context.Random, context.Opponent, out string? harvestMessage))
+        {
+            await context.ShowMessage(harvestMessage!, 900);
+        }
 
         if (pokemon.UpdateFormAtEndOfTurn())
         {
@@ -289,6 +298,14 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
         }
     }
 
+    public async Task AfterBattleAsync(BattleEndOfBattleContext context)
+    {
+        if (context.Pokemon.TryPickUp(context.Random, out string? pickupMessage))
+        {
+            await context.ShowMessage(pickupMessage!, 900);
+        }
+    }
+
     private static async Task DamageAsync(BattleEndOfTurnContext context, int damage, string message)
     {
         context.Pokemon.CurrentHp = Math.Max(0, context.Pokemon.CurrentHp - damage);
@@ -296,9 +313,21 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
         await context.ShowMessage(message, 900);
     }
 
-    private static async Task ConsumeBerryAsync(Pokemon pokemon, Func<string, Task> showMessage)
+    private static async Task ConsumeBerryAsync(
+        Pokemon pokemon,
+        Pokemon? opponent,
+        Func<string, Task> showMessage)
     {
-        if (pokemon.IsFainted || !pokemon.TryConsumeBerry(out string? berryMessage)) return;
+        if (pokemon.IsFainted) return;
+
+        if (pokemon.IsBerryConsumptionBlockedBy(opponent))
+        {
+            await showMessage(
+                $"{pokemon.Data.Name}은(는) 상대의 긴장감 때문에 나무열매를 먹을 수 없다!");
+            return;
+        }
+
+        if (!pokemon.TryConsumeBerry(opponent, out string? berryMessage)) return;
 
         await showMessage(berryMessage!);
         if (pokemon.SelectedAbility != "볼주머니") return;

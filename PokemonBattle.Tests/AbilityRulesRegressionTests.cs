@@ -167,6 +167,105 @@ public sealed class AbilityRulesRegressionTests
     }
 
     [Fact]
+    public async Task Harvest_restores_the_consumed_berry_once_at_turn_end()
+    {
+        BattleWeather.Reset();
+        BattleField.Reset();
+        var harvester = CreatePokemon(132, "tackle", ability: "수확", heldItem: "자뭉열매");
+        harvester.CurrentHp = harvester.MaxHp / 2;
+        var events = new List<BattleEvent>();
+
+        await CreateFullEngine(new FixedRandom(0)).ApplyEndOfTurnEffectsAsync(
+            new[] { harvester, CreatePokemon(202, "tackle") },
+            Capture(events));
+
+        Assert.Equal("자뭉열매", harvester.HeldItem);
+        Assert.True(harvester.HasConsumedBerry);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("수확", StringComparison.Ordinal) == true);
+
+        var failedHarvest = CreatePokemon(132, "tackle", ability: "수확", heldItem: "오랭열매");
+        failedHarvest.CurrentHp = failedHarvest.MaxHp / 2;
+        events.Clear();
+        await CreateFullEngine(new FixedRandom(99)).ApplyEndOfTurnEffectsAsync(
+            new[] { failedHarvest },
+            Capture(events));
+
+        Assert.Equal("없음", failedHarvest.HeldItem);
+        Assert.DoesNotContain(events, battleEvent =>
+            battleEvent.Message?.Contains("수확", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task Unnerve_blocks_berry_consumption_until_the_opponent_leaves()
+    {
+        var eater = CreatePokemon(132, "tackle", heldItem: "자뭉열매");
+        eater.CurrentHp = eater.MaxHp / 2;
+        var unnerve = CreatePokemon(667, "tackle", ability: "긴장감");
+        var events = new List<BattleEvent>();
+
+        await CreateFullEngine(new FixedRandom(0)).ApplyEndOfTurnEffectsAsync(
+            new[] { eater, unnerve },
+            Capture(events));
+
+        Assert.Equal("자뭉열매", eater.HeldItem);
+        Assert.False(eater.HasConsumedBerry);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("긴장감", StringComparison.Ordinal) == true);
+
+        unnerve.MarkFainted();
+        await CreateFullEngine(new FixedRandom(0)).ApplyEndOfTurnEffectsAsync(
+            new[] { eater, unnerve },
+            Capture(events));
+
+        Assert.Equal("없음", eater.HeldItem);
+        Assert.True(eater.HasConsumedBerry);
+    }
+
+    [Fact]
+    public async Task Unnerve_blocks_bug_bite_from_eating_the_defender_berry()
+    {
+        var attacker = CreatePokemon(132, "bug-bite");
+        var defender = CreatePokemon(667, "tackle", ability: "긴장감", heldItem: "자뭉열매");
+        var events = new List<BattleEvent>();
+
+        await CreateFullEngine(new FixedRandom(0)).TakeTurnAsync(
+            attacker, defender, "bug-bite", true, Capture(events));
+
+        Assert.Equal("자뭉열매", defender.HeldItem);
+        Assert.False(attacker.HasConsumedBerry);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("긴장감", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task Pickup_resolves_once_after_battle_and_reports_the_item()
+    {
+        var picker = CreatePokemon(660, "tackle", ability: "픽업");
+        var events = new List<BattleEvent>();
+        var engine = CreateFullEngine(new FixedRandom(0));
+
+        await engine.ApplyEndOfBattleEffectsAsync(new[] { picker }, Capture(events));
+
+        Assert.Equal("먹다남은음식", picker.HeldItem);
+        Assert.True(picker.HasPickedUpItem);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("픽업", StringComparison.Ordinal) == true);
+
+        events.Clear();
+        await engine.ApplyEndOfBattleEffectsAsync(new[] { picker }, Capture(events));
+        Assert.Empty(events);
+        Assert.Equal("먹다남은음식", picker.HeldItem);
+
+        var failedPicker = CreatePokemon(660, "tackle", ability: "픽업");
+        await CreateFullEngine(new FixedRandom(99)).ApplyEndOfBattleEffectsAsync(
+            new[] { failedPicker },
+            _ => Task.CompletedTask);
+        Assert.Equal("없음", failedPicker.HeldItem);
+        Assert.True(failedPicker.HasPickedUpItem);
+    }
+
+    [Fact]
     public void Trapping_abilities_block_only_eligible_switches()
     {
         var engine = CreateFullEngine();
@@ -290,8 +389,8 @@ public sealed class AbilityRulesRegressionTests
         return new Pokemon(PokemonDatabase.All[pokemonId], moves.ToList(), ability, heldItem, level: 50);
     }
 
-    private static BattleEngine CreateFullEngine() => new(
-        new Random(1234),
+    private static BattleEngine CreateFullEngine(Random? random = null) => new(
+        random ?? new Random(1234),
         new IBattleEffectHandler[]
         {
             new MoveEffectHandler(),
@@ -306,4 +405,16 @@ public sealed class AbilityRulesRegressionTests
             events.Add(battleEvent);
             return Task.CompletedTask;
         };
+
+    private sealed class FixedRandom : Random
+    {
+        private readonly int value;
+
+        public FixedRandom(int value)
+        {
+            this.value = value;
+        }
+
+        public override int Next(int maxValue) => Math.Min(value, maxValue - 1);
+    }
 }
