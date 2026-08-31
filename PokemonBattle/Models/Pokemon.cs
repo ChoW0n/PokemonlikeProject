@@ -93,7 +93,8 @@ public class Pokemon
     public bool Flinched;
     public Dictionary<string, int> StatStages = new()
     {
-        ["attack"] = 0, ["defense"] = 0, ["special-attack"] = 0, ["special-defense"] = 0, ["speed"] = 0
+        ["attack"] = 0, ["defense"] = 0, ["special-attack"] = 0, ["special-defense"] = 0,
+        ["speed"] = 0, ["accuracy"] = 0, ["evasion"] = 0
     };
 
     private static readonly Random rng = new Random();
@@ -334,7 +335,11 @@ public class Pokemon
         typeOverride1 = null;
         typeOverride2 = null;
 
-        StatStages = new() { ["attack"] = 0, ["defense"] = 0, ["special-attack"] = 0, ["special-defense"] = 0, ["speed"] = 0 };
+        StatStages = new()
+        {
+            ["attack"] = 0, ["defense"] = 0, ["special-attack"] = 0, ["special-defense"] = 0,
+            ["speed"] = 0, ["accuracy"] = 0, ["evasion"] = 0
+        };
         IsConfused = false;
         ConfusionTurnsRemaining = 0;
         ChoiceLockedMove = null;
@@ -384,6 +389,8 @@ public class Pokemon
     public bool CanChangeStage(string stat, int delta, bool causedByOpponent = false)
     {
         if (!StatStages.ContainsKey(stat) || delta == 0) return false;
+        if (causedByOpponent && delta < 0 && stat == "accuracy" && SelectedAbility == "날카로운눈")
+            return false;
         if (causedByOpponent && delta < 0 && (SelectedAbility is "클리어바디" or "하얀연기")) return false;
         if (causedByOpponent && delta < 0 && SelectedAbility == "괴력집게" && stat == "attack") return false;
         if (causedByOpponent && delta < 0 && SelectedAbility == "부풀린가슴" && stat == "defense") return false;

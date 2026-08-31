@@ -547,6 +547,8 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         "special-attack" => "특공",
         "special-defense" => "특방",
         "speed" => "속도",
+        "accuracy" => "명중률",
+        "evasion" => "회피율",
         _ => stat
     };
 }

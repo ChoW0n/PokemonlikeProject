@@ -192,7 +192,9 @@ public sealed class BattleEngine
                 bool stab = enemy.HasType(attackType);
                 score = MoveRuleMetadata.EffectivePower(key, move) * averageHits * (stab ? 1.5 : 1.0)
                     * PreviewMultiplier(move, hero, enemy)
-                    * ((move.AlwaysHits ? 100 : MoveRuleMetadata.EffectiveAccuracy(key, move)) / 100.0);
+                    * ((move.AlwaysHits
+                        ? 100
+                        : MoveRuleMetadata.EffectiveAccuracy(key, move, enemy, hero)) / 100.0);
             }
 
             if (score > bestScore)
@@ -464,12 +466,8 @@ public sealed class BattleEngine
             target: TargetsOpponent(move) ? "opponent" : "self",
             presentationKey: presentationKey));
 
-        double effectiveAccuracy = MoveRuleMetadata.EffectiveAccuracy(moveKey, move);
-        if (attacker.SelectedAbility == "의욕" && !move.IsStatus && !move.IsSpecial) effectiveAccuracy *= 0.8;
-        if (attacker.SelectedAbility == "복안") effectiveAccuracy *= 1.3;
-        if (attacker.SelectedAbility == "승리의별") effectiveAccuracy *= 1.1;
-        if (defender.SelectedAbility == "모래숨기" && BattleWeather.Current == "모래바람") effectiveAccuracy *= 0.8;
-        if (defender.SelectedAbility == "눈숨기" && BattleWeather.Current == "싸라기눈") effectiveAccuracy *= 0.8;
+        double effectiveAccuracy = MoveRuleMetadata.EffectiveAccuracy(
+            moveKey, move, attacker, defender);
         if (BattleField.Current == BattleField.Psychic && move.Priority > 0 && TargetsOpponent(move))
         {
             await emit(BattleEvent.MessageLine(
