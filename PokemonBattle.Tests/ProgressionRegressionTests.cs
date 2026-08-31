@@ -55,12 +55,145 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public void DuplicateTeamItemsKeepTheFirstItemAndAllowNoneToRepeat()
+    {
+        var normalized = TeamLoadoutRules.NormalizeUniqueItems(new[]
+        {
+            new PokemonLoadout { PokemonId = 1, ChosenItem = "기합의띠" },
+            new PokemonLoadout { PokemonId = 4, ChosenItem = "기합의띠" },
+            new PokemonLoadout { PokemonId = 7, ChosenItem = "없음" },
+            new PokemonLoadout { PokemonId = 10, ChosenItem = "없음" }
+        });
+
+        Assert.Equal("기합의띠", normalized[0].ChosenItem);
+        Assert.Equal("없음", normalized[1].ChosenItem);
+        Assert.Equal("없음", normalized[2].ChosenItem);
+        Assert.Equal("없음", normalized[3].ChosenItem);
+        Assert.False(TeamLoadoutRules.HasDuplicateItems(normalized));
+        Assert.True(TeamLoadoutRules.CanUseItem(normalized, 1, "기합의띠"));
+        Assert.False(TeamLoadoutRules.CanUseItem(normalized, 4, "기합의띠"));
+    }
+
+    [Fact]
+    public async Task InMemoryPresetsUpdateDeleteAndIsolateUsers()
+    {
+        var currentUser = new CurrentUserService();
+        var store = new InMemoryPresetStore(currentUser);
+        currentUser.SignIn("preset-user-a", isAdmin: false);
+
+        await store.SaveAsync("  팀  ", new List<PokemonLoadout>
+        {
+            new() { PokemonId = 1, ChosenItem = "기합의띠", Level = 9 }
+        });
+        await store.SaveAsync("팀", new List<PokemonLoadout>
+        {
+            new() { PokemonId = 4, ChosenItem = "먹다남은음식", Level = 9 }
+        });
+
+        Assert.Equal(new[] { "팀" }, await store.ListNamesAsync());
+        var updated = await store.LoadAsync("팀");
+        var updatedLoadout = Assert.Single(updated!);
+        Assert.Equal(4, updatedLoadout.PokemonId);
+        Assert.Equal(1, updatedLoadout.Level);
+
+        currentUser.SignIn("preset-user-b", isAdmin: false);
+        Assert.Empty(await store.ListNamesAsync());
+        Assert.Null(await store.LoadAsync("팀"));
+
+        currentUser.SignIn("preset-user-a", isAdmin: false);
+        Assert.True(await store.DeleteAsync("팀"));
+        Assert.Empty(await store.ListNamesAsync());
+        Assert.False(await store.DeleteAsync("팀"));
+    }
+
+    [Fact]
+    public async Task PostgresPresetsSurviveFreshContextAndKeepUsersSeparate()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreateUserPresetsTable(schema);
+            var loadouts = new List<PokemonLoadout>
+            {
+                new() { PokemonId = 1, ChosenItem = "기합의띠", Level = 14 }
+            };
+
+            var firstUser = new CurrentUserService();
+            firstUser.SignIn("preset-persistence-a", isAdmin: false);
+            await using (var db = CreateDbContext(schema))
+            {
+                var store = new PostgresPresetStore(db, firstUser);
+                await store.SaveAsync("팀", loadouts);
+                await store.SaveAsync("팀", new List<PokemonLoadout>
+                {
+                    new() { PokemonId = 4, ChosenItem = "먹다남은음식", Level = 22 }
+                });
+            }
+
+            await using (var freshDb = CreateDbContext(schema))
+            {
+                var store = new PostgresPresetStore(freshDb, firstUser);
+                var restored = await store.LoadAsync("팀");
+                var restoredLoadout = Assert.Single(restored!);
+                Assert.Equal(4, restoredLoadout.PokemonId);
+                Assert.Equal(1, restoredLoadout.Level);
+            }
+
+            var secondUser = new CurrentUserService();
+            secondUser.SignIn("preset-persistence-b", isAdmin: false);
+            await using (var otherDb = CreateDbContext(schema))
+            {
+                var store = new PostgresPresetStore(otherDb, secondUser);
+                Assert.Empty(await store.ListNamesAsync());
+                Assert.False(await store.DeleteAsync("팀"));
+            }
+
+            await using (var deleteDb = CreateDbContext(schema))
+            {
+                Assert.True(await new PostgresPresetStore(deleteDb, firstUser).DeleteAsync("팀"));
+            }
+        });
+    }
+
+    [Fact]
     public void LegendaryProgressClampsAtOneHundred()
     {
         Assert.Equal(100, LegendaryProgression.AddProgress(96, 20));
         Assert.Equal(0, LegendaryProgression.AddProgress(0, -10));
         Assert.True(LegendaryProgression.IsUnlocked(100));
         Assert.False(LegendaryProgression.IsUnlocked(99));
+    }
+
+    [Fact]
+    public void LegendaryEncounterConsumesOnlyAnUnlockedLegendaryLineup()
+    {
+        var consumed = LegendaryProgression.ConsumeEncounter(
+            currentProgressPercent: 100,
+            containsLegendary: true,
+            alreadyConsumed: false);
+
+        Assert.True(consumed.WasConsumed);
+        Assert.Equal(0, consumed.ProgressPercent);
+    }
+
+    [Fact]
+    public void LegendaryEncounterDoesNotConsumeBeforeUnlockOrWithoutLegendary()
+    {
+        var locked = LegendaryProgression.ConsumeEncounter(99, true, false);
+        var ordinary = LegendaryProgression.ConsumeEncounter(100, false, false);
+
+        Assert.False(locked.WasConsumed);
+        Assert.Equal(99, locked.ProgressPercent);
+        Assert.False(ordinary.WasConsumed);
+        Assert.Equal(100, ordinary.ProgressPercent);
+    }
+
+    [Fact]
+    public void LegendaryEncounterConsumptionIsIdempotentForTheSameLineup()
+    {
+        var repeated = LegendaryProgression.ConsumeEncounter(0, true, true);
+
+        Assert.False(repeated.WasConsumed);
+        Assert.Equal(0, repeated.ProgressPercent);
     }
 
     [Fact]
@@ -103,7 +236,7 @@ public class ProgressionRegressionTests
 
             await using (var db = CreateDbContext(schema))
             {
-                await new RunStore(db).Save(username, 23, loadouts, 68);
+                await new RunStore(db).Save(username, 23, 31, loadouts, 68);
             }
 
             await using (var freshDb = CreateDbContext(schema))
@@ -111,11 +244,136 @@ public class ProgressionRegressionTests
                 var restored = await new RunStore(freshDb).Load(username);
 
                 Assert.Equal(23, restored.score);
+                Assert.Equal(31, restored.highScore);
                 Assert.Equal(68, restored.legendaryProgressPercent);
                 var restoredLoadout = Assert.Single(restored.loadouts);
                 Assert.Equal(1, restoredLoadout.PokemonId);
                 Assert.Equal(7, restoredLoadout.Level);
                 Assert.Equal(new[] { "tackle" }, restoredLoadout.ChosenMoveNames);
+            }
+        });
+    }
+
+    [Fact]
+    public async Task GameStatePersistsHighScoreAcrossNewRunAndFreshContext()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            const string username = "high-score-regression";
+            await CreatePlayerRunsTable(schema);
+
+            await using (var seedDb = CreateDbContext(schema))
+            {
+                await new RunStore(seedDb).Save(
+                    username,
+                    18,
+                    12,
+                    new List<PokemonLoadout> { new() { PokemonId = 1, Level = 3 } },
+                    0);
+            }
+
+            var currentUser = new CurrentUserService();
+            currentUser.SignIn(username, isAdmin: false);
+
+            await using (var db = CreateDbContext(schema))
+            {
+                var state = new GameState(
+                    new InMemoryScoreStore(),
+                    new InMemoryPresetStore(),
+                    new UnlockService(db, currentUser),
+                    new RunStore(db),
+                    currentUser);
+
+                await state.LoadRunForCurrentUser();
+                Assert.Equal(18, state.CurrentScore);
+                Assert.Equal(12, state.HighScore);
+
+                await state.LoseBattle();
+                Assert.Equal(0, state.CurrentScore);
+                Assert.Equal(18, state.HighScore);
+
+                await state.ResetForNewRun();
+                Assert.Equal(0, state.CurrentScore);
+                Assert.Equal(18, state.HighScore);
+            }
+
+            await using (var freshDb = CreateDbContext(schema))
+            {
+                var restored = await new RunStore(freshDb).Load(username);
+
+                Assert.Equal(0, restored.score);
+                Assert.Equal(18, restored.highScore);
+                Assert.Empty(restored.loadouts);
+            }
+        });
+    }
+
+    [Fact]
+    public async Task LegendaryEncounterResetsProgressAndKeepsItZeroAfterWinning()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            const string username = "progress-regression-legendary-encounter";
+            await CreatePlayerRunsTable(schema);
+
+            await using (var seedDb = CreateDbContext(schema))
+            {
+                await new RunStore(seedDb).Save(
+                    username,
+                    7,
+                    7,
+                    new List<PokemonLoadout>(),
+                    LegendaryProgression.MaxProgressPercent);
+            }
+
+            var currentUser = new CurrentUserService();
+            currentUser.SignIn(username, isAdmin: false);
+
+            await using (var db = CreateDbContext(schema))
+            {
+                var state = new GameState(
+                    new InMemoryScoreStore(),
+                    new InMemoryPresetStore(),
+                    new UnlockService(db, currentUser),
+                    new RunStore(db),
+                    currentUser);
+
+                await state.LoadRunForCurrentUser();
+                await state.SetEnemyLoadouts(new List<PokemonLoadout>
+                {
+                    new() { PokemonId = 1 }
+                });
+                Assert.Equal(LegendaryProgression.MaxProgressPercent, state.LegendaryProgressPercent);
+                Assert.False(state.LegendaryEncounterConsumed);
+
+                await state.SetEnemyLoadouts(new List<PokemonLoadout>
+                {
+                    new() { PokemonId = 144 }
+                });
+
+                Assert.Equal(0, state.LegendaryProgressPercent);
+                Assert.True(state.LegendaryEncounterConsumed);
+
+                //ConfirmTeamAndGo can submit the same fixed lineup again without a second consumption.
+                await state.SetEnemyLoadouts(new List<PokemonLoadout>
+                {
+                    new() { PokemonId = 144 }
+                });
+                Assert.Equal(0, state.LegendaryProgressPercent);
+
+                await state.WinRound();
+
+                Assert.Equal(0, state.LegendaryProgressPercent);
+                Assert.Equal(0, state.LastLegendaryProgressReward);
+
+                await state.ResetForNewRun();
+                Assert.Equal(0, state.LegendaryProgressPercent);
+            }
+
+            await using (var freshDb = CreateDbContext(schema))
+            {
+                var restored = await new RunStore(freshDb).Load(username);
+                Assert.Equal(0, restored.legendaryProgressPercent);
             }
         });
     }
@@ -132,6 +390,7 @@ public class ProgressionRegressionTests
                 await new RunStore(seedDb).Save(
                     username,
                     41,
+                    52,
                     new List<PokemonLoadout> { new() { PokemonId = 4, Level = 12 } },
                     82);
             }
@@ -150,6 +409,7 @@ public class ProgressionRegressionTests
 
                 await state.LoadRunForCurrentUser();
                 Assert.Equal(41, state.CurrentScore);
+                Assert.Equal(52, state.HighScore);
                 Assert.Equal(new[] { 4 }, state.PlayerTeamIds);
                 Assert.Equal(82, state.LegendaryProgressPercent);
 
@@ -166,6 +426,7 @@ public class ProgressionRegressionTests
                 var restored = await new RunStore(freshDb).Load(username);
 
                 Assert.Equal(0, restored.score);
+                Assert.Equal(52, restored.highScore);
                 Assert.Empty(restored.loadouts);
                 Assert.Equal(82, restored.legendaryProgressPercent);
             }
@@ -197,6 +458,10 @@ public class ProgressionRegressionTests
                 // This is the same idempotent migration used during application startup.
                 await db.Database.ExecuteSqlRawAsync("""
                     ALTER TABLE "PlayerRuns"
+                        ADD COLUMN IF NOT EXISTS "HighScore" INTEGER NOT NULL DEFAULT 0;
+                    """);
+                await db.Database.ExecuteSqlRawAsync("""
+                    ALTER TABLE "PlayerRuns"
                         ADD COLUMN IF NOT EXISTS "LegendaryProgressPercent" INTEGER NOT NULL DEFAULT 0;
                     """);
                 await db.Database.ExecuteSqlRawAsync("""
@@ -210,6 +475,7 @@ public class ProgressionRegressionTests
                 var restored = await new RunStore(freshDb).Load(username);
 
                 Assert.Equal(19, restored.score);
+                Assert.Equal(0, restored.highScore);
                 Assert.Empty(restored.loadouts);
                 Assert.Equal(0, restored.legendaryProgressPercent);
             }
@@ -256,8 +522,24 @@ public class ProgressionRegressionTests
                 "Id" SERIAL PRIMARY KEY,
                 "Username" TEXT NOT NULL,
                 "CurrentScore" INTEGER NOT NULL,
+                "HighScore" INTEGER NOT NULL DEFAULT 0,
                 "LoadoutsJson" TEXT NOT NULL,
                 "LegendaryProgressPercent" INTEGER NOT NULL DEFAULT 0
+            );
+            """);
+    }
+
+    private static async Task CreateUserPresetsTable(string schema)
+    {
+        await using var db = CreateDbContext(schema);
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE "UserPresets" (
+                "Id" SERIAL PRIMARY KEY,
+                "Username" TEXT NOT NULL,
+                "Name" TEXT NOT NULL,
+                "LoadoutsJson" TEXT NOT NULL,
+                "UpdatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT "UX_UserPresets_Username_Name" UNIQUE ("Username", "Name")
             );
             """);
     }

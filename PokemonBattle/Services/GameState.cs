@@ -12,10 +12,11 @@ public class GameState
 
     public GameScreen CurrentScreen { get; private set; } = GameScreen.Start;
     public int CurrentScore { get; private set; }
-    public int HighScore => _scoreStore.GetHighScore();
+    public int HighScore { get; private set; }
     public int LegendaryProgressPercent { get; private set; }
     public int LastLegendaryProgressReward { get; private set; }
     public bool LegendaryUnlocked => LegendaryProgression.IsUnlocked(LegendaryProgressPercent);
+    public bool LegendaryEncounterConsumed { get; private set; }
 
     public int SelectedPokemonId { get; private set; } = 1;
     public int EnemyPokemonId { get; private set; } = 4;
@@ -44,7 +45,7 @@ public class GameState
     {
         if (_runLoaded || !_currentUser.IsLoggedIn) return;
 
-        var (score, loadouts, legendaryProgressPercent) = await _runStore.Load(_currentUser.Username!);
+        var (score, highScore, loadouts, legendaryProgressPercent) = await _runStore.Load(_currentUser.Username!);
 
         //방어 코드: 도감에 없는 포켓몬(예: 크래시로 깨진 PokemonId=0)이 하나라도 섞여있으면
         //전체 데이터를 신뢰할 수 없다고 보고 진행 상황을 완전히 초기화함
@@ -60,12 +61,19 @@ public class GameState
         else
         {
             CurrentScore = score;
-            PlayerLoadouts = loadouts;
-            PlayerTeamIds = loadouts.Select(l => l.PokemonId).ToList();
+            bool hadDuplicateItems = TeamLoadoutRules.HasDuplicateItems(loadouts);
+            PlayerLoadouts = TeamLoadoutRules.NormalizeUniqueItems(loadouts);
+            PlayerTeamIds = PlayerLoadouts.Select(l => l.PokemonId).ToList();
+            if (hadDuplicateItems)
+            {
+                await PersistRun();
+            }
         }
 
+        HighScore = highScore;
         LegendaryProgressPercent = Math.Clamp(legendaryProgressPercent, 0, LegendaryProgression.MaxProgressPercent);
         LastLegendaryProgressReward = 0;
+        LegendaryEncounterConsumed = false;
         _runLoaded = true;
     }
 
@@ -73,7 +81,7 @@ public class GameState
     private async Task PersistRun()
     {
         if (!_currentUser.IsLoggedIn) return;
-        await _runStore.Save(_currentUser.Username!, CurrentScore, PlayerLoadouts, LegendaryProgressPercent);
+        await _runStore.Save(_currentUser.Username!, CurrentScore, HighScore, PlayerLoadouts, LegendaryProgressPercent);
     }
 
     public void GoTo(GameScreen screen)
@@ -106,17 +114,36 @@ public class GameState
         NotifyChange();
     }
 
-    public void SetEnemyLoadouts(List<PokemonLoadout> loadouts) //상대 미리보기 화면에서 확정된 4개 기술/특성/도구 저장
+    public async Task SetEnemyLoadouts(List<PokemonLoadout> loadouts) //상대 미리보기에서 확정된 라인업 저장 및 전설 출현 소비
     {
-        EnemyLoadouts = loadouts;
-        EnemyTeamIds = loadouts.Select(l => l.PokemonId).ToList();
+        var normalizedLoadouts = TeamLoadoutRules.NormalizeUniqueItems(loadouts);
+        if (!HaveSameLoadouts(EnemyLoadouts, normalizedLoadouts))
+        {
+            LegendaryEncounterConsumed = false;
+        }
+
+        EnemyLoadouts = normalizedLoadouts;
+        EnemyTeamIds = EnemyLoadouts.Select(l => l.PokemonId).ToList();
+
+        var consumption = LegendaryProgression.ConsumeEncounter(
+            LegendaryProgressPercent,
+            EnemyTeamProvider.ContainsLegendary(EnemyTeamIds),
+            LegendaryEncounterConsumed);
+
+        if (consumption.WasConsumed)
+        {
+            LegendaryProgressPercent = consumption.ProgressPercent;
+            LegendaryEncounterConsumed = true;
+            await PersistRun();
+        }
+
         NotifyChange();
     }
 
     public async Task SetPlayerLoadouts(List<PokemonLoadout> loadouts)
     {
-        PlayerLoadouts = loadouts;
-        PlayerTeamIds = loadouts.Select(l => l.PokemonId).ToList();
+        PlayerLoadouts = TeamLoadoutRules.NormalizeUniqueItems(loadouts);
+        PlayerTeamIds = PlayerLoadouts.Select(l => l.PokemonId).ToList();
         await PersistRun();
         NotifyChange();
     }
@@ -124,7 +151,9 @@ public class GameState
     public async Task WinRound()
     {
         int progressBefore = LegendaryProgressPercent;
-        int progressReward = LegendaryProgression.CalculateReward(CurrentScore + 1, EnemyLoadouts);
+        int progressReward = LegendaryEncounterConsumed
+            ? 0
+            : LegendaryProgression.CalculateReward(CurrentScore + 1, EnemyLoadouts);
         LegendaryProgressPercent = LegendaryProgression.AddProgress(progressBefore, progressReward);
         LastLegendaryProgressReward = LegendaryProgressPercent - progressBefore;
         CurrentScore++;
@@ -151,6 +180,7 @@ public class GameState
     public async Task LoseBattle()
     {
         _scoreStore.SaveIfHigher(CurrentScore);
+        HighScore = Math.Max(HighScore, _scoreStore.GetHighScore());
         LastBattleWon = false;
         LastLegendaryProgressReward = 0;
         CurrentScore = 0;
@@ -167,23 +197,72 @@ public class GameState
         LastLegendaryProgressReward = 0;
         PlayerLoadouts = new List<PokemonLoadout>();
         PlayerTeamIds = new List<int>();
+        EnemyLoadouts = new List<PokemonLoadout>();
+        EnemyTeamIds = new List<int>();
+        LegendaryEncounterConsumed = false;
         await PersistRun();
         CurrentScreen = GameScreen.Start;
         NotifyChange();
     }
 
-    public void SavePreset(string name, List<PokemonLoadout> team) => _presetStore.Save(name, team);
-    public List<PokemonLoadout>? LoadPreset(string name, IEnumerable<PokemonLoadout>? currentRun = null)
+    public async Task<bool> SavePreset(string name, List<PokemonLoadout> team)
     {
-        var preset = _presetStore.Load(name);
+        if (!_currentUser.IsLoggedIn || string.IsNullOrWhiteSpace(name)) return false;
+
+        await _presetStore.SaveAsync(name, TeamLoadoutRules.NormalizeUniqueItems(team));
+        return true;
+    }
+
+    public async Task<List<PokemonLoadout>?> LoadPreset(
+        string name,
+        IEnumerable<PokemonLoadout>? currentRun = null)
+    {
+        if (!_currentUser.IsLoggedIn || string.IsNullOrWhiteSpace(name)) return null;
+
+        var preset = await _presetStore.LoadAsync(name);
         return preset == null
             ? null
-            : PresetLoadoutMapper.ApplyCurrentRunLevels(preset, currentRun ?? Enumerable.Empty<PokemonLoadout>());
+            : PresetLoadoutMapper.ApplyCurrentRunLevels(
+                TeamLoadoutRules.NormalizeUniqueItems(preset),
+                currentRun ?? Enumerable.Empty<PokemonLoadout>());
     }
-    public List<string> ListPresetNames() => _presetStore.ListNames();
+
+    public Task<List<string>> ListPresetNames() =>
+        _currentUser.IsLoggedIn
+            ? _presetStore.ListNamesAsync()
+            : Task.FromResult(new List<string>());
+
+    public async Task<bool> DeletePreset(string name)
+    {
+        if (!_currentUser.IsLoggedIn || string.IsNullOrWhiteSpace(name)) return false;
+        return await _presetStore.DeleteAsync(name);
+    }
 
     private void NotifyChange()
     {
         OnChange?.Invoke();
+    }
+
+    private static bool HaveSameLoadouts(
+        IReadOnlyList<PokemonLoadout> first,
+        IReadOnlyList<PokemonLoadout> second)
+    {
+        if (first.Count != second.Count) return false;
+
+        for (int i = 0; i < first.Count; i++)
+        {
+            var left = first[i];
+            var right = second[i];
+            if (left.PokemonId != right.PokemonId
+                || left.ChosenAbility != right.ChosenAbility
+                || left.ChosenItem != right.ChosenItem
+                || left.Level != right.Level
+                || !left.ChosenMoveNames.SequenceEqual(right.ChosenMoveNames))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

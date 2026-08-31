@@ -565,6 +565,31 @@ h1 {
     background: rgba(255,210,63,0.1); color: #ffd23f;
     font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap;
 }
+.preset-list { display: flex; flex-direction: column; gap: 6px; }
+.preset-entry {
+    display: flex; align-items: center; gap: var(--sp-2);
+    width: 100%; min-width: 0; box-sizing: border-box;
+    padding: 6px 8px;
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 9px;
+    background: rgba(255,255,255,0.04); color: #fff;
+}
+.preset-entry:hover { border-color: rgba(255,210,63,0.35); background: rgba(255,255,255,0.07); }
+.preset-name {
+    min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; font-size: 0.78rem; font-weight: 700;
+}
+.preset-actions { display: flex; flex: 0 0 auto; gap: 5px; }
+.preset-action {
+    min-height: 44px; padding: 6px 10px;
+    border: 1px solid rgba(63,214,232,0.35); border-radius: 7px;
+    background: rgba(63,214,232,0.08); color: #a9f2ff;
+    font: inherit; font-size: 0.7rem; font-weight: 700; cursor: pointer;
+    white-space: nowrap;
+}
+.preset-action:hover { background: rgba(63,214,232,0.16); }
+.preset-delete { border-color: rgba(255,107,107,0.38); background: rgba(255,107,107,0.07); color: #ffb0b0; }
+.preset-delete:hover { background: rgba(255,107,107,0.14); }
+.preset-empty { margin: 0; color: #8993b8; font-size: 0.78rem; }
 
 .order-buttons { display: flex; gap: 4px; justify-content: center; margin-top: 6px; }
 .order-buttons button {
@@ -603,4 +628,7 @@ h1 {
     .move-grid { grid-template-columns: 1fr; }
     .action-grid { grid-template-columns: 1fr; }
     .move-name-grid { grid-template-columns: 1fr; }
+    .preset-row { align-items: center; flex-direction: row; }
+    .preset-row button { width: auto; }
+    .preset-action { padding-inline: 8px; }
 }

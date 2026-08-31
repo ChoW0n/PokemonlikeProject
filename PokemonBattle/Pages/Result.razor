@@ -18,7 +18,11 @@
         {
             <p class="config-label">이번 클리어 보상: +@State.LastLegendaryProgressReward%</p>
         }
-        @if (State.LegendaryUnlocked)
+        @if (State.LegendaryEncounterConsumed)
+        {
+            <p class="config-label">전설 출현을 소비했습니다. 현재 진행도 0%에서 다음 주기를 시작합니다.</p>
+        }
+        else if (State.LegendaryUnlocked)
         {
             <p class="config-label">전설 포켓몬이 다음 상대 후보에 등장할 수 있습니다!</p>
         }
@@ -58,6 +62,11 @@
         <h1 class="result-lose">패배...</h1>
         <p>이번 판 점수: 0으로 초기화됨</p>
         <p>최고 기록: @State.HighScore</p>
+        <p class="config-label">전설 출현 진행도: @State.LegendaryProgressPercent%</p>
+        @if (State.LegendaryEncounterConsumed)
+        {
+            <p class="config-label">전설 출현을 소비했습니다. 현재 진행도 0%에서 다음 주기를 시작합니다.</p>
+        }
         <button type="button" @onclick="RestartGame">처음부터 다시 시작</button>
     }
 </main>

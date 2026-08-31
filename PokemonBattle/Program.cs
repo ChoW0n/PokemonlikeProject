@@ -21,7 +21,7 @@ foreach (var handlerType in typeof(BattleEngine).Assembly.GetTypes()
 }
 
 builder.Services.AddSingleton<IScoreStore, InMemoryScoreStore>();
-builder.Services.AddSingleton<IPresetStore, InMemoryPresetStore>();
+builder.Services.AddScoped<IPresetStore, PostgresPresetStore>();
 builder.Services.AddScoped<GameState>();
 
 builder.Services.AddRazorComponents()
@@ -49,9 +49,21 @@ using (var scope = app.Services.CreateScope())
             ""Id"" SERIAL PRIMARY KEY,
             ""Username"" TEXT NOT NULL,
             ""CurrentScore"" INTEGER NOT NULL,
+            ""HighScore"" INTEGER NOT NULL DEFAULT 0,
             ""LoadoutsJson"" TEXT NOT NULL,
             ""LegendaryProgressPercent"" INTEGER NOT NULL DEFAULT 0
         );
+        CREATE TABLE IF NOT EXISTS ""UserPresets"" (
+            ""Id"" SERIAL PRIMARY KEY,
+            ""Username"" TEXT NOT NULL,
+            ""Name"" TEXT NOT NULL,
+            ""LoadoutsJson"" TEXT NOT NULL,
+            ""UpdatedAt"" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ""IX_UserPresets_Username_Name""
+            ON ""UserPresets"" (""Username"", ""Name"");
+        ALTER TABLE ""PlayerRuns""
+            ADD COLUMN IF NOT EXISTS ""HighScore"" INTEGER NOT NULL DEFAULT 0;
         ALTER TABLE ""PlayerRuns""
             ADD COLUMN IF NOT EXISTS ""LegendaryProgressPercent"" INTEGER NOT NULL DEFAULT 0;
     ");

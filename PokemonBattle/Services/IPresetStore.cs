@@ -4,7 +4,8 @@ namespace PokemonBattle.Services;
 
 public interface IPresetStore
 {
-    void Save(string name, List<PokemonLoadout> team);
-    List<PokemonLoadout>? Load(string name);
-    List<string> ListNames();
+    Task SaveAsync(string name, List<PokemonLoadout> team);
+    Task<List<PokemonLoadout>?> LoadAsync(string name);
+    Task<List<string>> ListNamesAsync();
+    Task<bool> DeleteAsync(string name);
 }

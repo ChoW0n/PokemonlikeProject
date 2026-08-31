@@ -90,15 +90,30 @@
                 }
 
                 <p class="config-label">저장된 프리셋</p>
+                <label class="visually-hidden" for="preset-name">프리셋 이름</label>
                 <div class="preset-row">
-                    <input class="dex-search" placeholder="프리셋 이름" value="@PresetName" @oninput="OnPresetNameChanged" />
+                    <input id="preset-name" class="dex-search" placeholder="프리셋 이름" maxlength="80" value="@PresetName" @oninput="OnPresetNameChanged" />
                     <button type="button" disabled="@(TeamLoadouts.Count == 0 || string.IsNullOrWhiteSpace(PresetName))" @onclick="SaveCurrentPreset">저장</button>
                 </div>
-                @foreach (var name in State.ListPresetNames())
+                <p class="form-message" role="status" aria-live="polite">@PresetMessage</p>
+                @if (PresetNames.Count == 0)
                 {
-                    <button type="button" class="dex-entry preset-entry" aria-label="@($"{name} 프리셋 불러오기")" @onclick="() => LoadPresetByName(name)">
-                        <span class="dex-name">📁 @name</span>
-                    </button>
+                    <p class="preset-empty">저장된 프리셋이 없습니다.</p>
+                }
+                else
+                {
+                    <div class="preset-list" role="list" aria-label="저장된 프리셋 목록">
+                        @foreach (var name in PresetNames)
+                        {
+                            <div class="preset-entry" role="listitem">
+                                <span class="preset-name" title="@name">📁 @name</span>
+                                <div class="preset-actions">
+                                    <button type="button" class="preset-action" aria-label="@($"{name} 프리셋 불러오기")" @onclick="() => LoadPresetByName(name)">불러오기</button>
+                                    <button type="button" class="preset-action preset-delete" aria-label="@($"{name} 프리셋 삭제")" @onclick="() => DeletePresetByName(name)">삭제</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
                 }
             }
             else
@@ -245,7 +260,9 @@
 
     private string ItemSearchText = "";
     private string PresetName = "";
+    private string PresetMessage = "";
     private List<PokemonLoadout> TeamLoadouts = new();
+    private List<string> PresetNames = new();
     private HashSet<int> UnlockedIds = new();
 
     private int? ConfiguringId;
@@ -283,6 +300,9 @@
                 };
             }).ToList();
         }
+
+        TeamLoadouts = TeamLoadoutRules.NormalizeUniqueItems(TeamLoadouts);
+        await RefreshPresetNames();
     }
 
     private int TotalMatchCount =>
@@ -300,8 +320,10 @@
 
     private List<Item> FilteredItems(string pokemonName)
     {
+        var unavailableItems = TeamLoadoutRules.UsedItems(TeamLoadouts, ConfiguringId);
         return ItemDatabase.GetAvailableItems(pokemonName)
             .Where(i => i.Name.Contains(ItemSearchText))
+            .Where(i => i.Name == TeamLoadoutRules.NoItem || !unavailableItems.Contains(i.Name))
             .ToList();
     }
 
@@ -385,6 +407,12 @@
     {
         if (ConfiguringId == null) return;
 
+        if (!TeamLoadoutRules.CanUseItem(TeamLoadouts, ConfiguringId.Value, DraftItem))
+        {
+            PresetMessage = "이미 다른 팀원이 사용 중인 도구입니다. 다른 도구를 선택해주세요.";
+            return;
+        }
+
         TeamLoadouts.RemoveAll(l => l.PokemonId == ConfiguringId.Value);
         TeamLoadouts.Add(new PokemonLoadout
         {
@@ -415,24 +443,49 @@
         TeamLoadouts.RemoveAt(idx);
     }
 
-    private void SaveCurrentPreset()
+    private async Task SaveCurrentPreset()
     {
         if (TeamLoadouts.Count == 0 || string.IsNullOrWhiteSpace(PresetName)) return;
-        State.SavePreset(PresetName, new List<PokemonLoadout>(TeamLoadouts));
-        PresetName = "";
+
+        string name = PresetName.Trim();
+        if (name.Length == 0) return;
+
+        bool saved = await State.SavePreset(name, TeamLoadouts);
+        PresetMessage = saved
+            ? $"'{name}' 프리셋을 저장했습니다."
+            : "프리셋을 저장하지 못했습니다. 로그인 상태를 확인해주세요.";
+        if (saved)
+        {
+            PresetName = "";
+            await RefreshPresetNames();
+        }
     }
 
-    private void LoadPresetByName(string name)
+    private async Task RefreshPresetNames()
     {
-        var loaded = State.LoadPreset(name, TeamLoadouts);
-        if (loaded == null) return;
+        PresetNames = await State.ListPresetNames();
+    }
 
-        TeamLoadouts = loaded
+    private async Task LoadPresetByName(string name)
+    {
+        var currentTeam = TeamLoadouts;
+        var loaded = await State.LoadPreset(name, currentTeam);
+        if (loaded == null)
+        {
+            PresetMessage = $"'{name}' 프리셋을 찾을 수 없습니다.";
+            await RefreshPresetNames();
+            return;
+        }
+
+        var currentLevels = currentTeam
+            .GroupBy(loadout => loadout.PokemonId)
+            .ToDictionary(group => group.Key, group => group.First().Level);
+
+        TeamLoadouts = TeamLoadoutRules.NormalizeUniqueItems(loaded)
             .Where(l => UnlockedIds.Contains(l.PokemonId) && PokemonDatabase.All.ContainsKey(l.PokemonId))
             .Take(Math.Min(UnlockedIds.Count, 6))
             .Select(l =>
             {
-                var existing = TeamLoadouts.FirstOrDefault(t => t.PokemonId == l.PokemonId);
                 var validKeys = PokemonDatabase.All[l.PokemonId].MoveNames.ToHashSet();
                 return new PokemonLoadout
                 {
@@ -440,9 +493,21 @@
                     ChosenMoveNames = l.ChosenMoveNames.Where(m => validKeys.Contains(m)).ToList(),
                     ChosenAbility = l.ChosenAbility,
                     ChosenItem = l.ChosenItem,
-                    Level = existing?.Level ?? 1
+                    Level = currentLevels.TryGetValue(l.PokemonId, out var level) ? level : 1
                 };
             }).ToList();
+
+        TeamLoadouts = TeamLoadoutRules.NormalizeUniqueItems(TeamLoadouts);
+        PresetMessage = $"'{name}' 프리셋을 불러왔습니다.";
+    }
+
+    private async Task DeletePresetByName(string name)
+    {
+        bool deleted = await State.DeletePreset(name);
+        PresetMessage = deleted
+            ? $"'{name}' 프리셋을 삭제했습니다."
+            : $"'{name}' 프리셋을 찾을 수 없습니다.";
+        await RefreshPresetNames();
     }
 
     private async Task ConfirmTeam()

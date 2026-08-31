@@ -18,21 +18,31 @@ public class RunStore
         _db = db;
     }
 
-    public async Task<(int score, List<PokemonLoadout> loadouts, int legendaryProgressPercent)> Load(string username)
+    public async Task<(int score, int highScore, List<PokemonLoadout> loadouts, int legendaryProgressPercent)> Load(string username)
     {
         var run = await _db.PlayerRuns.FirstOrDefaultAsync(r => r.Username == username);
-        if (run == null) return (0, new List<PokemonLoadout>(), 0);
+        if (run == null) return (0, 0, new List<PokemonLoadout>(), 0);
 
         var loadouts = JsonSerializer.Deserialize<List<PokemonLoadout>>(
             run.LoadoutsJson,
             LoadoutJsonOptions) ?? new List<PokemonLoadout>();
-        return (run.CurrentScore, loadouts, Math.Clamp(run.LegendaryProgressPercent, 0, LegendaryProgression.MaxProgressPercent));
+        return (
+            run.CurrentScore,
+            Math.Max(0, run.HighScore),
+            loadouts,
+            Math.Clamp(run.LegendaryProgressPercent, 0, LegendaryProgression.MaxProgressPercent));
     }
 
-    public async Task Save(string username, int score, List<PokemonLoadout> loadouts, int legendaryProgressPercent)
+    public async Task Save(
+        string username,
+        int score,
+        int highScore,
+        List<PokemonLoadout> loadouts,
+        int legendaryProgressPercent)
     {
         var run = await _db.PlayerRuns.FirstOrDefaultAsync(r => r.Username == username);
         string json = JsonSerializer.Serialize(loadouts, LoadoutJsonOptions);
+        int safeHighScore = Math.Max(0, highScore);
         int safeProgress = Math.Clamp(legendaryProgressPercent, 0, LegendaryProgression.MaxProgressPercent);
 
         if (run == null)
@@ -41,6 +51,7 @@ public class RunStore
             {
                 Username = username,
                 CurrentScore = score,
+                HighScore = safeHighScore,
                 LoadoutsJson = json,
                 LegendaryProgressPercent = safeProgress
             });
@@ -48,6 +59,7 @@ public class RunStore
         else
         {
             run.CurrentScore = score;
+            run.HighScore = Math.Max(run.HighScore, safeHighScore);
             run.LoadoutsJson = json;
             run.LegendaryProgressPercent = safeProgress;
         }

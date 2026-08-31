@@ -9,7 +9,16 @@ public class AppDbContext : DbContext
 
     public DbSet<PlayerRun> PlayerRuns => Set<PlayerRun>();
 
+    public DbSet<UserPreset> UserPresets => Set<UserPreset>();
+
     public DbSet<UserAccount> Users => Set<UserAccount>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<UserPreset>()
+            .HasIndex(preset => new { preset.Username, preset.Name })
+            .IsUnique();
+    }
 }
