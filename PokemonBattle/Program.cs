@@ -13,6 +13,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UnlockService>();
 builder.Services.AddScoped<RunStore>();
 builder.Services.AddScoped<AdminDashboardService>();
+builder.Services.AddScoped<AdminOperationsService>();
 builder.Services.AddScoped<BattleEngine>();
 foreach (var handlerType in typeof(BattleEngine).Assembly.GetTypes()
     .Where(type => type is { IsClass: true, IsAbstract: false }
@@ -64,6 +65,14 @@ using (var scope = app.Services.CreateScope())
         );
         CREATE UNIQUE INDEX IF NOT EXISTS ""IX_UserPresets_Username_Name""
             ON ""UserPresets"" (""Username"", ""Name"");
+        CREATE TABLE IF NOT EXISTS ""AdminAuditLogs"" (
+            ""Id"" SERIAL PRIMARY KEY,
+            ""AdminUsername"" TEXT NOT NULL,
+            ""Action"" TEXT NOT NULL,
+            ""TargetUsername"" TEXT NOT NULL,
+            ""Details"" TEXT NOT NULL DEFAULT '',
+            ""CreatedAtUtc"" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         ALTER TABLE ""PlayerRuns""
             ADD COLUMN IF NOT EXISTS ""HighScore"" INTEGER NOT NULL DEFAULT 0;
         ALTER TABLE ""PlayerRuns""
@@ -82,6 +91,12 @@ using (var scope = app.Services.CreateScope())
         });
         db.SaveChanges();
     }
+
+    ConsolidateAdminAccounts(db);
+    db.Database.ExecuteSqlRaw("""
+        CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_Username"
+            ON "Users" ("Username");
+        """);
 }
 
 if (!app.Environment.IsDevelopment())
@@ -130,4 +145,83 @@ string BuildConnectionString()
     }
 
     return $"Host={host};Port={port};Username={user};Password={password};Database={database};SSL Mode={sslMode};Trust Server Certificate=true";
+}
+
+void ConsolidateAdminAccounts(AppDbContext db)
+{
+    var adminAccounts = db.Users
+        .Where(user => user.Username.ToLower() == "admin")
+        .OrderBy(user => user.Id)
+        .ToList();
+
+    if (adminAccounts.Count == 0)
+    {
+        return;
+    }
+
+    var keeper = adminAccounts.FirstOrDefault(user => user.Username == "admin") ?? adminAccounts[0];
+    keeper.Username = "admin";
+
+    foreach (var duplicate in adminAccounts.Where(user => user.Id != keeper.Id).ToList())
+    {
+        var duplicateUsername = duplicate.Username;
+
+        var keeperUnlocks = db.UnlockedPokemons
+            .Where(unlock => unlock.Username == keeper.Username)
+            .Select(unlock => unlock.PokemonId)
+            .ToHashSet();
+        var duplicateUnlocks = db.UnlockedPokemons
+            .Where(unlock => unlock.Username == duplicateUsername)
+            .ToList();
+        foreach (var unlock in duplicateUnlocks)
+        {
+            if (keeperUnlocks.Add(unlock.PokemonId))
+            {
+                unlock.Username = keeper.Username;
+            }
+            else
+            {
+                db.UnlockedPokemons.Remove(unlock);
+            }
+        }
+
+        var keeperPresetNames = db.UserPresets
+            .Where(preset => preset.Username == keeper.Username)
+            .Select(preset => preset.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        var duplicatePresets = db.UserPresets
+            .Where(preset => preset.Username == duplicateUsername)
+            .ToList();
+        foreach (var preset in duplicatePresets)
+        {
+            if (keeperPresetNames.Add(preset.Name))
+            {
+                preset.Username = keeper.Username;
+            }
+            else
+            {
+                db.UserPresets.Remove(preset);
+            }
+        }
+
+        foreach (var run in db.PlayerRuns.Where(run => run.Username == duplicateUsername).ToList())
+        {
+            run.Username = keeper.Username;
+        }
+
+        db.Users.Remove(duplicate);
+    }
+
+    var adminRuns = db.PlayerRuns
+        .Where(run => run.Username == keeper.Username)
+        .OrderByDescending(run => run.HighScore)
+        .ThenByDescending(run => run.CurrentScore)
+        .ThenByDescending(run => run.Id)
+        .ToList();
+    foreach (var duplicateRun in adminRuns.Skip(1))
+    {
+        db.PlayerRuns.Remove(duplicateRun);
+    }
+
+    db.SaveChanges();
 }

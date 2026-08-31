@@ -24,6 +24,17 @@ public sealed class AdminDashboardService
         var runs = await _db.PlayerRuns.AsNoTracking().ToListAsync();
         var presets = await _db.UserPresets.AsNoTracking().ToListAsync();
         var unlocks = await _db.UnlockedPokemons.AsNoTracking().ToListAsync();
+        var auditLogs = await _db.AdminAuditLogs
+            .AsNoTracking()
+            .OrderByDescending(log => log.CreatedAtUtc)
+            .Take(25)
+            .Select(log => new AdminAuditLogSnapshot(
+                log.AdminUsername,
+                log.Action,
+                log.TargetUsername,
+                log.Details,
+                log.CreatedAtUtc))
+            .ToListAsync();
         var issues = new List<string>();
 
         foreach (var duplicateRun in runs.GroupBy(run => run.Username).Where(group => group.Count() > 1))
@@ -110,7 +121,89 @@ public sealed class AdminDashboardService
             PokemonDatabase.All.Count,
             MoveDatabase.All.Count,
             userRows,
-            issues);
+            issues,
+            auditLogs);
+    }
+
+    public async Task<AdminUserDetails?> LoadUserDetailsAsync(string username)
+    {
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            return null;
+        }
+
+        var user = await _db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(candidate => candidate.Username == username.Trim());
+        if (user == null)
+        {
+            return null;
+        }
+
+        var run = await _db.PlayerRuns
+            .AsNoTracking()
+            .Where(candidate => candidate.Username == user.Username)
+            .OrderByDescending(candidate => candidate.Id)
+            .FirstOrDefaultAsync();
+        var presets = await _db.UserPresets
+            .AsNoTracking()
+            .Where(preset => preset.Username == user.Username)
+            .OrderBy(preset => preset.Name)
+            .Select(preset => new AdminPresetSnapshot(preset.Name, preset.UpdatedAt))
+            .ToListAsync();
+        var unlockedIds = await _db.UnlockedPokemons
+            .AsNoTracking()
+            .Where(unlock => unlock.Username == user.Username)
+            .Select(unlock => unlock.PokemonId)
+            .Distinct()
+            .OrderBy(id => id)
+            .ToListAsync();
+
+        var team = new List<AdminTeamMemberSnapshot>();
+        var history = new List<LegendaryEncounterHistoryEntry>();
+        if (run != null)
+        {
+            try
+            {
+                var loadouts = JsonSerializer.Deserialize<List<PokemonLoadout>>(run.LoadoutsJson, JsonOptions) ?? new();
+                team = loadouts
+                    .Where(loadout => PokemonDatabase.All.ContainsKey(loadout.PokemonId))
+                    .Select(loadout =>
+                    {
+                        var data = PokemonDatabase.All[loadout.PokemonId];
+                        return new AdminTeamMemberSnapshot(
+                            data.Name,
+                            loadout.Level,
+                            loadout.ChosenAbility,
+                            loadout.ChosenItem,
+                            loadout.ChosenMoveNames.ToList());
+                    })
+                    .ToList();
+                history = JsonSerializer.Deserialize<List<LegendaryEncounterHistoryEntry>>(
+                    run.LegendaryEncounterHistoryJson,
+                    JsonOptions) ?? new();
+            }
+            catch (JsonException)
+            {
+                // The dashboard integrity panel reports malformed JSON; details remain safe to view.
+            }
+        }
+
+        var unlockedNames = unlockedIds
+            .Where(PokemonDatabase.All.ContainsKey)
+            .Select(id => PokemonDatabase.All[id].Name)
+            .ToList();
+
+        return new AdminUserDetails(
+            user.Username,
+            user.IsAdmin,
+            run?.CurrentScore ?? 0,
+            run?.HighScore ?? 0,
+            run?.LegendaryProgressPercent ?? 0,
+            team,
+            presets,
+            unlockedNames,
+            history);
     }
 }
 
@@ -124,7 +217,8 @@ public sealed record AdminDashboardSnapshot(
     int KnownPokemonCount,
     int KnownMoveCount,
     IReadOnlyList<AdminUserSnapshot> Users,
-    IReadOnlyList<string> IntegrityIssues);
+    IReadOnlyList<string> IntegrityIssues,
+    IReadOnlyList<AdminAuditLogSnapshot> AuditLogs);
 
 public sealed record AdminUserSnapshot(
     string Username,
@@ -135,3 +229,30 @@ public sealed record AdminUserSnapshot(
     int UnlockedCount,
     int PresetCount,
     int LegendaryEncounterCount);
+
+public sealed record AdminUserDetails(
+    string Username,
+    bool IsAdmin,
+    int CurrentScore,
+    int HighScore,
+    int LegendaryProgressPercent,
+    IReadOnlyList<AdminTeamMemberSnapshot> CurrentTeam,
+    IReadOnlyList<AdminPresetSnapshot> Presets,
+    IReadOnlyList<string> UnlockedPokemonNames,
+    IReadOnlyList<LegendaryEncounterHistoryEntry> LegendaryHistory);
+
+public sealed record AdminTeamMemberSnapshot(
+    string Name,
+    int Level,
+    string Ability,
+    string Item,
+    IReadOnlyList<string> Moves);
+
+public sealed record AdminPresetSnapshot(string Name, DateTime UpdatedAt);
+
+public sealed record AdminAuditLogSnapshot(
+    string AdminUsername,
+    string Action,
+    string TargetUsername,
+    string Details,
+    DateTimeOffset CreatedAtUtc);
