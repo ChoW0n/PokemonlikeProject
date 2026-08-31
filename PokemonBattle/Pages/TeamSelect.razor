@@ -70,19 +70,21 @@
                 @if (TeamLoadouts.Count > 0)
                 {
                     <p class="config-label">배틀 순서 (위쪽이 먼저 출전합니다)</p>
-                    <div class="dex-grid">
+                    <div class="team-order-list" role="list" aria-label="배틀 출전 순서">
                         @for (int i = 0; i < TeamLoadouts.Count; i++)
                         {
                             int idx = i;
                             var data = PokemonDatabase.All[TeamLoadouts[idx].PokemonId];
-                            <div class="dex-entry team-order-entry">
-                                <span class="dex-number">#@(idx + 1) Lv.@TeamLoadouts[idx].Level</span>
-                                <img src="@data.EffectiveImageUrl" alt="@data.Name" class="dex-sprite" />
-                                <span class="dex-name">@data.Name</span>
+                            <div class="team-order-card" role="listitem">
+                                <div class="team-order-summary">
+                                    <span class="dex-number">#@(idx + 1) · Lv.@TeamLoadouts[idx].Level</span>
+                                    <img src="@data.EffectiveImageUrl" alt="@data.Name" class="team-order-sprite" />
+                                    <span class="dex-name">@data.Name</span>
+                                </div>
                                 <div class="order-buttons">
-                                     <button type="button" aria-label="@($"{data.Name} 팀 순서 위로 이동")" disabled="@(idx == 0)" @onclick="() => MoveOrderUp(idx)">↑</button>
-                                     <button type="button" aria-label="@($"{data.Name} 팀 순서 아래로 이동")" disabled="@(idx == TeamLoadouts.Count - 1)" @onclick="() => MoveOrderDown(idx)">↓</button>
-                                     <button type="button" class="remove-btn" aria-label="@($"{data.Name} 팀에서 제거")" @onclick="() => RemoveFromTeam(idx)">✕</button>
+                                     <button type="button" class="order-button" aria-label="@($"{data.Name} 팀 순서 위로 이동")" disabled="@(idx == 0)" @onclick="() => MoveOrderUp(idx)">↑</button>
+                                     <button type="button" class="order-button" aria-label="@($"{data.Name} 팀 순서 아래로 이동")" disabled="@(idx == TeamLoadouts.Count - 1)" @onclick="() => MoveOrderDown(idx)">↓</button>
+                                     <button type="button" class="order-button remove-btn" aria-label="@($"{data.Name} 팀에서 제거")" @onclick="() => RemoveFromTeam(idx)">✕</button>
                                 </div>
                             </div>
                         }
