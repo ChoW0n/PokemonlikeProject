@@ -10,3 +10,4 @@
 - [Switch and escape rules](switch-escape-rules.md) — separate wild escape permissions, voluntary traps, and opponent-directed forced-switch immunity.
 - [Protection move catalog](protection-move-catalog.md) — adding a protection rule requires matching move data and presentation registration, not metadata alone.
 - [Ally ability boundaries](ally-ability-boundaries.md) — 1v1 must not infer the opponent as an ally; only owner-protecting effects run without a partner.
+- [Skill rating persistence](skill-rating-persistence.md) — account rating is separate from the run; active-run difficulty is persisted and fixed until reset.

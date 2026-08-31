@@ -15,12 +15,18 @@ public class AppDbContext : DbContext
 
     public DbSet<AdminAuditLog> AdminAuditLogs => Set<AdminAuditLog>();
 
+    public DbSet<PlayerSkillRating> PlayerSkillRatings => Set<PlayerSkillRating>();
+
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<UserPreset>()
             .HasIndex(preset => new { preset.Username, preset.Name })
+            .IsUnique();
+
+        modelBuilder.Entity<PlayerSkillRating>()
+            .HasIndex(rating => rating.Username)
             .IsUnique();
     }
 }

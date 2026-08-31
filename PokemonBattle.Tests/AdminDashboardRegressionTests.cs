@@ -169,6 +169,7 @@ public class AdminDashboardRegressionTests
             Assert.Null(await verifyDb.Users.SingleOrDefaultAsync(user => user.Username == "player"));
             Assert.Empty(await verifyDb.UnlockedPokemons.Where(item => item.Username == "player").ToListAsync());
             Assert.Empty(await verifyDb.PlayerRuns.Where(item => item.Username == "player").ToListAsync());
+            Assert.Empty(await verifyDb.PlayerSkillRatings.Where(item => item.Username == "player").ToListAsync());
             Assert.Empty(await verifyDb.UserPresets.Where(item => item.Username == "player").ToListAsync());
         });
     }
@@ -223,7 +224,17 @@ public class AdminDashboardRegressionTests
                 "HighScore" INTEGER NOT NULL DEFAULT 0,
                 "LoadoutsJson" TEXT NOT NULL,
                 "LegendaryProgressPercent" INTEGER NOT NULL DEFAULT 0,
-                "LegendaryEncounterHistoryJson" TEXT NOT NULL DEFAULT '[]'
+                "LegendaryEncounterHistoryJson" TEXT NOT NULL DEFAULT '[]',
+                "DifficultyAdjustment" INTEGER NOT NULL DEFAULT 0,
+                "RoundPerformancesJson" TEXT NOT NULL DEFAULT '[]'
+            );
+            CREATE TABLE "PlayerSkillRatings" (
+                "Id" SERIAL PRIMARY KEY,
+                "Username" TEXT NOT NULL,
+                "Rating" DOUBLE PRECISION NOT NULL DEFAULT 1000,
+                "CompletedRuns" INTEGER NOT NULL DEFAULT 0,
+                "UpdatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT "UX_PlayerSkillRatings_Username" UNIQUE ("Username")
             );
             CREATE TABLE "UserPresets" (
                 "Id" SERIAL PRIMARY KEY,

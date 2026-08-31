@@ -12,6 +12,7 @@ builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UnlockService>();
 builder.Services.AddScoped<RunStore>();
+builder.Services.AddScoped<SkillRatingService>();
 builder.Services.AddScoped<AdminDashboardService>();
 builder.Services.AddScoped<AdminOperationsService>();
 builder.Services.AddScoped<BattleEngine>();
@@ -54,7 +55,16 @@ using (var scope = app.Services.CreateScope())
             ""HighScore"" INTEGER NOT NULL DEFAULT 0,
             ""LoadoutsJson"" TEXT NOT NULL,
             ""LegendaryProgressPercent"" INTEGER NOT NULL DEFAULT 0,
-            ""LegendaryEncounterHistoryJson"" TEXT NOT NULL DEFAULT '[]'
+            ""LegendaryEncounterHistoryJson"" TEXT NOT NULL DEFAULT '[]',
+            ""DifficultyAdjustment"" INTEGER NOT NULL DEFAULT 0,
+            ""RoundPerformancesJson"" TEXT NOT NULL DEFAULT '[]'
+        );
+        CREATE TABLE IF NOT EXISTS ""PlayerSkillRatings"" (
+            ""Id"" SERIAL PRIMARY KEY,
+            ""Username"" TEXT NOT NULL,
+            ""Rating"" DOUBLE PRECISION NOT NULL DEFAULT 1000,
+            ""CompletedRuns"" INTEGER NOT NULL DEFAULT 0,
+            ""UpdatedAtUtc"" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS ""UserPresets"" (
             ""Id"" SERIAL PRIMARY KEY,
@@ -79,6 +89,12 @@ using (var scope = app.Services.CreateScope())
             ADD COLUMN IF NOT EXISTS ""LegendaryProgressPercent"" INTEGER NOT NULL DEFAULT 0;
         ALTER TABLE ""PlayerRuns""
             ADD COLUMN IF NOT EXISTS ""LegendaryEncounterHistoryJson"" TEXT NOT NULL DEFAULT '[]';
+        ALTER TABLE ""PlayerRuns""
+            ADD COLUMN IF NOT EXISTS ""DifficultyAdjustment"" INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE ""PlayerRuns""
+            ADD COLUMN IF NOT EXISTS ""RoundPerformancesJson"" TEXT NOT NULL DEFAULT '[]';
+        CREATE UNIQUE INDEX IF NOT EXISTS ""IX_PlayerSkillRatings_Username""
+            ON ""PlayerSkillRatings"" (""Username"");
     ");
 
     if (!db.Users.Any(u => u.Username == "admin"))
@@ -96,6 +112,12 @@ using (var scope = app.Services.CreateScope())
     db.Database.ExecuteSqlRaw("""
         CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_Username"
             ON "Users" ("Username");
+        """);
+
+    db.Database.ExecuteSqlRaw("""
+        INSERT INTO "PlayerSkillRatings" ("Username")
+        SELECT "Username" FROM "Users"
+        ON CONFLICT ("Username") DO NOTHING;
         """);
 }
 
@@ -207,6 +229,22 @@ void ConsolidateAdminAccounts(AppDbContext db)
         foreach (var run in db.PlayerRuns.Where(run => run.Username == duplicateUsername).ToList())
         {
             run.Username = keeper.Username;
+        }
+
+        var keeperRating = db.PlayerSkillRatings
+            .FirstOrDefault(rating => rating.Username == keeper.Username);
+        var duplicateRating = db.PlayerSkillRatings
+            .FirstOrDefault(rating => rating.Username == duplicateUsername);
+        if (duplicateRating != null)
+        {
+            if (keeperRating == null)
+            {
+                duplicateRating.Username = keeper.Username;
+            }
+            else
+            {
+                db.PlayerSkillRatings.Remove(duplicateRating);
+            }
         }
 
         db.Users.Remove(duplicate);
