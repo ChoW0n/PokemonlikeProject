@@ -166,33 +166,35 @@ public class Pokemon
         }
     }
 
-    public int EffectiveSpAtk
+    public int EffectiveSpAtk => EffectiveSpAtkAgainst();
+
+    public int EffectiveSpAtkAgainst(Pokemon? opponent = null)
     {
-        get
-        {
-            double value = SpAtk * StageMult("special-attack");
-            if (SelectedAbility is "플러스" or "마이너스") value *= 1.5;
-            if (SelectedAbility == "선파워" && BattleWeather.Current == "쾌청") value *= 1.5;
-            return (int)value;
-        }
+        double value = SpAtk * StageMult("special-attack");
+        if (SelectedAbility is "플러스" or "마이너스") value *= 1.5;
+        if (!BattleWeather.AreEffectsSuppressed(this, opponent)
+            && SelectedAbility == "선파워" && BattleWeather.Current == "쾌청") value *= 1.5;
+        return (int)value;
     }
     public int EffectiveSpDef => (int)(SpDef * StageMult("special-defense"));
 
-    //엽록소: 쾌청 날씨에서 속도 2배
-    public int EffectiveSpd
+    //엽록소·쓱쓱·모래헤치기·눈치우기: 날씨에서 속도 2배
+    public int EffectiveSpd => EffectiveSpdAgainst();
+
+    public int EffectiveSpdAgainst(Pokemon? opponent = null)
     {
-        get
+        double spd = Spd * StageMult("speed");
+        if (Status == StatusCondition.Paralysis && SelectedAbility != "속보") spd *= 0.5;
+        if (!BattleWeather.AreEffectsSuppressed(this, opponent))
         {
-            double spd = Spd * StageMult("speed");
-            if (Status == StatusCondition.Paralysis && SelectedAbility != "속보") spd *= 0.5;
             if (SelectedAbility == "엽록소" && BattleWeather.Current == "쾌청") spd *= 2.0;
             if (SelectedAbility is "쓱쓱" && BattleWeather.Current == "비") spd *= 2.0;
             if (SelectedAbility is "모래헤치기" && BattleWeather.Current == "모래바람") spd *= 2.0;
             if (SelectedAbility is "눈치우기" && BattleWeather.Current == "싸라기눈") spd *= 2.0;
-            if (SelectedAbility == "속보" && Status != StatusCondition.None) spd *= 1.5;
-            if (SelectedAbility == "슬로스타트" && TurnsOnField < 5) spd *= 0.5;
-            return (int)spd;
         }
+        if (SelectedAbility == "속보" && Status != StatusCondition.None) spd *= 1.5;
+        if (SelectedAbility == "슬로스타트" && TurnsOnField < 5) spd *= 0.5;
+        return (int)spd;
     }
 
     public Pokemon(PokemonData data, List<string>? chosenMoves = null, string ability = "", string item = "없음", int level = 1)
@@ -358,7 +360,7 @@ public class Pokemon
         return null;
     }
 
-    public bool IsImmuneToAilment(string ailmentName)
+    public bool IsImmuneToAilment(string ailmentName, Pokemon? opponent = null)
     {
         if (ailmentName == "toxic") ailmentName = "poison";
         if (ailmentName == "sleep" && UproarActive) return true;
@@ -374,16 +376,17 @@ public class Pokemon
         if (ailmentName == "paralysis" && SelectedAbility == "유연") return true;
         if (ailmentName == "burn" && SelectedAbility == "수의베일") return true;
         if (ailmentName == "freeze" && SelectedAbility == "마그마의무장") return true;
-        if (BattleWeather.Current == "쾌청" && SelectedAbility == "리프가드") return true;
+        if (!BattleWeather.AreEffectsSuppressed(this, opponent)
+            && BattleWeather.Current == "쾌청" && SelectedAbility == "리프가드") return true;
         return false;
     }
     public bool IsImmuneToConfusion() =>
         SelectedAbility == "마이페이스" || BattleField.Current == BattleField.Misty;
 
-    public void ApplyAilment(string ailmentName, Random? random = null)
+    public void ApplyAilment(string ailmentName, Random? random = null, Pokemon? opponent = null)
     {
         if (Status != StatusCondition.None) return;
-        if (IsImmuneToAilment(ailmentName)) return;
+        if (IsImmuneToAilment(ailmentName, opponent)) return;
 
         Status = ailmentName switch
         {
@@ -866,7 +869,7 @@ public class Pokemon
             || (SelectedAbility == "초식" && attackType == PokemonType.Grass);
     }
 
-    public PokemonType ResolveMoveType(Move move)
+    public PokemonType ResolveMoveType(Move move, Pokemon? opponent = null)
     {
         string key = move.Name switch
         {
@@ -875,7 +878,7 @@ public class Pokemon
             "테크노버스터" => "techno-blast",
             _ => ""
         };
-        return MoveRuleMetadata.ResolveMoveType(key, move, this);
+        return MoveRuleMetadata.ResolveMoveType(key, move, this, opponent);
     }
 
     public void DisableMove(string moveName)

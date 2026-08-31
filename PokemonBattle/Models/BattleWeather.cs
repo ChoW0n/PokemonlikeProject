@@ -22,6 +22,9 @@ public static class BattleWeather
 
     public static int TurnsRemaining { get; private set; }
 
+    public static bool AreEffectsSuppressed(Pokemon? first, Pokemon? second) =>
+        HasAirLock(first) || HasAirLock(second);
+
     public static void Reset()
     {
         current = Clear;
@@ -43,4 +46,7 @@ public static class BattleWeather
         current = Clear;
         return true;
     }
+
+    private static bool HasAirLock(Pokemon? pokemon) =>
+        pokemon != null && !pokemon.IsFainted && pokemon.SelectedAbility == "에어록";
 }

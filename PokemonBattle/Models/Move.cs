@@ -212,7 +212,11 @@ public static class MoveRuleMetadata
     public static bool IsGroundShakingMove(string moveKey) => moveKey is
         "earthquake" or "bulldoze" or "magnitude";
 
-    public static PokemonType ResolveMoveType(string moveKey, Move move, Pokemon? attacker = null)
+    public static PokemonType ResolveMoveType(
+        string moveKey,
+        Move move,
+        Pokemon? attacker = null,
+        Pokemon? defender = null)
     {
         PokemonType resolvedType = move.Type;
         if (moveKey == "judgment" && attacker != null)
@@ -250,7 +254,7 @@ public static class MoveRuleMetadata
                 _ => move.Type
             };
         }
-        if (moveKey == "weather-ball")
+        if (moveKey == "weather-ball" && !BattleWeather.AreEffectsSuppressed(attacker, defender))
         {
             resolvedType = BattleWeather.Current switch
             {
@@ -271,13 +275,16 @@ public static class MoveRuleMetadata
     }
 
     public static double EffectivePower(string moveKey, Move move)
+        => EffectivePowerBase(moveKey, move, weatherSuppressed: false);
+
+    private static double EffectivePowerBase(string moveKey, Move move, bool weatherSuppressed)
     {
         double power = move.Power;
-        if (moveKey == "weather-ball" && BattleWeather.Current != BattleWeather.Clear)
+        if (!weatherSuppressed && moveKey == "weather-ball" && BattleWeather.Current != BattleWeather.Clear)
         {
             power *= 2.0;
         }
-        else if (moveKey == "solar-beam"
+        else if (!weatherSuppressed && moveKey == "solar-beam"
             && BattleWeather.Current is BattleWeather.Rain or BattleWeather.Sand or BattleWeather.Hail)
         {
             power *= 0.5;
@@ -292,7 +299,10 @@ public static class MoveRuleMetadata
         Pokemon attacker,
         Pokemon defender)
     {
-        double power = EffectivePower(moveKey, move);
+        double power = EffectivePowerBase(
+            moveKey,
+            move,
+            BattleWeather.AreEffectsSuppressed(attacker, defender));
         switch (moveKey)
         {
             case "facade" when attacker.Status != StatusCondition.None:
@@ -326,12 +336,12 @@ public static class MoveRuleMetadata
                 power *= (double)attacker.CurrentHp / Math.Max(1, attacker.MaxHp);
                 break;
             case "electro-ball":
-                power = Math.Max(40, 120 * (double)Math.Max(1, attacker.EffectiveSpd)
-                    / Math.Max(1, defender.EffectiveSpd));
+                power = Math.Max(40, 120 * (double)Math.Max(1, attacker.EffectiveSpdAgainst(defender))
+                    / Math.Max(1, defender.EffectiveSpdAgainst(attacker)));
                 break;
             case "gyro-ball":
-                power = Math.Min(150, 25 * (double)Math.Max(1, defender.EffectiveSpd)
-                    / Math.Max(1, attacker.EffectiveSpd));
+                power = Math.Min(150, 25 * (double)Math.Max(1, defender.EffectiveSpdAgainst(attacker))
+                    / Math.Max(1, attacker.EffectiveSpdAgainst(defender)));
                 break;
             case "crush-grip":
             case "wring-out":
@@ -354,9 +364,15 @@ public static class MoveRuleMetadata
     public static PokemonType? SecondaryAttackType(string moveKey) =>
         moveKey == "flying-press" ? PokemonType.Flying : null;
 
-    public static double EffectiveAccuracy(string moveKey, Move move)
+    public static double EffectiveAccuracy(
+        string moveKey,
+        Move move,
+        Pokemon? attacker = null,
+        Pokemon? defender = null)
     {
         double accuracy = move.Accuracy;
+        if (BattleWeather.AreEffectsSuppressed(attacker, defender)) return accuracy;
+
         if (moveKey is "thunder" or "hurricane")
         {
             if (BattleWeather.Current == BattleWeather.Rain) return 100;
@@ -371,11 +387,21 @@ public static class MoveRuleMetadata
         return accuracy;
     }
 
-    public static int RecoveryAmount(string moveKey, Move move, int maxHp)
+    public static int RecoveryAmount(
+        string moveKey,
+        Move move,
+        int maxHp,
+        Pokemon? user = null,
+        Pokemon? opponent = null)
     {
         if (moveKey is not ("synthesis" or "morning-sun" or "moonlight"))
         {
             return maxHp * move.HealingPercent / 100;
+        }
+
+        if (BattleWeather.AreEffectsSuppressed(user, opponent))
+        {
+            return Math.Max(1, maxHp / 2);
         }
 
         return BattleWeather.Current switch
