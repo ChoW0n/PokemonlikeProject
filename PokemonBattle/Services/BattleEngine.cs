@@ -55,7 +55,8 @@ public sealed class BattleEngine
 
     public IReadOnlyList<string> InitializeWeather(Pokemon hero, Pokemon enemy)
     {
-        BattleWeather.Current = "맑음";
+        BattleWeather.Reset();
+        BattleField.Reset();
         var messages = new List<string>();
         var entrants = new[] { (Pokemon: hero, Opponent: enemy), (Pokemon: enemy, Opponent: hero) }
             .OrderByDescending(entry => EffectiveSpeed(entry.Pokemon));
@@ -81,7 +82,7 @@ public sealed class BattleEngine
         };
         if (weather != null)
         {
-            BattleWeather.Current = weather;
+            BattleWeather.Set(weather);
             messages.Add($"{entrant.Data.Name}의 {entrant.SelectedAbility}! 날씨가 {weather}(으)로 바뀌었다!");
         }
 
@@ -164,11 +165,12 @@ public sealed class BattleEngine
             }
             else
             {
-                bool stab = move.Type == enemy.Data.Type1 || enemy.Data.Type2 == move.Type;
+                PokemonType attackType = enemy.ResolveMoveType(move);
                 double averageHits = (move.MinHits + move.MaxHits) / 2.0;
-                score = move.Power * averageHits * (stab ? 1.5 : 1.0)
+                bool stab = attackType == enemy.Data.Type1 || enemy.Data.Type2 == attackType;
+                score = MoveRuleMetadata.EffectivePower(key, move) * averageHits * (stab ? 1.5 : 1.0)
                     * PreviewMultiplier(move, hero, enemy)
-                    * ((move.AlwaysHits ? 100 : move.Accuracy) / 100.0);
+                    * ((move.AlwaysHits ? 100 : MoveRuleMetadata.EffectiveAccuracy(key, move)) / 100.0);
             }
 
             if (score > bestScore)
@@ -200,6 +202,15 @@ public sealed class BattleEngine
             var context = new BattleEndOfTurnContext(pokemon, emit);
             foreach (var handler in effectHandlers) await handler.EndOfTurnAsync(context);
             pokemon.AdvanceTurn();
+        }
+
+        if (BattleWeather.AdvanceTurn())
+        {
+            await emit(BattleEvent.MessageLine("날씨의 효과가 사라졌다!", 900));
+        }
+        if (BattleField.AdvanceTurn())
+        {
+            await emit(BattleEvent.MessageLine("필드의 효과가 사라졌다!", 900));
         }
     }
 
@@ -284,12 +295,18 @@ public sealed class BattleEngine
                 $"{attacker.Data.Name}의 배틀스위치로 {form}로 모습이 변했다!"));
         }
 
-        double effectiveAccuracy = move.Accuracy;
+        double effectiveAccuracy = MoveRuleMetadata.EffectiveAccuracy(moveKey, move);
         if (attacker.SelectedAbility == "의욕" && !move.IsStatus && !move.IsSpecial) effectiveAccuracy *= 0.8;
         if (attacker.SelectedAbility == "복안") effectiveAccuracy *= 1.3;
         if (attacker.SelectedAbility == "승리의별") effectiveAccuracy *= 1.1;
         if (defender.SelectedAbility == "모래숨기" && BattleWeather.Current == "모래바람") effectiveAccuracy *= 0.8;
         if (defender.SelectedAbility == "눈숨기" && BattleWeather.Current == "싸라기눈") effectiveAccuracy *= 0.8;
+        if (BattleField.Current == BattleField.Psychic && move.Priority > 0 && TargetsOpponent(move))
+        {
+            await emit(BattleEvent.MessageLine(
+                $"{defender.Data.Name} 주변의 사이코필드가 우선도 기술을 막았다!"));
+            return;
+        }
         bool hit = move.AlwaysHits || attacker.SelectedAbility == "노가드" || defender.SelectedAbility == "노가드"
             || rng.Next(100) < Math.Min(100, (int)effectiveAccuracy);
         if (!hit)
@@ -356,11 +373,12 @@ public sealed class BattleEngine
         {
             int attackStat = GetAttackStat(attacker, move.IsSpecial);
             int defenseStat = move.IsSpecial ? defender.EffectiveSpDef : defender.EffectiveDef;
-            double power = move.Power;
+            double power = MoveRuleMetadata.EffectivePower(moveKey, move);
             bool stab = attackType == attacker.Data.Type1 || attacker.Data.Type2 == attackType;
             if (stab) power *= 1.5;
 
-            var powerContext = new BattlePowerContext(attacker, defender, move, attackType, makesContact, power);
+            var powerContext = new BattlePowerContext(
+                attacker, defender, move, attackType, makesContact, power, moveKey);
             foreach (var handler in effectHandlers) handler.ModifyPower(powerContext);
             power = powerContext.Power;
 

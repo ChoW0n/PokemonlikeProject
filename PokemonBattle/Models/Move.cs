@@ -77,6 +77,89 @@ public static class MoveRuleMetadata
     public static bool MakesContact(string moveKey, Move move) =>
         !move.IsStatus && !move.IsSpecial && move.Power > 0 && !NonContactPhysicalMoves.Contains(moveKey);
 
+    public static string? WeatherForMove(string moveKey) => moveKey switch
+    {
+        "sunny-day" => BattleWeather.Sun,
+        "rain-dance" => BattleWeather.Rain,
+        "sandstorm" => BattleWeather.Sand,
+        "hail" => BattleWeather.Hail,
+        _ => null
+    };
+
+    public static string? FieldForMove(string moveKey) => moveKey switch
+    {
+        "grassy-terrain" => BattleField.Grassy,
+        "electric-terrain" => BattleField.Electric,
+        "psychic-terrain" => BattleField.Psychic,
+        "misty-terrain" => BattleField.Misty,
+        _ => null
+    };
+
+    public static bool IsGroundShakingMove(string moveKey) => moveKey is
+        "earthquake" or "bulldoze" or "magnitude";
+
+    public static PokemonType ResolveMoveType(string moveKey, Move move)
+    {
+        if (moveKey != "weather-ball") return move.Type;
+
+        return BattleWeather.Current switch
+        {
+            BattleWeather.Sun => PokemonType.Fire,
+            BattleWeather.Rain => PokemonType.Water,
+            BattleWeather.Sand => PokemonType.Rock,
+            BattleWeather.Hail => PokemonType.Ice,
+            _ => PokemonType.Normal
+        };
+    }
+
+    public static double EffectivePower(string moveKey, Move move)
+    {
+        double power = move.Power;
+        if (moveKey == "weather-ball" && BattleWeather.Current != BattleWeather.Clear)
+        {
+            power *= 2.0;
+        }
+        else if (moveKey == "solar-beam"
+            && BattleWeather.Current is BattleWeather.Rain or BattleWeather.Sand or BattleWeather.Hail)
+        {
+            power *= 0.5;
+        }
+
+        return power;
+    }
+
+    public static double EffectiveAccuracy(string moveKey, Move move)
+    {
+        double accuracy = move.Accuracy;
+        if (moveKey is "thunder" or "hurricane")
+        {
+            if (BattleWeather.Current == BattleWeather.Rain) return 100;
+            if (BattleWeather.Current == BattleWeather.Sun) return 50;
+        }
+        else if (moveKey == "blizzard")
+        {
+            if (BattleWeather.Current == BattleWeather.Hail) return 100;
+            if (BattleWeather.Current == BattleWeather.Sun) return 50;
+        }
+
+        return accuracy;
+    }
+
+    public static int RecoveryAmount(string moveKey, Move move, int maxHp)
+    {
+        if (moveKey is not ("synthesis" or "morning-sun" or "moonlight"))
+        {
+            return maxHp * move.HealingPercent / 100;
+        }
+
+        return BattleWeather.Current switch
+        {
+            BattleWeather.Sun => maxHp * 2 / 3,
+            BattleWeather.Rain or BattleWeather.Sand or BattleWeather.Hail => Math.Max(1, maxHp / 4),
+            _ => Math.Max(1, maxHp / 2)
+        };
+    }
+
     public static bool HasHighCriticalRate(string moveKey) => HighCriticalRateMoves.Contains(moveKey);
 
     public static bool GuaranteesCriticalHit(string moveKey) => GuaranteedCriticalMoves.Contains(moveKey);
