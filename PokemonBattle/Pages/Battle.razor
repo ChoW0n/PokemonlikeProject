@@ -461,6 +461,10 @@
     {
         var result = await Rules.TakeTurnAsync(attacker, defender, moveKey, attackerIsHero, PlayBattleEvent);
 
+        if (result.FaintedPokemon == null && result.ForcedSwitchPokemon != null)
+        {
+            return await HandleForcedSwitch(ReferenceEquals(result.ForcedSwitchPokemon, Hero));
+        }
         if (result.FaintedPokemon == null) return false;
 
         bool faintedIsAttacker = ReferenceEquals(result.FaintedPokemon, attacker);
@@ -472,6 +476,33 @@
         return await HandleFaint(
             result.FaintedPokemon,
             faintedIsAttacker ? attackerIsHero : !attackerIsHero);
+    }
+
+    private async Task<bool> HandleForcedSwitch(bool isHero)
+    {
+        if (isHero)
+        {
+            Menu = BattleMenu.ForcedSwitch;
+            LogHistory.Add("기술의 효과로 교체할 포켓몬을 선택하세요.");
+            if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
+            IsBusy = false;
+            StateHasChanged();
+            return true;
+        }
+
+        if (EnemyTeamIndex >= EnemyTeam.Count - 1)
+        {
+            await ShowMessage("상대는 교체할 포켓몬이 없다!");
+            return false;
+        }
+
+        Rules.PrepareSwitchOut(Enemy);
+        EnemyTeamIndex++;
+        EnemyMoveKeys = ResolveMoveKeys(Enemy);
+        await ShowMessage($"{Enemy.Data.Name}이(가) 기술의 효과로 교체되어 나왔다!");
+        foreach (var message in Rules.ActivateSwitchIn(Enemy, Hero))
+            await ShowMessage(message, 1000);
+        return false;
     }
 
     private async Task<bool> HandleFaint(Pokemon fainted, bool faintedIsHero)
@@ -609,6 +640,18 @@
 
     private async void ForcedSwitchTo(int idx)
     {
+        if (idx < 0 || idx >= PlayerTeam.Count || PlayerTeam[idx].IsFainted)
+            return;
+
+        var outgoing = Hero;
+        int hpBeforeSwitch = outgoing.CurrentHp;
+        var statusBeforeSwitch = outgoing.Status;
+        Rules.PrepareSwitchOut(outgoing);
+        if (outgoing.CurrentHp > hpBeforeSwitch)
+            await ShowMessage($"{outgoing.Data.Name}은(는) {outgoing.SelectedAbility}으로 HP를 회복했다!", 900);
+        if (statusBeforeSwitch != StatusCondition.None && outgoing.Status == StatusCondition.None)
+            await ShowMessage($"{outgoing.Data.Name}은(는) 자연회복으로 상태 이상을 회복했다!", 900);
+
         PlayerTeamIndex = idx;
         HeroMoveKeys = ResolveMoveKeys(Hero);
         Menu = BattleMenu.Main;
@@ -617,8 +660,18 @@
         {
             await ShowMessage(message, 1000);
         }
+
+        string? enemyMoveKey = Rules.PickEnemyMove(Enemy, EnemyMoveKeys, Hero);
+        if (await RunTurn(Enemy, Hero, enemyMoveKey, false)) return;
+        if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }
+
+        await Rules.ApplyEndOfTurnEffectsAsync(new[] { Hero, Enemy }, PlayBattleEvent);
+        if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }
+        if (Enemy.IsFainted) { if (await HandleFaint(Enemy, false)) return; }
+
         LogHistory.Add("행동을 선택하세요.");
         if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
+        IsBusy = false;
         StateHasChanged();
     }
 }

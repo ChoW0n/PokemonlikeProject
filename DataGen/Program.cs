@@ -36,6 +36,7 @@ moveSb.AppendLine("namespace PokemonBattle.Models;");
 moveSb.AppendLine();
 moveSb.AppendLine("public static class MoveDatabase");
 moveSb.AppendLine("{");
+moveSb.AppendLine("    // MoveRuleMetadata owns runtime-only move behavior and is intentionally not generated.");
 moveSb.AppendLine("    public static Dictionary<string, Move> All = new Dictionary<string, Move>();");
 moveSb.AppendLine();
 moveSb.AppendLine("    static MoveDatabase()");

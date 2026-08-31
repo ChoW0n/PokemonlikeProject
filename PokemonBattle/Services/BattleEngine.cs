@@ -31,6 +31,7 @@ public sealed class BattleEngine
 
     public bool CanSwitch(Pokemon active, Pokemon opponent)
     {
+        if (active.Ingrained || active.BindingTurnsRemaining > 0) return false;
         bool isGhostType = active.Data.Type1 == PokemonType.Ghost || active.Data.Type2 == PokemonType.Ghost;
         if (opponent.SelectedAbility == "그림자밟기"
             && !isGhostType
@@ -165,7 +166,7 @@ public sealed class BattleEngine
             }
             else
             {
-                PokemonType attackType = enemy.ResolveMoveType(move);
+                PokemonType attackType = MoveRuleMetadata.ResolveMoveType(key, move, enemy);
                 double averageHits = (move.MinHits + move.MaxHits) / 2.0;
                 bool stab = attackType == enemy.Data.Type1 || enemy.Data.Type2 == attackType;
                 score = MoveRuleMetadata.EffectivePower(key, move) * averageHits * (stab ? 1.5 : 1.0)
@@ -223,6 +224,13 @@ public sealed class BattleEngine
     {
         var result = new BattleTurnResult();
 
+        if (attacker.MustRecharge)
+        {
+            attacker.ClearRecharge();
+            await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) 재충전 중이라 움직일 수 없다!"));
+            return result;
+        }
+
         if (attacker.ShouldSkipTurn)
         {
             await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) 게으름을 피우고 있다!"));
@@ -241,7 +249,7 @@ public sealed class BattleEngine
             return result;
         }
 
-        var (canAct, statusMessage) = attacker.CheckActionPrevention();
+        var (canAct, statusMessage) = attacker.CheckActionPrevention(rng);
         if (statusMessage != null) await emit(BattleEvent.MessageLine(statusMessage));
         if (!canAct)
         {
@@ -249,7 +257,21 @@ public sealed class BattleEngine
             return result;
         }
 
-        if (moveKey == null)
+        string? pendingDelayedKey = attacker.ConsumePendingDelayedAttack(out Pokemon? delayedTarget);
+        if (pendingDelayedKey != null && delayedTarget != null && !delayedTarget.IsFainted)
+        {
+            var delayedMove = MoveDatabase.All[pendingDelayedKey];
+            await emit(BattleEvent.MessageLine(
+                $"{attacker.Data.Name}의 {delayedMove.Name}의 시한 공격이 떨어졌다!"));
+            await ExecuteMoveAsync(attacker, delayedTarget, delayedMove, pendingDelayedKey,
+                attackerIsHero, emit, result, isContinuation: true);
+        }
+
+        string? executingMoveKey = attacker.ConsumePendingMove();
+        bool isContinuation = executingMoveKey != null;
+        if (executingMoveKey == null) executingMoveKey = moveKey;
+
+        if (executingMoveKey == null)
         {
             await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) 사용할 수 있는 기술이 없어 몸부림쳤다!"));
             int damage = Math.Max(1, (int)(((2.0 * attacker.Level / 5 + 2) * 50 * attacker.EffectiveAtk
@@ -265,14 +287,46 @@ public sealed class BattleEngine
         }
         else
         {
-            if (!MoveDatabase.All.TryGetValue(moveKey, out var move) || !attacker.TryUseMove(moveKey))
+            if (!MoveDatabase.All.TryGetValue(executingMoveKey, out var move)
+                || (!isContinuation && !attacker.TryUseMove(executingMoveKey)))
             {
                 await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) 그 기술을 사용할 수 없다!"));
                 return result;
             }
 
+            attacker.MarkMoveUsed(executingMoveKey);
             await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 {move.Name}!"));
-            await ExecuteMoveAsync(attacker, defender, move, moveKey, attackerIsHero, emit);
+
+            var rule = MoveRuleMetadata.GetRule(executingMoveKey, move);
+            if (!MoveRuleMetadata.IsProtectionMove(executingMoveKey))
+                attacker.ResetProtectionStreak();
+            if (executingMoveKey == "focus-punch" && attacker.WasDamagedThisTurn)
+            {
+                await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) 공격받아 집중이 끊겼다!"));
+                return result;
+            }
+            if (!isContinuation && rule.Kind == MoveRuleKind.DelayedDamage)
+            {
+                attacker.SetPendingDelayedAttack(executingMoveKey, defender, rule.Duration);
+                await emit(BattleEvent.MessageLine(
+                    $"{attacker.Data.Name}은(는) 미래를 예지했다. {rule.Duration}턴 뒤 공격한다!"));
+                return result;
+            }
+            if (!isContinuation && rule.Kind == MoveRuleKind.Charge)
+            {
+                attacker.SetPendingMove(executingMoveKey,
+                    executingMoveKey is "bounce" or "dive" or "fly" or "sky-drop"
+                    or "phantom-force" or "shadow-force");
+                if (executingMoveKey == "skull-bash")
+                {
+                    attacker.ChangeStage("defense", 1);
+                    await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) 머리를 움츠려 방어를 올렸다!"));
+                }
+                await emit(BattleEvent.MessageLine(
+                    $"{attacker.Data.Name}은(는) {move.Name}을(를) 준비했다!"));
+                return result;
+            }
+            await ExecuteMoveAsync(attacker, defender, move, executingMoveKey, attackerIsHero, emit, result, isContinuation);
         }
 
         if (attacker.IsFainted && !defender.IsFainted) result.FaintedPokemon = attacker;
@@ -286,7 +340,9 @@ public sealed class BattleEngine
         Move move,
         string moveKey,
         bool attackerIsHero,
-        Func<BattleEvent, Task> emit)
+        Func<BattleEvent, Task> emit,
+        BattleTurnResult result,
+        bool isContinuation = false)
     {
         if (attacker.UpdateFormForMove(moveKey, move.IsStatus))
         {
@@ -315,15 +371,35 @@ public sealed class BattleEngine
             return;
         }
 
-        PokemonType attackType = attacker.ResolveMoveType(move);
+        PokemonType attackType = MoveRuleMetadata.ResolveMoveType(moveKey, move, attacker);
         bool makesContact = MoveRuleMetadata.MakesContact(moveKey, move);
         string effectKind = TypeColors.GetEffectKind(attackType, move.IsStatus);
         var context = new BattleEffectContext(
             attacker, defender, move, attackerIsHero, rng, emit, moveKey, attackType, makesContact);
 
+        if (defender.IsSemiInvulnerable && !IsSemiInvulnerableBypass(moveKey))
+        {
+            await emit(BattleEvent.MessageLine($"{defender.Data.Name}은(는) 모습을 감춰 공격을 피했다!"));
+            return;
+        }
+
+        if (MoveRuleMetadata.IsProtectionMove(moveKey) && moveKey != "kings-shield")
+        {
+            if (attacker.TryActivateProtection(rng))
+            {
+                await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) {move.Name}으로 몸을 지켰다!"));
+                await emit(BattleEvent.Effect(effectKind, attackerIsHero, attackType, move.Name));
+            }
+            else
+            {
+                await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 {move.Name}은(는) 실패했다!"));
+            }
+            return;
+        }
+
         if (MoveRuleMetadata.ChangesToShieldForm(moveKey))
         {
-            attacker.ActivateProtection();
+            if (!attacker.TryActivateProtection(rng)) return;
             await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) 킹실드로 몸을 지켰다!"));
             await emit(BattleEvent.Effect(effectKind, attackerIsHero, attackType, move.Name));
             return;
@@ -354,7 +430,12 @@ public sealed class BattleEngine
             return;
         }
 
-        if (TargetsOpponent(move) && defender.IsImmuneToMoveType(attackType))
+        bool revealedImmunity = defender.TypeImmunityRevealed
+            && attackType is PokemonType.Normal or PokemonType.Fighting or PokemonType.Psychic;
+        bool bypassesGroundImmunity = moveKey == "thousand-arrows"
+            && attackType == PokemonType.Ground;
+        if (TargetsOpponent(move) && defender.IsImmuneToMoveType(attackType)
+            && !revealedImmunity && !bypassesGroundImmunity)
         {
             var (absorbed, absorbMessage) = defender.TryAbsorb(attackType);
             context.WasAbsorbed = absorbed;
@@ -371,11 +452,16 @@ public sealed class BattleEngine
 
         if (!move.IsStatus && move.Power > 0)
         {
-            int attackStat = GetAttackStat(attacker, move.IsSpecial);
-            int defenseStat = move.IsSpecial ? defender.EffectiveSpDef : defender.EffectiveDef;
-            double power = MoveRuleMetadata.EffectivePower(moveKey, move);
+            int attackStat = GetAttackStat(attacker, defender, moveKey, move);
+            int defenseStat = GetDefenseStat(defender, moveKey, move);
+            double power = MoveRuleMetadata.EffectivePower(moveKey, move, attacker, defender);
             bool stab = attackType == attacker.Data.Type1 || attacker.Data.Type2 == attackType;
             if (stab) power *= 1.5;
+            if (attacker.ChargeBoostActive && attackType == PokemonType.Electric)
+            {
+                power *= 2;
+                attacker.ClearChargeBoost();
+            }
 
             var powerContext = new BattlePowerContext(
                 attacker, defender, move, attackType, makesContact, power, moveKey);
@@ -395,7 +481,16 @@ public sealed class BattleEngine
                 int hpBefore = defender.CurrentHp;
                 int scaledPower = (int)(power * ((double)attackStat / Math.Max(defenseStat, 1)));
                 if (isCritical && attacker.SelectedAbility == "스나이퍼") scaledPower = (int)(scaledPower * 1.5);
-                defender.TakeDamage(scaledPower, attackType, move.IsSpecial, isCritical);
+                defender.TakeDamage(
+                    scaledPower,
+                    attackType,
+                    move.IsSpecial,
+                    isCritical,
+                    MoveRuleMetadata.SecondaryAttackType(moveKey),
+                    moveKey == "freeze-dry"
+                        && (defender.Data.Type1 == PokemonType.Water
+                            || defender.Data.Type2 == PokemonType.Water) ? 2.0 : 1.0,
+                    ignoresGroundImmunity: bypassesGroundImmunity);
                 context.LastHitDamage = hpBefore - defender.CurrentHp;
                 context.TotalDamage += context.LastHitDamage;
                 context.ActualHits++;
@@ -420,11 +515,24 @@ public sealed class BattleEngine
         }
 
         foreach (var handler in effectHandlers) await handler.AfterMoveAsync(context);
+        if (context.RequestSwitch)
+        {
+            result.ForcedSwitchPokemon = context.SwitchPokemon;
+            result.ForcedSwitchReason = context.SwitchReason;
+        }
     }
 
-    private int GetAttackStat(Pokemon attacker, bool isSpecial)
+    private static int GetAttackStat(Pokemon attacker, Pokemon defender, string moveKey, Move move)
     {
-        return isSpecial ? attacker.EffectiveSpAtk : attacker.EffectiveAtk;
+        if (moveKey == "body-press") return attacker.EffectiveDef;
+        if (moveKey == "foul-play") return defender.EffectiveAtk;
+        return move.IsSpecial ? attacker.EffectiveSpAtk : attacker.EffectiveAtk;
+    }
+
+    private static int GetDefenseStat(Pokemon defender, string moveKey, Move move)
+    {
+        if (moveKey is "secret-sword" or "psystrike" or "psyshock") return defender.EffectiveDef;
+        return move.IsSpecial ? defender.EffectiveSpDef : defender.EffectiveDef;
     }
 
     private int RollHitCount(Pokemon attacker, Move move)
@@ -495,6 +603,10 @@ public sealed class BattleEngine
         if (move.AilmentName != "none") return true;
         return move.StatChanges.Any(change => !change.TargetsSelf);
     }
+
+    private static bool IsSemiInvulnerableBypass(string moveKey) =>
+        moveKey is "gust" or "twister" or "thunder" or "hurricane" or "smack-down"
+            or "thousand-arrows";
 
     private static string? EffectivenessLine(double multiplier)
     {
