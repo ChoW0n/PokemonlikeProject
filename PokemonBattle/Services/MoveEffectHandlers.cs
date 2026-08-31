@@ -294,7 +294,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         switch (MoveRuleMetadata.GetRule(key, move).Kind)
         {
             case MoveRuleKind.LeechSeed:
-                if (defender.Data.Type1 == PokemonType.Grass || defender.Data.Type2 == PokemonType.Grass)
+                if (defender.HasType(PokemonType.Grass))
                 {
                     await context.ShowMessage($"{defender.Data.Name}은(는) 씨뿌리기를 피했다!");
                 }

@@ -3,6 +3,11 @@ namespace PokemonBattle.Models;
 public class Pokemon
 {
     private static int nextActorNumber;
+    private readonly PokemonData originalData;
+    private readonly string[] originalMoveKeys;
+    private Dictionary<string, int>? preTransformPP;
+    private PokemonType? typeOverride1;
+    private PokemonType? typeOverride2;
 
     public PokemonData Data;
     public string ActorId { get; }
@@ -22,7 +27,18 @@ public class Pokemon
     public bool IsAlternateForm { get; private set; }
     public bool HasConsumedBerry { get; private set; }
     public bool HasPickedUpItem { get; private set; }
-    public bool IsSteelType => Data.Type1 == PokemonType.Steel || Data.Type2 == PokemonType.Steel;
+    public PokemonType CurrentType1 => typeOverride1
+        ?? (SelectedAbility == "멀티타입"
+            ? GetPlateType(HeldItem) ?? Data.Type1
+            : Data.Type1);
+    public PokemonType? CurrentType2 => typeOverride1 != null
+        ? typeOverride2
+        : (SelectedAbility == "멀티타입" && GetPlateType(HeldItem) != null ? null : Data.Type2);
+    public string TypeDisplay => CurrentType2 == null
+        ? CurrentType1.ToString()
+        : $"{CurrentType1}/{CurrentType2}";
+    public bool HasType(PokemonType type) => CurrentType1 == type || CurrentType2 == type;
+    public bool IsSteelType => HasType(PokemonType.Steel);
     public bool CanBeForcedSwitched => SelectedAbility != "흡반";
     private string? ConsumedBerryName { get; set; }
     public bool LastHitWasCritical { get; private set; }
@@ -39,6 +55,7 @@ public class Pokemon
     public bool IsSemiInvulnerable { get; private set; }
     public bool WasDamagedThisTurn { get; private set; }
     public bool LastDamageTakenThisTurn => WasDamagedThisTurn;
+    public bool IsTransformed { get; private set; }
     public bool IsBadlyPoisoned { get; private set; }
     public int ToxicTurns { get; private set; }
     public bool LeechSeeded { get; private set; }
@@ -84,7 +101,7 @@ public class Pokemon
     private int StatHp(int baseStat) => (2 * baseStat + 31) * Level / 100 + Level + 10;
     private int StatOther(int baseStat) => (2 * baseStat + 31) * Level / 100 + 5;
 
-    public int MaxHp => StatHp(Data.BaseHp);
+    public int MaxHp => StatHp(IsTransformed ? originalData.BaseHp : Data.BaseHp);
 
     private double ItemStatMult(string stat)
     {
@@ -206,6 +223,7 @@ public class Pokemon
 
     public Pokemon(PokemonData data, List<string>? chosenMoves = null, string ability = "", string item = "없음", int level = 1)
     {
+        originalData = data;
         Data = data;
         ActorId = $"{data.EnglishName}-{Interlocked.Increment(ref nextActorNumber)}";
         Level = level;
@@ -215,6 +233,7 @@ public class Pokemon
         HeldItem = item;
 
         var moveList = chosenMoves != null && chosenMoves.Count > 0 ? chosenMoves : data.MoveNames.ToList();
+        originalMoveKeys = moveList.ToArray();
         foreach (var moveName in moveList)
         {
             if (MoveDatabase.All.ContainsKey(moveName))
@@ -230,6 +249,10 @@ public class Pokemon
             else if (MoveDatabase.All.ContainsKey("tackle")) CurrentPP["tackle"] = MoveDatabase.All["tackle"].MaxPP;
         }
     }
+
+    private static Dictionary<string, int> CreateMovePp(IEnumerable<string> moveKeys) =>
+        moveKeys.Where(MoveDatabase.All.ContainsKey)
+            .ToDictionary(key => key, key => MoveDatabase.All[key].MaxPP);
 
     private bool IsChoiceItem =>
         HeldItem == "구애스카프" || HeldItem == "구애머리띠" || HeldItem == "구애안경";
@@ -267,6 +290,22 @@ public class Pokemon
 
     public void ResetOnSwitchOut()
     {
+        if (IsTransformed)
+        {
+            Data = originalData;
+            IsTransformed = false;
+            typeOverride1 = null;
+            typeOverride2 = null;
+            IsAlternateForm = false;
+            CurrentPP = preTransformPP != null
+                ? new Dictionary<string, int>(preTransformPP)
+                : CreateMovePp(originalMoveKeys);
+            preTransformPP = null;
+            UsedMoveKeys.Clear();
+        }
+        typeOverride1 = null;
+        typeOverride2 = null;
+
         StatStages = new() { ["attack"] = 0, ["defense"] = 0, ["special-attack"] = 0, ["special-defense"] = 0, ["speed"] = 0 };
         IsConfused = false;
         ConfusionTurnsRemaining = 0;
@@ -566,39 +605,39 @@ public class Pokemon
         double moveEffectivenessMultiplier = 1.0,
         bool ignoresGroundImmunity = false)
     {
-        double multiplier = TypeChart.GetMultiplier(attackType, Data.Type1);
-        if (Data.Type2 != null)
+        double multiplier = TypeChart.GetMultiplier(attackType, CurrentType1);
+        if (CurrentType2 != null)
         {
-            multiplier *= TypeChart.GetMultiplier(attackType, Data.Type2.Value);
+            multiplier *= TypeChart.GetMultiplier(attackType, CurrentType2.Value);
         }
         if (secondaryAttackType != null)
         {
-            multiplier *= TypeChart.GetMultiplier(secondaryAttackType.Value, Data.Type1);
-            if (Data.Type2 != null)
-                multiplier *= TypeChart.GetMultiplier(secondaryAttackType.Value, Data.Type2.Value);
+            multiplier *= TypeChart.GetMultiplier(secondaryAttackType.Value, CurrentType1);
+            if (CurrentType2 != null)
+                multiplier *= TypeChart.GetMultiplier(secondaryAttackType.Value, CurrentType2.Value);
         }
         multiplier *= moveEffectivenessMultiplier;
 
         if (IsImmuneToMoveType(attackType)) multiplier = 0;
         if (ignoresGroundImmunity && attackType == PokemonType.Ground
-            && (Data.Type1 == PokemonType.Flying || Data.Type2 == PokemonType.Flying))
+            && HasType(PokemonType.Flying))
         {
-            multiplier = Data.Type1 == PokemonType.Flying
+            multiplier = CurrentType1 == PokemonType.Flying
                 ? 1
-                : TypeChart.GetMultiplier(attackType, Data.Type1);
-            if (Data.Type2 != null && Data.Type2 != PokemonType.Flying)
-                multiplier *= TypeChart.GetMultiplier(attackType, Data.Type2.Value);
+                : TypeChart.GetMultiplier(attackType, CurrentType1);
+            if (CurrentType2 != null && CurrentType2 != PokemonType.Flying)
+                multiplier *= TypeChart.GetMultiplier(attackType, CurrentType2.Value);
         }
         if (TypeImmunityRevealed && multiplier == 0
             && attackType is PokemonType.Normal or PokemonType.Fighting or PokemonType.Psychic)
         {
             // Foresight/Odor Sleuth/Miracle Eye remove the relevant type
             // immunity, while preserving ordinary resistances.
-            multiplier = TypeChart.GetMultiplier(attackType, Data.Type1);
+            multiplier = TypeChart.GetMultiplier(attackType, CurrentType1);
             if (multiplier == 0) multiplier = 1;
-            if (Data.Type2 != null)
+            if (CurrentType2 != null)
             {
-                double second = TypeChart.GetMultiplier(attackType, Data.Type2.Value);
+                double second = TypeChart.GetMultiplier(attackType, CurrentType2.Value);
                 multiplier *= second == 0 ? 1 : second;
             }
         }
@@ -832,6 +871,64 @@ public class Pokemon
         bool shouldBeAlternateForm = CurrentHp <= MaxHp / 2;
         if (IsAlternateForm == shouldBeAlternateForm) return false;
         IsAlternateForm = shouldBeAlternateForm;
+        return true;
+    }
+
+    public static PokemonType? GetPlateType(string itemName) => itemName switch
+    {
+        "불꽃플레이트" => PokemonType.Fire,
+        "물방울플레이트" => PokemonType.Water,
+        "전기플레이트" => PokemonType.Electric,
+        "초원플레이트" => PokemonType.Grass,
+        "고드름플레이트" => PokemonType.Ice,
+        "주먹플레이트" => PokemonType.Fighting,
+        "독플레이트" => PokemonType.Poison,
+        "대지플레이트" => PokemonType.Ground,
+        "푸른하늘플레이트" => PokemonType.Flying,
+        "이상한플레이트" => PokemonType.Psychic,
+        "비늘플레이트" => PokemonType.Bug,
+        "암석플레이트" => PokemonType.Rock,
+        "원령플레이트" => PokemonType.Ghost,
+        "용의플레이트" => PokemonType.Dragon,
+        "공포플레이트" => PokemonType.Dark,
+        "강철플레이트" => PokemonType.Steel,
+        "정령플레이트" => PokemonType.Fairy,
+        _ => null
+    };
+
+    public bool TryChangeTypeForMove(PokemonType moveType)
+    {
+        if (SelectedAbility != "변환자재"
+            || (CurrentType1 == moveType && CurrentType2 == null)) return false;
+
+        typeOverride1 = moveType;
+        typeOverride2 = null;
+        return true;
+    }
+
+    public bool TryChangeTypeFromHit(PokemonType moveType)
+    {
+        if (SelectedAbility != "변색"
+            || (CurrentType1 == moveType && CurrentType2 == null)) return false;
+
+        typeOverride1 = moveType;
+        typeOverride2 = null;
+        return true;
+    }
+
+    public bool TryTransformInto(Pokemon target)
+    {
+        if (SelectedAbility != "괴짜" || IsTransformed || ReferenceEquals(this, target)) return false;
+
+        preTransformPP = new Dictionary<string, int>(CurrentPP);
+        Data = target.Data;
+        IsAlternateForm = target.IsAlternateForm;
+        typeOverride1 = target.CurrentType1;
+        typeOverride2 = target.CurrentType2;
+        IsTransformed = true;
+        CurrentPP = new Dictionary<string, int>(target.CurrentPP);
+        UsedMoveKeys.Clear();
+        ChoiceLockedMove = null;
         return true;
     }
 

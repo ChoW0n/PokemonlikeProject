@@ -28,10 +28,10 @@
                 <span class="hud-name">@Enemy.Data.Name</span>
                 <span class="hud-level">Lv.@Enemy.Level</span>
                 <div class="hud-types">
-                    <img src="@TypeIcons.GetUrl(Enemy.Data.Type1)" class="type-icon-img" alt="@Enemy.Data.Type1" />
-                    @if (Enemy.Data.Type2 != null)
+                    <img src="@TypeIcons.GetUrl(Enemy.CurrentType1)" class="type-icon-img" alt="@Enemy.CurrentType1" />
+                    @if (Enemy.CurrentType2 != null)
                     {
-                        <img src="@TypeIcons.GetUrl(Enemy.Data.Type2.Value)" class="type-icon-img" alt="@Enemy.Data.Type2" />
+                        <img src="@TypeIcons.GetUrl(Enemy.CurrentType2.Value)" class="type-icon-img" alt="@Enemy.CurrentType2" />
                     }
                 </div>
                 <div class="hud-hp-row">
@@ -63,10 +63,10 @@
                 <span class="hud-name">@Hero.Data.Name</span>
                 <span class="hud-level">Lv.@Hero.Level</span>
                 <div class="hud-types">
-                    <img src="@TypeIcons.GetUrl(Hero.Data.Type1)" class="type-icon-img" alt="@Hero.Data.Type1" />
-                    @if (Hero.Data.Type2 != null)
+                    <img src="@TypeIcons.GetUrl(Hero.CurrentType1)" class="type-icon-img" alt="@Hero.CurrentType1" />
+                    @if (Hero.CurrentType2 != null)
                     {
-                        <img src="@TypeIcons.GetUrl(Hero.Data.Type2.Value)" class="type-icon-img" alt="@Hero.Data.Type2" />
+                        <img src="@TypeIcons.GetUrl(Hero.CurrentType2.Value)" class="type-icon-img" alt="@Hero.CurrentType2" />
                     }
                 </div>
                 <div class="hud-hp-row">

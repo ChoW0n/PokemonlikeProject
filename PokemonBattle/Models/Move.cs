@@ -248,27 +248,7 @@ public static class MoveRuleMetadata
         PokemonType resolvedType = move.Type;
         if (moveKey == "judgment" && attacker != null)
         {
-            resolvedType = attacker.HeldItem switch
-            {
-                "불꽃플레이트" => PokemonType.Fire,
-                "물방울플레이트" => PokemonType.Water,
-                "전기플레이트" => PokemonType.Electric,
-                "초원플레이트" => PokemonType.Grass,
-                "고드름플레이트" => PokemonType.Ice,
-                "주먹플레이트" => PokemonType.Fighting,
-                "독플레이트" => PokemonType.Poison,
-                "대지플레이트" => PokemonType.Ground,
-                "푸른하늘플레이트" => PokemonType.Flying,
-                "이상한플레이트" => PokemonType.Psychic,
-                "비늘플레이트" => PokemonType.Bug,
-                "암석플레이트" => PokemonType.Rock,
-                "원령플레이트" => PokemonType.Ghost,
-                "용의플레이트" => PokemonType.Dragon,
-                "공포플레이트" => PokemonType.Dark,
-                "강철플레이트" => PokemonType.Steel,
-                "정령플레이트" => PokemonType.Fairy,
-                _ => move.Type
-            };
+            resolvedType = Pokemon.GetPlateType(attacker.HeldItem) ?? move.Type;
         }
         if (moveKey == "techno-blast" && attacker != null)
         {
