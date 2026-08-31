@@ -2,6 +2,7 @@
 @using PokemonBattle.Services
 @inject CurrentUserService CurrentUser
 @inject AdminDashboardService Dashboard
+@inject AdminOperationsService Operations
 @inject NavigationManager Nav
 
 <PageTitle>관리자 콘솔</PageTitle>
@@ -34,9 +35,9 @@
     {
         <header class="admin-header">
             <div>
-                <p class="eyebrow">ADMIN / READ-ONLY DEBUG</p>
+                <p class="eyebrow">ADMIN / OPERATIONS</p>
                 <h1>관리자 콘솔</h1>
-                <p>계정 진행 상황과 저장 데이터 무결성을 확인합니다.</p>
+                <p>사용자 진행 상황을 조회하고 테스트용 운영 도구를 실행합니다.</p>
             </div>
             <button type="button" class="admin-refresh" @onclick="Refresh">새로고침</button>
         </header>
@@ -48,42 +49,186 @@
             <article class="admin-metric"><span>공통 데이터</span><strong>@Snapshot.KnownPokemonCount</strong><small>포켓몬 · 기술 @(Snapshot.KnownMoveCount)개</small></article>
         </section>
 
-        <section class="admin-panel" aria-labelledby="user-overview-title">
-            <div class="admin-panel-heading">
-                <div>
-                    <p class="eyebrow">PLAYER DATA</p>
-                    <h2 id="user-overview-title">사용자 진행 현황</h2>
+        <div class="admin-user-layout">
+            <section class="admin-panel admin-directory" aria-labelledby="directory-title">
+                <div class="admin-panel-heading">
+                    <div>
+                        <p class="eyebrow">USER DIRECTORY</p>
+                        <h2 id="directory-title">사용자 조회</h2>
+                    </div>
+                    <span class="admin-generated">@VisibleUsers.Count / @Snapshot.Users.Count</span>
                 </div>
-                <span class="admin-generated">@Snapshot.GeneratedAtUtc.ToLocalTime().ToString("yyyy.MM.dd HH:mm") 갱신</span>
-            </div>
-            <div class="admin-table-wrap">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>계정</th>
-                            <th>현재 / 최고</th>
-                            <th>전설 진행</th>
-                            <th>해금</th>
-                            <th>프리셋</th>
-                            <th>출현 이력</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var user in Snapshot.Users)
+                <label class="visually-hidden" for="admin-user-search">사용자 검색</label>
+                <input id="admin-user-search" class="admin-input" placeholder="아이디 검색..." value="@UserSearch" @oninput="OnUserSearchChanged" />
+                <div class="admin-user-list" role="list" aria-label="사용자 목록">
+                    @if (VisibleUsers.Count == 0)
+                    {
+                        <p class="admin-muted">검색 결과가 없습니다.</p>
+                    }
+                    else
+                    {
+                        @foreach (var user in VisibleUsers)
                         {
-                            <tr>
-                                <th scope="row">@user.Username @(user.IsAdmin ? "· 관리자" : "")</th>
-                                <td>@user.CurrentScore / @user.HighScore</td>
-                                <td><span class="admin-progress"><i style="width:@user.LegendaryProgressPercent%"></i></span> @user.LegendaryProgressPercent%</td>
-                                <td>@user.UnlockedCount</td>
-                                <td>@user.PresetCount</td>
-                                <td>@user.LegendaryEncounterCount</td>
-                            </tr>
+                            <button type="button" class="admin-user-row @(SelectedUsername == user.Username ? "is-selected" : "")" @onclick="() => SelectUser(user.Username)">
+                                <span>
+                                    <strong>@user.Username</strong>
+                                    <small>@(user.IsAdmin ? "관리자" : "일반 사용자") · 해금 @user.UnlockedCount</small>
+                                </span>
+                                <span class="admin-user-score">@user.HighScore<span> 최고</span></span>
+                            </button>
                         }
-                    </tbody>
-                </table>
-            </div>
-        </section>
+                    }
+                </div>
+            </section>
+
+            <section class="admin-panel admin-detail-panel" aria-labelledby="detail-title">
+                @if (SelectedDetails == null)
+                {
+                    <div class="admin-detail-empty">
+                        <p class="eyebrow">USER DETAIL</p>
+                        <h2 id="detail-title">사용자를 선택하세요</h2>
+                        <p>왼쪽 목록에서 계정을 선택하면 상세 진행 상황과 관리 도구가 표시됩니다.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="admin-panel-heading">
+                        <div>
+                            <p class="eyebrow">USER DETAIL</p>
+                            <h2 id="detail-title">@SelectedDetails.Username</h2>
+                            <span class="admin-role">@(SelectedDetails.IsAdmin ? "관리자 계정" : "일반 사용자")</span>
+                        </div>
+                        <span class="admin-health is-ok">조회 가능</span>
+                    </div>
+
+                    <div class="admin-detail-stats">
+                        <span>현재 점수 <strong>@SelectedDetails.CurrentScore</strong></span>
+                        <span>최고 점수 <strong>@SelectedDetails.HighScore</strong></span>
+                        <span>전설 <strong>@SelectedDetails.LegendaryProgressPercent%</strong></span>
+                        <span>해금 <strong>@SelectedDetails.UnlockedPokemonNames.Count</strong></span>
+                    </div>
+
+                    <div class="admin-detail-columns">
+                        <div>
+                            <h3>현재 팀</h3>
+                            @if (SelectedDetails.CurrentTeam.Count == 0)
+                            {
+                                <p class="admin-muted">저장된 팀이 없습니다.</p>
+                            }
+                            else
+                            {
+                                <ul class="admin-compact-list">
+                                    @foreach (var member in SelectedDetails.CurrentTeam)
+                                    {
+                                        <li>
+                                            <strong>@member.Name · Lv.@member.Level</strong>
+                                            <small>@member.Ability · @member.Item</small>
+                                            <small>@(member.Moves.Count == 0 ? "선택 기술 없음" : string.Join(" · ", member.Moves))</small>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                        <div>
+                            <h3>저장 정보</h3>
+                            <p class="admin-detail-line">프리셋 <strong>@SelectedDetails.Presets.Count</strong>개</p>
+                            <p class="admin-detail-line">전설 출현 이력 <strong>@SelectedDetails.LegendaryHistory.Count</strong>회</p>
+                            @if (SelectedDetails.Presets.Count > 0)
+                            {
+                                <p class="admin-muted">@string.Join(" · ", SelectedDetails.Presets.Select(preset => preset.Name))</p>
+                            }
+                        </div>
+                    </div>
+
+                    <section class="admin-tools" aria-labelledby="account-tools-title">
+                        <div class="admin-subheading">
+                            <div>
+                                <p class="eyebrow">ACCOUNT TOOLS</p>
+                                <h3 id="account-tools-title">계정 관리</h3>
+                            </div>
+                        </div>
+                        <div class="admin-tool-grid">
+                            <div class="admin-tool-card">
+                                <label for="admin-new-password">새 비밀번호 설정</label>
+                                <div class="admin-inline-form">
+                                    <input id="admin-new-password" class="admin-input" type="password" placeholder="4자 이상" value="@NewPassword" @oninput="OnPasswordChanged" />
+                                    <button type="button" @onclick="ResetPassword">저장</button>
+                                </div>
+                            </div>
+                            <div class="admin-tool-card">
+                                <span class="admin-label">권한</span>
+                                <button type="button" disabled="@(SelectedDetails.Username == CurrentUser.Username)" @onclick="ToggleAdminRole">
+                                    @(SelectedDetails.IsAdmin ? "관리자 권한 회수" : "관리자 권한 부여")
+                                </button>
+                                @if (SelectedDetails.Username == CurrentUser.Username)
+                                {
+                                    <small class="admin-muted">현재 로그인 계정의 권한은 변경할 수 없습니다.</small>
+                                }
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="admin-tools" aria-labelledby="cheat-tools-title">
+                        <div class="admin-subheading">
+                            <div>
+                                <p class="eyebrow">TEST & CHEAT TOOLS</p>
+                                <h3 id="cheat-tools-title">테스트 도구</h3>
+                            </div>
+                            <span class="admin-warning-label">저장 데이터에 즉시 반영</span>
+                        </div>
+                        <div class="admin-tool-grid admin-cheat-grid">
+                            <div class="admin-tool-card">
+                                <label for="admin-current-score">점수 직접 설정</label>
+                                <div class="admin-number-grid">
+                                    <input id="admin-current-score" class="admin-input" type="number" min="0" placeholder="현재" value="@CurrentScoreInput" @oninput="OnCurrentScoreChanged" />
+                                    <input class="admin-input" type="number" min="0" placeholder="최고" value="@HighScoreInput" @oninput="OnHighScoreChanged" />
+                                </div>
+                                <button type="button" @onclick="SetScores">점수 적용</button>
+                            </div>
+                            <div class="admin-tool-card">
+                                <label for="admin-legendary-progress">전설 출현 진행률</label>
+                                <div class="admin-inline-form">
+                                    <input id="admin-legendary-progress" class="admin-input" type="number" min="0" max="100" value="@LegendaryProgressInput" @oninput="OnLegendaryProgressChanged" />
+                                    <button type="button" @onclick="SetLegendaryProgress">적용</button>
+                                </div>
+                            </div>
+                            <div class="admin-tool-card">
+                                <span class="admin-label">빠른 테스트 상태</span>
+                                <button type="button" @onclick="InjectTestTeam">레벨 100 테스트 팀 주입</button>
+                                <button type="button" @onclick="GrantAllPokemon">모든 포켓몬 해금</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="admin-tools admin-danger-tools" aria-labelledby="danger-tools-title">
+                        <div class="admin-subheading">
+                            <div>
+                                <p class="eyebrow">RESET / DELETE</p>
+                                <h3 id="danger-tools-title">초기화 및 삭제</h3>
+                            </div>
+                        </div>
+                        <div class="admin-tool-grid">
+                            <div class="admin-tool-card">
+                                <span class="admin-label">현재 런만 초기화</span>
+                                <small class="admin-muted">점수, 팀, 전설 진행률과 이력을 삭제합니다. 프리셋·해금은 유지됩니다.</small>
+                                <button type="button" @onclick="ResetRun">런 초기화</button>
+                            </div>
+                            <div class="admin-tool-card">
+                                <span class="admin-label">전체 진행 초기화</span>
+                                <small class="admin-muted">런·프리셋·포켓몬 해금을 모두 삭제합니다.</small>
+                                <button type="button" class="admin-danger-button" @onclick="ResetProgress">전체 진행 초기화</button>
+                            </div>
+                            <div class="admin-tool-card">
+                                <label for="admin-delete-confirm">계정 삭제 확인</label>
+                                <small class="admin-muted">삭제하려면 아래에 대상 아이디를 정확히 입력하세요.</small>
+                                <input id="admin-delete-confirm" class="admin-input" placeholder="@SelectedDetails.Username" value="@DeleteConfirmation" @oninput="OnDeleteConfirmationChanged" />
+                                <button type="button" class="admin-danger-button" disabled="@(DeleteConfirmation != SelectedDetails.Username)" @onclick="DeleteUser">계정 삭제</button>
+                            </div>
+                        </div>
+                    </section>
+                }
+            </section>
+        </div>
 
         <section class="admin-panel" aria-labelledby="debug-title">
             <div class="admin-panel-heading">
@@ -110,24 +255,208 @@
             }
         </section>
 
+        <section class="admin-panel" aria-labelledby="audit-title">
+            <div class="admin-panel-heading">
+                <div>
+                    <p class="eyebrow">AUDIT TRAIL</p>
+                    <h2 id="audit-title">최근 관리자 작업</h2>
+                </div>
+                <span class="admin-generated">최근 25건</span>
+            </div>
+            @if (Snapshot.AuditLogs.Count == 0)
+            {
+                <p class="admin-muted">기록된 관리자 작업이 없습니다.</p>
+            }
+            else
+            {
+                <div class="admin-table-wrap">
+                    <table class="admin-table admin-audit-table">
+                        <thead>
+                            <tr><th>시각</th><th>관리자</th><th>작업</th><th>대상</th><th>내용</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in Snapshot.AuditLogs)
+                            {
+                                <tr>
+                                    <td>@log.CreatedAtUtc.ToLocalTime().ToString("MM.dd HH:mm")</td>
+                                    <td>@log.AdminUsername</td>
+                                    <td>@log.Action</td>
+                                    <td>@log.TargetUsername</td>
+                                    <td>@log.Details</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(ActionMessage))
+        {
+            <p class="admin-action-message @(ActionSucceeded ? "is-success" : "is-error")" role="status" aria-live="polite">@ActionMessage</p>
+        }
+
         <button type="button" class="admin-back" @onclick="GoHome">게임으로 돌아가기</button>
     }
 </main>
 
 @code {
     private AdminDashboardSnapshot? Snapshot;
+    private AdminUserDetails? SelectedDetails;
+    private string? SelectedUsername;
+    private string UserSearch = "";
+    private string NewPassword = "";
+    private string DeleteConfirmation = "";
+    private string CurrentScoreInput = "0";
+    private string HighScoreInput = "0";
+    private string LegendaryProgressInput = "0";
+    private string ActionMessage = "";
+    private bool ActionSucceeded;
+
+    private IReadOnlyList<AdminUserSnapshot> VisibleUsers =>
+        Snapshot?.Users
+            .Where(user => string.IsNullOrWhiteSpace(UserSearch)
+                || user.Username.Contains(UserSearch.Trim(), StringComparison.OrdinalIgnoreCase))
+            .ToList()
+        ?? Array.Empty<AdminUserSnapshot>();
 
     protected override async Task OnInitializedAsync()
     {
-        if (CurrentUser.IsAdmin)
+        if (!CurrentUser.IsAdmin)
         {
-            Snapshot = await Dashboard.LoadAsync();
+            return;
+        }
+
+        await ReloadSnapshot();
+        if (Snapshot?.Users.FirstOrDefault() is { } firstUser)
+        {
+            await SelectUser(firstUser.Username);
+        }
+    }
+
+    private async Task ReloadSnapshot()
+    {
+        Snapshot = await Dashboard.LoadAsync();
+        if (SelectedUsername != null && Snapshot.Users.All(user => user.Username != SelectedUsername))
+        {
+            SelectedUsername = null;
+            SelectedDetails = null;
         }
     }
 
     private async Task Refresh()
     {
-        Snapshot = await Dashboard.LoadAsync();
+        await ReloadSnapshot();
+        if (SelectedUsername != null)
+        {
+            await SelectUser(SelectedUsername);
+        }
+    }
+
+    private async Task SelectUser(string username)
+    {
+        SelectedUsername = username;
+        SelectedDetails = await Dashboard.LoadUserDetailsAsync(username);
+        DeleteConfirmation = "";
+        if (SelectedDetails != null)
+        {
+            CurrentScoreInput = SelectedDetails.CurrentScore.ToString();
+            HighScoreInput = SelectedDetails.HighScore.ToString();
+            LegendaryProgressInput = SelectedDetails.LegendaryProgressPercent.ToString();
+        }
+    }
+
+    private async Task RunSelectedAsync(Func<string, Task<AdminActionResult>> action)
+    {
+        if (string.IsNullOrWhiteSpace(SelectedUsername))
+        {
+            SetActionMessage(false, "먼저 사용자를 선택해주세요.");
+            return;
+        }
+
+        var result = await action(SelectedUsername);
+        SetActionMessage(result.Success, result.Message);
+        if (result.Success)
+        {
+            await ReloadSnapshot();
+            if (SelectedUsername != null)
+            {
+                await SelectUser(SelectedUsername);
+            }
+        }
+    }
+
+    private async Task ResetPassword()
+    {
+        await RunSelectedAsync(username => Operations.ResetPasswordAsync(username, NewPassword));
+        if (ActionSucceeded)
+        {
+            NewPassword = "";
+        }
+    }
+
+    private Task ToggleAdminRole() =>
+        RunSelectedAsync(username => Operations.SetAdminRoleAsync(username, !(SelectedDetails?.IsAdmin ?? false)));
+
+    private Task ResetRun() => RunSelectedAsync(Operations.ResetRunAsync);
+    private Task ResetProgress() => RunSelectedAsync(Operations.ResetProgressAsync);
+    private Task GrantAllPokemon() => RunSelectedAsync(Operations.GrantAllPokemonAsync);
+    private Task InjectTestTeam() => RunSelectedAsync(Operations.InjectTestTeamAsync);
+
+    private async Task SetLegendaryProgress()
+    {
+        if (!int.TryParse(LegendaryProgressInput, out int progress))
+        {
+            SetActionMessage(false, "전설 진행률은 숫자로 입력해주세요.");
+            return;
+        }
+
+        await RunSelectedAsync(username => Operations.SetLegendaryProgressAsync(username, progress));
+    }
+
+    private async Task SetScores()
+    {
+        if (!int.TryParse(CurrentScoreInput, out int currentScore)
+            || !int.TryParse(HighScoreInput, out int highScore))
+        {
+            SetActionMessage(false, "점수는 숫자로 입력해주세요.");
+            return;
+        }
+
+        await RunSelectedAsync(username => Operations.SetScoresAsync(username, currentScore, highScore));
+    }
+
+    private async Task DeleteUser()
+    {
+        if (SelectedUsername == null || DeleteConfirmation != SelectedUsername)
+        {
+            SetActionMessage(false, "계정 삭제를 진행하려면 대상 아이디를 정확히 입력해주세요.");
+            return;
+        }
+
+        string deletedUsername = SelectedUsername;
+        var result = await Operations.DeleteUserAsync(deletedUsername);
+        SetActionMessage(result.Success, result.Message);
+        if (result.Success)
+        {
+            SelectedUsername = null;
+            SelectedDetails = null;
+            DeleteConfirmation = "";
+            await ReloadSnapshot();
+        }
+    }
+
+    private void OnUserSearchChanged(ChangeEventArgs args) => UserSearch = args.Value?.ToString() ?? "";
+    private void OnPasswordChanged(ChangeEventArgs args) => NewPassword = args.Value?.ToString() ?? "";
+    private void OnDeleteConfirmationChanged(ChangeEventArgs args) => DeleteConfirmation = args.Value?.ToString() ?? "";
+    private void OnCurrentScoreChanged(ChangeEventArgs args) => CurrentScoreInput = args.Value?.ToString() ?? "";
+    private void OnHighScoreChanged(ChangeEventArgs args) => HighScoreInput = args.Value?.ToString() ?? "";
+    private void OnLegendaryProgressChanged(ChangeEventArgs args) => LegendaryProgressInput = args.Value?.ToString() ?? "";
+
+    private void SetActionMessage(bool success, string message)
+    {
+        ActionSucceeded = success;
+        ActionMessage = message;
     }
 
     private void GoLogin() => Nav.NavigateTo("/login");

@@ -13,6 +13,8 @@ public class AppDbContext : DbContext
 
     public DbSet<UserAccount> Users => Set<UserAccount>();
 
+    public DbSet<AdminAuditLog> AdminAuditLogs => Set<AdminAuditLog>();
+
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
