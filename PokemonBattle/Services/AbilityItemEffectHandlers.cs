@@ -234,7 +234,7 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
             await context.ShowMessage($"{pokemon.Data.Name}의 달마모드로 모습이 변했다!", 900);
         }
 
-        if (pokemon.SelectedAbility == "가속")
+        if (pokemon.SelectedAbility == "가속" && pokemon.TurnsOnField > 0)
         {
             pokemon.ChangeStage("speed", 1);
             await context.ShowMessage($"{pokemon.Data.Name}의 가속으로 속도가 올랐다!", 900);

@@ -7,3 +7,4 @@
 - [Post-merge workspace setup](post-merge-workspace-setup.md) — recover catalog lockfile drift, but never force an empty Drizzle schema over Blazor EF tables.
 - [Battle environment state](battle-environment-state.md) — shared weather/terrain state requires reset and serialized tests.
 - [Battle FX contracts](battle-fx-contracts.md) — presentation keys must share the CSS/config vocabulary and normalize legacy aliases.
+- [Switch and escape rules](switch-escape-rules.md) — separate wild escape permissions, voluntary traps, and opponent-directed forced-switch immunity.

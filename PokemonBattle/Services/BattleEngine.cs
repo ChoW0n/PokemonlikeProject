@@ -41,7 +41,23 @@ public sealed class BattleEngine
             && active.Data.Type2 != PokemonType.Flying
             && !isGhostType
             && active.SelectedAbility != "부유") return false;
+        if (opponent.SelectedAbility == "자력"
+            && active.IsSteelType
+            && active.SelectedAbility != "자력") return false;
         return true;
+    }
+
+    /// <summary>
+    /// Determines whether the active Pokémon can leave a wild battle.
+    /// This is a permission check for the escape action; a regular wild
+    /// encounter is allowed when no trapping condition applies, while Run
+    /// Away explicitly bypasses those conditions.
+    /// </summary>
+    public bool CanEscape(Pokemon active, Pokemon opponent, bool isWildBattle = true)
+    {
+        if (!isWildBattle || active.IsFainted) return false;
+        if (active.SelectedAbility == "도주") return true;
+        return CanSwitch(active, opponent);
     }
 
     public double PreviewMultiplier(Move move, Pokemon target, Pokemon? attacker = null)
@@ -283,7 +299,7 @@ public sealed class BattleEngine
                 attackerIsHero, emit, result, isContinuation: true);
         }
 
-        string? executingMoveKey = attacker.ConsumePendingMove();
+        string? executingMoveKey = attacker.RampageMoveKey ?? attacker.ConsumePendingMove();
         bool isContinuation = executingMoveKey != null;
         if (executingMoveKey == null) executingMoveKey = moveKey;
 
@@ -478,7 +494,7 @@ public sealed class BattleEngine
 
         if (MoveRuleMetadata.IsProtectionMove(moveKey) && moveKey != "kings-shield")
         {
-            if (attacker.TryActivateProtection(rng))
+            if (attacker.TryActivateProtection(moveKey, rng))
             {
                 await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) {move.Name}으로 몸을 지켰다!"));
                 await emit(BattleEvent.MoveStep(
@@ -494,8 +510,8 @@ public sealed class BattleEngine
 
         if (MoveRuleMetadata.ChangesToShieldForm(moveKey))
         {
-            if (!attacker.TryActivateProtection(rng)) return;
-            await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) 킹실드로 몸을 지켰다!"));
+            if (!attacker.TryActivateProtection(moveKey, rng)) return;
+            await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) {move.Name}으로 몸을 지켰다!"));
             await emit(BattleEvent.MoveStep(
                 BattleEventPhase.Impact, attacker, defender, attackerIsHero, move, moveKey,
                 attackType, "shield", target: "self", presentationKey: presentationKey));
@@ -506,16 +522,53 @@ public sealed class BattleEngine
             && TargetsOpponent(move)
             && !MoveRuleMetadata.BypassesProtection(moveKey))
         {
-            await emit(BattleEvent.MessageLine($"{defender.Data.Name}은(는) 킹실드로 기술을 막았다!"));
+            string protectionName = defender.ActiveProtectionMoveKey != null
+                && MoveDatabase.All.TryGetValue(defender.ActiveProtectionMoveKey, out var protectionMove)
+                ? protectionMove.Name
+                : "방어 기술";
+            await emit(BattleEvent.MessageLine($"{defender.Data.Name}은(는) {protectionName}(으)로 기술을 막았다!"));
             if (makesContact)
             {
-                int before = attacker.StatStages["attack"];
-                attacker.ChangeStage("attack", -2, causedByOpponent: true);
-                if (attacker.StatStages["attack"] < before)
+                switch (MoveRuleMetadata.GetProtectionEffect(defender.ActiveProtectionMoveKey ?? "protect"))
                 {
-                    await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 공격이 크게 떨어졌다!"));
-                    string? reaction = attacker.TriggerStatDropAbility();
-                    if (reaction != null) await emit(BattleEvent.MessageLine(reaction));
+                    case ProtectionEffect.KingsShield:
+                    {
+                        int before = attacker.StatStages["attack"];
+                        attacker.ChangeStage("attack", -2, causedByOpponent: true);
+                        if (attacker.StatStages["attack"] < before)
+                        {
+                            await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 공격이 크게 떨어졌다!"));
+                            string? reaction = attacker.TriggerStatDropAbility();
+                            if (reaction != null) await emit(BattleEvent.MessageLine(reaction));
+                        }
+                        break;
+                    }
+                    case ProtectionEffect.Obstruct:
+                    {
+                        int before = attacker.StatStages["defense"];
+                        attacker.ChangeStage("defense", -2, causedByOpponent: true);
+                        if (attacker.StatStages["defense"] < before)
+                            await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 방어가 크게 떨어졌다!"));
+                        break;
+                    }
+                    case ProtectionEffect.SpikyShield:
+                    {
+                        int damage = Math.Max(1, attacker.MaxHp / 8);
+                        attacker.CurrentHp = Math.Max(0, attacker.CurrentHp - damage);
+                        if (attacker.CurrentHp == 0) attacker.MarkFainted();
+                        await emit(BattleEvent.MessageLine(
+                            $"{attacker.Data.Name}은(는) 가시방벽에 찔려 데미지를 입었다!"));
+                        break;
+                    }
+                    case ProtectionEffect.BanefulBunker:
+                        if (attacker.Status == StatusCondition.None)
+                        {
+                            attacker.ApplyAilment("poison", rng, defender);
+                            if (attacker.Status == StatusCondition.Poison)
+                                await emit(BattleEvent.MessageLine(
+                                    $"{attacker.Data.Name}은(는) 독가시방벽 때문에 독 상태가 되었다!"));
+                        }
+                        break;
                 }
             }
             await emit(BattleEvent.MoveStep(

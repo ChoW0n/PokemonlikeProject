@@ -22,10 +22,15 @@ public class Pokemon
     public bool IsAlternateForm { get; private set; }
     public bool HasConsumedBerry { get; private set; }
     public bool HasPickedUpItem { get; private set; }
+    public bool IsSteelType => Data.Type1 == PokemonType.Steel || Data.Type2 == PokemonType.Steel;
+    public bool CanBeForcedSwitched => SelectedAbility != "흡반";
     private string? ConsumedBerryName { get; set; }
     public bool LastHitWasCritical { get; private set; }
     public bool IsProtected { get; private set; }
     public int ProtectionStreak { get; private set; }
+    public string? ActiveProtectionMoveKey { get; private set; }
+    public string? RampageMoveKey { get; private set; }
+    public int RampageTurnsRemaining { get; private set; }
     public string? PendingMoveKey { get; private set; }
     public string? PendingDelayedAttackKey { get; private set; }
     public int PendingDelayedAttackTurns { get; private set; }
@@ -231,6 +236,7 @@ public class Pokemon
 
     public bool CanUseMove(string moveName)
     {
+        if (RampageMoveKey != null && RampageMoveKey != moveName) return false;
         if (!CurrentPP.TryGetValue(moveName, out var pp) || pp <= 0) return false;
         if (DisabledMoveKey == moveName) return false;
         if (ImprisonedMoveKeys.Contains(moveName)) return false;
@@ -272,6 +278,8 @@ public class Pokemon
         IsAlternateForm = false;
         IsProtected = false;
         ProtectionStreak = 0;
+        ActiveProtectionMoveKey = null;
+        ClearRampage();
         PendingMoveKey = null;
         // Future Sight/Doom Desire remain pending when their user switches out.
         // The immediate charge move below is cancelled by switching.
@@ -327,6 +335,7 @@ public class Pokemon
     {
         TurnsOnField++;
         IsProtected = false;
+        ActiveProtectionMoveKey = null;
         Flinched = false;
         WasDamagedThisTurn = false;
         if (DisabledTurnsRemaining > 0 && --DisabledTurnsRemaining == 0) DisabledMoveKey = null;
@@ -628,6 +637,7 @@ public class Pokemon
             {
                 CurrentHp = 0;
                 IsFainted = true;
+                ClearRampage();
             }
         }
     }
@@ -653,9 +663,16 @@ public class Pokemon
         return true;
     }
 
-    public void ActivateProtection() => IsProtected = true;
+    public void ActivateProtection()
+    {
+        IsProtected = true;
+        ActiveProtectionMoveKey = "protect";
+    }
 
     public bool TryActivateProtection(Random random)
+        => TryActivateProtection("protect", random);
+
+    public bool TryActivateProtection(string moveKey, Random random)
     {
         // Consecutive protection uses rapidly become unreliable. The first
         // attempt always succeeds; the following one succeeds 1/2, then 1/4.
@@ -663,16 +680,38 @@ public class Pokemon
         if (success)
         {
             ProtectionStreak++;
-            IsProtected = true;
+            ActiveProtectionMoveKey = moveKey;
+            IsProtected = moveKey != "endure";
         }
         else
         {
             ProtectionStreak = 0;
+            ActiveProtectionMoveKey = null;
+            IsProtected = false;
         }
         return success;
     }
 
     public void ResetProtectionStreak() => ProtectionStreak = 0;
+
+    public void StartRampage(string moveKey, int totalTurns)
+    {
+        RampageMoveKey = moveKey;
+        RampageTurnsRemaining = Math.Max(1, totalTurns - 1);
+    }
+
+    public bool AdvanceRampageTurn()
+    {
+        if (RampageMoveKey == null) return false;
+        RampageTurnsRemaining = Math.Max(0, RampageTurnsRemaining - 1);
+        return RampageTurnsRemaining == 0;
+    }
+
+    public void ClearRampage()
+    {
+        RampageMoveKey = null;
+        RampageTurnsRemaining = 0;
+    }
 
     public void SetPendingMove(string moveKey, bool semiInvulnerable = false)
     {
@@ -778,6 +817,7 @@ public class Pokemon
     {
         CurrentHp = 0;
         IsFainted = true;
+        ClearRampage();
     }
 
     public void ClearStatStages()

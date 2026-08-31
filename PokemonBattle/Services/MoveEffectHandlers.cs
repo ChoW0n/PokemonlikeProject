@@ -13,6 +13,31 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
 
     public async Task AfterDamageResultAsync(BattleEffectContext context)
     {
+        if (MoveRuleMetadata.IsRampageMove(context.MoveKey)
+            && context.TotalDamage > 0
+            && !context.Attacker.IsFainted)
+        {
+            bool ended = false;
+            if (context.Attacker.RampageMoveKey == null)
+            {
+                context.Attacker.StartRampage(context.MoveKey, context.Random.Next(2, 4));
+            }
+            else
+            {
+                ended = context.Attacker.AdvanceRampageTurn();
+            }
+
+            if (ended)
+            {
+                context.Attacker.ClearRampage();
+                if (!context.Attacker.IsConfused && !context.Attacker.IsImmuneToConfusion())
+                {
+                    context.Attacker.ApplyConfusion(context.Random);
+                    await context.ShowMessage($"{context.Attacker.Data.Name}은(는) 난동이 끝나 혼란에 빠졌다!");
+                }
+            }
+        }
+
         if (context.Move.DrainPercent > 0 && !context.Attacker.IsFainted)
         {
             int heal = Math.Max(1, context.TotalDamage * context.Move.DrainPercent / 100);
@@ -401,13 +426,19 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         if (key is "brick-break" && !defender.IsFainted)
             await context.ShowMessage($"{defender.Data.Name}의 장벽이 부서졌다!");
 
-        if (MoveRuleMetadata.IsForcedSwitchMove(key) && !attacker.IsFainted)
+        bool switchesAttacker = key is "u-turn" or "volt-switch" or "parting-shot"
+            or "baton-pass" or "teleport";
+        if (MoveRuleMetadata.IsForcedSwitchMove(key) && !attacker.IsFainted
+            && (switchesAttacker || defender.CanBeForcedSwitched))
         {
             context.RequestSwitch = true;
-            context.SwitchPokemon = key is "u-turn" or "volt-switch" or "parting-shot"
-                or "baton-pass" or "teleport" ? attacker : defender;
-            context.SwitchReason = key is "u-turn" or "volt-switch" or "parting-shot"
-                or "baton-pass" or "teleport" ? "교대 기술" : "강제 교체";
+            context.SwitchPokemon = switchesAttacker ? attacker : defender;
+            context.SwitchReason = switchesAttacker ? "교대 기술" : "강제 교체";
+        }
+        else if (MoveRuleMetadata.IsForcedSwitchMove(key) && !attacker.IsFainted
+            && !switchesAttacker && !defender.CanBeForcedSwitched)
+        {
+            await context.ShowMessage($"{defender.Data.Name}은(는) 흡반으로 강제 교체를 막았다!");
         }
     }
 

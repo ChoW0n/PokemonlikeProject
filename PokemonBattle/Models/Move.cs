@@ -45,6 +45,7 @@ public enum MoveRuleKind
     StandardDamage,
     Status,
     Protect,
+    Rampage,
     Charge,
     DelayedDamage,
     Recharge,
@@ -61,6 +62,16 @@ public enum MoveRuleKind
     SpecialDefenseCalculation,
     DualTypeDamage,
     HazardRemoval
+}
+
+public enum ProtectionEffect
+{
+    Block,
+    Endure,
+    KingsShield,
+    BanefulBunker,
+    SpikyShield,
+    Obstruct
 }
 
 public sealed record MoveRule(MoveRuleKind Kind, int Duration = 0, double PowerMultiplier = 1.0);
@@ -122,6 +133,11 @@ public static class MoveRuleMetadata
         "spiky-shield", "obstruct", "silk-guard"
     };
 
+    private static readonly HashSet<string> RampageMoves = new()
+    {
+        "outrage", "petal-dance", "thrash"
+    };
+
     private static readonly HashSet<string> BindingMoves = new()
     {
         "bind", "clamp", "fire-spin", "magma-storm", "sand-tomb", "wrap",
@@ -160,6 +176,7 @@ public static class MoveRuleMetadata
     public static MoveRule GetRule(string moveKey, Move move)
     {
         if (ProtectMoves.Contains(moveKey.Trim())) return new(MoveRuleKind.Protect);
+        if (RampageMoves.Contains(moveKey)) return new(MoveRuleKind.Rampage);
         if (ChargeMoves.Contains(moveKey)) return new(MoveRuleKind.Charge);
         if (DelayedDamageMoves.Contains(moveKey)) return new(MoveRuleKind.DelayedDamage, 2);
         if (RechargeMoves.Contains(moveKey)) return new(MoveRuleKind.Recharge);
@@ -182,9 +199,19 @@ public static class MoveRuleMetadata
     }
 
     public static bool IsChargeMove(string moveKey) => ChargeMoves.Contains(moveKey);
+    public static bool IsRampageMove(string moveKey) => RampageMoves.Contains(moveKey);
     public static bool IsDelayedDamageMove(string moveKey) => DelayedDamageMoves.Contains(moveKey);
     public static bool RequiresRecharge(string moveKey) => RechargeMoves.Contains(moveKey);
     public static bool IsProtectionMove(string moveKey) => ProtectMoves.Contains(moveKey.Trim());
+    public static ProtectionEffect GetProtectionEffect(string moveKey) => moveKey switch
+    {
+        "endure" => ProtectionEffect.Endure,
+        "kings-shield" => ProtectionEffect.KingsShield,
+        "baneful-bunker" => ProtectionEffect.BanefulBunker,
+        "spiky-shield" => ProtectionEffect.SpikyShield,
+        "obstruct" => ProtectionEffect.Obstruct,
+        _ => ProtectionEffect.Block
+    };
     public static bool IsBindingMove(string moveKey) => BindingMoves.Contains(moveKey);
     public static bool IsForcedSwitchMove(string moveKey) => ForcedSwitchMoves.Contains(moveKey);
 
