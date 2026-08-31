@@ -55,6 +55,24 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
         if (attacker.SelectedAbility == "모래의힘" && BattleWeather.Current == "모래바람"
             && (attackType is PokemonType.Rock or PokemonType.Ground or PokemonType.Steel)) context.Power *= 1.3;
 
+        if (BattleField.Current == BattleField.Grassy)
+        {
+            if (attackType == PokemonType.Grass) context.Power *= 1.3;
+            if (MoveRuleMetadata.IsGroundShakingMove(context.MoveKey)) context.Power *= 0.5;
+        }
+        else if (BattleField.Current == BattleField.Electric && attackType == PokemonType.Electric)
+        {
+            context.Power *= 1.3;
+        }
+        else if (BattleField.Current == BattleField.Psychic && attackType == PokemonType.Psychic)
+        {
+            context.Power *= 1.3;
+        }
+        else if (BattleField.Current == BattleField.Misty && attackType == PokemonType.Dragon)
+        {
+            context.Power *= 0.5;
+        }
+
         if (BattleWeather.Current == "쾌청")
         {
             if (attackType == PokemonType.Fire) context.Power *= 1.5;
@@ -237,6 +255,16 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
             if (pokemon.CurrentHp > before)
             {
                 await context.ShowMessage($"{pokemon.Data.Name}은(는) {pokemon.SelectedAbility}으로 HP를 회복했다!", 900);
+            }
+        }
+
+        if (!pokemon.IsFainted && BattleField.Current == BattleField.Grassy)
+        {
+            int before = pokemon.CurrentHp;
+            pokemon.CurrentHp = Math.Min(pokemon.MaxHp, pokemon.CurrentHp + Math.Max(1, pokemon.MaxHp / 16));
+            if (pokemon.CurrentHp > before)
+            {
+                await context.ShowMessage($"{pokemon.Data.Name}은(는) 그래스필드로 HP를 회복했다!", 900);
             }
         }
 

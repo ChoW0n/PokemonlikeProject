@@ -119,7 +119,7 @@ public class Pokemon
         get
         {
             double value = Def * StageMult("defense");
-            if (SelectedAbility == "풀모피" && BattleWeather.Current == "그래스필드") value *= 2.0;
+            if (SelectedAbility == "풀모피" && BattleField.Current == BattleField.Grassy) value *= 2.0;
             if (SelectedAbility == "이상한비늘" && Status != StatusCondition.None) value *= 1.5;
             return (int)value;
         }
@@ -259,6 +259,13 @@ public class Pokemon
 
     public bool IsImmuneToAilment(string ailmentName)
     {
+        if (BattleField.Current is BattleField.Electric or BattleField.Misty)
+        {
+            if (ailmentName is "sleep" or "poison" or "paralysis" or "burn" or "freeze")
+            {
+                return true;
+            }
+        }
         if (ailmentName == "sleep" && (SelectedAbility is "불면" or "의기양양")) return true;
         if (ailmentName == "poison" && SelectedAbility == "면역") return true;
         if (ailmentName == "paralysis" && SelectedAbility == "유연") return true;
@@ -267,7 +274,8 @@ public class Pokemon
         if (BattleWeather.Current == "쾌청" && SelectedAbility == "리프가드") return true;
         return false;
     }
-    public bool IsImmuneToConfusion() => SelectedAbility == "마이페이스";
+    public bool IsImmuneToConfusion() =>
+        SelectedAbility == "마이페이스" || BattleField.Current == BattleField.Misty;
 
     public void ApplyAilment(string ailmentName)
     {
@@ -580,7 +588,9 @@ public class Pokemon
         if (SelectedAbility == "노말스킨") return PokemonType.Normal;
         if (move.Type == PokemonType.Normal && SelectedAbility == "프리즈스킨") return PokemonType.Ice;
         if (move.Type == PokemonType.Normal && SelectedAbility == "페어리스킨") return PokemonType.Fairy;
-        return move.Type;
+        return move.Name == "웨더볼"
+            ? MoveRuleMetadata.ResolveMoveType("weather-ball", move)
+            : move.Type;
     }
 
     public void DisableMove(string moveName)

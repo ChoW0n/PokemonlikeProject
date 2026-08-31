@@ -9,7 +9,38 @@ public static class BattleWeather
     public const string Sand = "모래바람";
     public const string Hail = "싸라기눈";
 
-    public static string Current { get; set; } = Clear;
+    private static string current = Clear;
+    public static string Current
+    {
+        get => current;
+        set
+        {
+            current = value;
+            TurnsRemaining = 0;
+        }
+    }
 
-    public static void Reset() => Current = Clear;
+    public static int TurnsRemaining { get; private set; }
+
+    public static void Reset()
+    {
+        current = Clear;
+        TurnsRemaining = 0;
+    }
+
+    public static void Set(string weather, int turns = 0)
+    {
+        current = weather;
+        TurnsRemaining = Math.Max(0, turns);
+    }
+
+    public static bool AdvanceTurn()
+    {
+        if (TurnsRemaining <= 0) return false;
+        TurnsRemaining--;
+        if (TurnsRemaining > 0) return false;
+
+        current = Clear;
+        return true;
+    }
 }

@@ -79,6 +79,7 @@ public sealed class BattlePowerContext
     public Pokemon Attacker { get; }
     public Pokemon Defender { get; }
     public Move Move { get; }
+    public string MoveKey { get; }
     public PokemonType AttackType { get; }
     public bool MakesContact { get; }
     public double Power { get; set; }
@@ -89,11 +90,13 @@ public sealed class BattlePowerContext
         Move move,
         PokemonType attackType,
         bool makesContact,
-        double power)
+        double power,
+        string moveKey = "")
     {
         Attacker = attacker;
         Defender = defender;
         Move = move;
+        MoveKey = moveKey;
         AttackType = attackType;
         MakesContact = makesContact;
         Power = power;

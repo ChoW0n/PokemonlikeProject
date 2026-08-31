@@ -65,9 +65,23 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
             || (!move.IsStatus && defender.SelectedAbility == "인분");
         int chanceMultiplier = attacker.SelectedAbility == "하늘의은총" ? 2 : 1;
 
+        string? weather = MoveRuleMetadata.WeatherForMove(context.MoveKey);
+        if (weather != null)
+        {
+            BattleWeather.Set(weather, turns: 5);
+            await context.ShowMessage($"{attacker.Data.Name}의 기술로 날씨가 {weather}(으)로 바뀌었다!");
+        }
+
+        string? field = MoveRuleMetadata.FieldForMove(context.MoveKey);
+        if (field != null)
+        {
+            BattleField.Set(field, turns: 5);
+            await context.ShowMessage($"{attacker.Data.Name}의 기술로 필드가 {field}(으)로 바뀌었다!");
+        }
+
         if (move.IsStatus && move.HealingPercent > 0)
         {
-            int heal = attacker.MaxHp * move.HealingPercent / 100;
+            int heal = MoveRuleMetadata.RecoveryAmount(context.MoveKey, move, attacker.MaxHp);
             attacker.CurrentHp = Math.Min(attacker.MaxHp, attacker.CurrentHp + heal);
             await context.ShowMessage($"{attacker.Data.Name}은(는) HP를 회복했다!");
         }

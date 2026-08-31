@@ -500,5 +500,13 @@ public static class MoveDatabase
         All["hyperspace-hole"] = new Move("이차원홀", 80, PokemonType.Psychic, 5, 100, true, 0, false, true, "none", 0, 0, new List<StatChangeEntry>(), 0, "다른차원홀로 갑자기 상대 바로 옆에 나타나 공격한다. 방어나 판별도 무시할 수 있다.", 0, 0, 1, 1);
         All["steam-eruption"] = new Move("스팀버스트", 110, PokemonType.Water, 5, 95, false, 0, false, true, "burn", 30, 0, new List<StatChangeEntry>(), 0, "상대에게 굉장히 뜨거운 증기를 뿜는다. 상대는 화상을 입기도 한다.", 0, 0, 1, 1);
         All["kings-shield"] = new Move("킹실드", 0, PokemonType.Steel, 10, 100, true, 4, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "공격을 막고 접촉한 상대의 공격을 크게 떨어뜨린다.", 0, 0, 1, 1);
+        All["sunny-day"] = new Move("쾌청", 0, PokemonType.Fire, 5, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 햇살이 강해진다.", 0, 0, 1, 1);
+        All["rain-dance"] = new Move("비바라기", 0, PokemonType.Water, 5, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 비가 내린다.", 0, 0, 1, 1);
+        All["sandstorm"] = new Move("모래바람", 0, PokemonType.Rock, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 모래바람이 분다.", 0, 0, 1, 1);
+        All["hail"] = new Move("싸라기눈", 0, PokemonType.Ice, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 싸라기눈이 내린다.", 0, 0, 1, 1);
+        All["grassy-terrain"] = new Move("그래스필드", 0, PokemonType.Grass, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 땅이 초록빛으로 물든다.", 0, 0, 1, 1);
+        All["electric-terrain"] = new Move("일렉트릭필드", 0, PokemonType.Electric, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 땅에 전기가 흐른다.", 0, 0, 1, 1);
+        All["psychic-terrain"] = new Move("사이코필드", 0, PokemonType.Psychic, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 신비한 힘이 땅을 감싼다.", 0, 0, 1, 1);
+        All["misty-terrain"] = new Move("미스트필드", 0, PokemonType.Fairy, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 안개가 땅을 감싼다.", 0, 0, 1, 1);
     }
 }

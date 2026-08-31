@@ -12,7 +12,38 @@ public static class BattleField
     public const string Psychic = "사이코필드";
     public const string Misty = "미스트필드";
 
-    public static string Current { get; set; } = None;
+    private static string current = None;
+    public static string Current
+    {
+        get => current;
+        set
+        {
+            current = value;
+            TurnsRemaining = 0;
+        }
+    }
 
-    public static void Reset() => Current = None;
+    public static int TurnsRemaining { get; private set; }
+
+    public static void Reset()
+    {
+        current = None;
+        TurnsRemaining = 0;
+    }
+
+    public static void Set(string field, int turns = 0)
+    {
+        current = field;
+        TurnsRemaining = Math.Max(0, turns);
+    }
+
+    public static bool AdvanceTurn()
+    {
+        if (TurnsRemaining <= 0) return false;
+        TurnsRemaining--;
+        if (TurnsRemaining > 0) return false;
+
+        current = None;
+        return true;
+    }
 }
