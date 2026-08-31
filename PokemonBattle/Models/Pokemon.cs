@@ -21,6 +21,8 @@ public class Pokemon
     public int TurnsOnField { get; private set; }
     public bool IsAlternateForm { get; private set; }
     public bool HasConsumedBerry { get; private set; }
+    public bool HasPickedUpItem { get; private set; }
+    private string? ConsumedBerryName { get; set; }
     public bool LastHitWasCritical { get; private set; }
     public bool IsProtected { get; private set; }
     public int ProtectionStreak { get; private set; }
@@ -796,22 +798,41 @@ public class Pokemon
     public static bool IsBerry(string itemName) =>
         itemName is "오랭열매" or "자뭉열매" or "무화열매" or "리샘열매";
 
-    public bool TryConsumeBerry(out string? message)
+    public bool IsReadyToConsumeBerry()
     {
-        message = null;
-        if (EmbargoTurnsRemaining > 0 || !IsBerry(HeldItem)) return false;
+        if (IsFainted || EmbargoTurnsRemaining > 0 || !IsBerry(HeldItem)) return false;
 
-        bool shouldEat = HeldItem switch
+        return HeldItem switch
         {
             "리샘열매" => Status != StatusCondition.None,
             "무화열매" => CurrentHp <= MaxHp / (SelectedAbility == "먹보" ? 2 : 4),
             _ => CurrentHp <= MaxHp / 2
         };
-        if (!shouldEat) return false;
+    }
+
+    public bool IsBerryConsumptionBlockedBy(Pokemon? opponent) =>
+        IsReadyToConsumeBerry()
+        && opponent != null
+        && !opponent.IsFainted
+        && opponent.SelectedAbility == "긴장감";
+
+    public bool IsBerryEatingBlockedBy(Pokemon? opponent) =>
+        opponent != null
+        && !opponent.IsFainted
+        && opponent.SelectedAbility == "긴장감";
+
+    public bool TryConsumeBerry(out string? message)
+        => TryConsumeBerry(null, out message);
+
+    public bool TryConsumeBerry(Pokemon? opponent, out string? message)
+    {
+        message = null;
+        if (!IsReadyToConsumeBerry() || IsBerryConsumptionBlockedBy(opponent)) return false;
 
         string berry = HeldItem;
         HeldItem = "없음";
         HasConsumedBerry = true;
+        ConsumedBerryName = berry;
         ApplyBerryEffect(berry);
         message = $"{Data.Name}은(는) {berry}을(를) 먹었다!";
         return true;
@@ -831,6 +852,7 @@ public class Pokemon
     public void ApplyBerryEffect(string berry)
     {
         HasConsumedBerry = true;
+        ConsumedBerryName = berry;
         if (berry == "오랭열매")
         {
             CurrentHp = Math.Min(MaxHp, CurrentHp + 10);
@@ -847,6 +869,48 @@ public class Pokemon
         {
             ClearPrimaryStatus();
         }
+    }
+
+    public bool TryHarvest(Random random, Pokemon? opponent, out string? message)
+    {
+        message = null;
+        if (SelectedAbility != "수확"
+            || IsFainted
+            || HeldItem != "없음"
+            || !HasConsumedBerry
+            || string.IsNullOrEmpty(ConsumedBerryName))
+        {
+            return false;
+        }
+
+        bool sunnyHarvest = !BattleWeather.AreEffectsSuppressed(this, opponent)
+            && BattleWeather.Current == "쾌청";
+        if (!sunnyHarvest && random.Next(100) >= 50) return false;
+
+        HeldItem = ConsumedBerryName;
+        message = $"{Data.Name}의 수확으로 {HeldItem}이(가) 되돌아왔다!";
+        return true;
+    }
+
+    public bool TryPickUp(Random random, out string? message)
+    {
+        message = null;
+        if (SelectedAbility != "픽업" || IsFainted || HeldItem != "없음") return false;
+
+        // Pickup resolves once after a battle. A resolved attempt is represented by
+        // HasPickedUpItem so repeated lifecycle calls cannot grant duplicate items.
+        if (HasPickedUpItem) return false;
+        HasPickedUpItem = true;
+        if (random.Next(100) >= 10) return false;
+
+        var availableItems = ItemDatabase.GeneralItems
+            .Where(item => item.Name != "없음")
+            .ToArray();
+        if (availableItems.Length == 0) return false;
+
+        HeldItem = availableItems[random.Next(availableItems.Length)].Name;
+        message = $"{Data.Name}의 픽업으로 {HeldItem}을(를) 주웠다!";
+        return true;
     }
 
     //철가시: 물리 접촉기로 나를 때린 공격자가 자기 최대HP의 1/8만큼 반사 데미지를 입음
