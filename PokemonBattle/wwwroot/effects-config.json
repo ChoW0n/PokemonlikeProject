@@ -1,7 +1,23 @@
 {
+  "impact": { "windupMs": 95, "mainMs": 260, "tailMs": 90, "shakeMs": 260, "flashMs": 90, "hitstopMs": 55 },
+  "projectile": { "windupMs": 150, "mainMs": 300, "tailMs": 90, "shakeMs": 180, "flashMs": 90, "hitstopMs": 55 },
+  "beam": { "windupMs": 180, "mainMs": 390, "tailMs": 120, "shakeMs": 240, "flashMs": 130, "hitstopMs": 65 },
+  "dash": { "windupMs": 75, "mainMs": 210, "tailMs": 80, "shakeMs": 180, "flashMs": 80, "hitstopMs": 45 },
+  "slash": { "windupMs": 90, "mainMs": 300, "tailMs": 100, "shakeMs": 250, "flashMs": 100, "hitstopMs": 60 },
+  "multi": { "windupMs": 80, "mainMs": 360, "tailMs": 100, "shakeMs": 230, "flashMs": 90, "hitstopMs": 45 },
+  "wave": { "windupMs": 120, "mainMs": 350, "tailMs": 120, "shakeMs": 220, "flashMs": 90, "hitstopMs": 50 },
+  "quake": { "windupMs": 100, "mainMs": 330, "tailMs": 100, "shakeMs": 300, "flashMs": 120, "hitstopMs": 65 },
+  "orb": { "windupMs": 140, "mainMs": 340, "tailMs": 110, "shakeMs": 220, "flashMs": 100, "hitstopMs": 55 },
+  "burst": { "windupMs": 160, "mainMs": 380, "tailMs": 130, "shakeMs": 260, "flashMs": 150, "hitstopMs": 70 },
+  "heal": { "windupMs": 110, "mainMs": 380, "tailMs": 150, "shakeMs": 0, "flashMs": 0, "hitstopMs": 0 },
+  "status": { "windupMs": 105, "mainMs": 360, "tailMs": 140, "shakeMs": 0, "flashMs": 0, "hitstopMs": 0 },
+  "shield": { "windupMs": 80, "mainMs": 300, "tailMs": 120, "shakeMs": 0, "flashMs": 0, "hitstopMs": 0 },
+  "charge": { "windupMs": 440, "mainMs": 310, "tailMs": 140, "shakeMs": 250, "flashMs": 120, "hitstopMs": 65 },
+  "delayed": { "windupMs": 220, "mainMs": 300, "tailMs": 120, "shakeMs": 220, "flashMs": 100, "hitstopMs": 60 },
+  "recoil": { "windupMs": 140, "mainMs": 360, "tailMs": 140, "shakeMs": 280, "flashMs": 140, "hitstopMs": 70 },
+  "miss": { "windupMs": 80, "mainMs": 180, "tailMs": 80, "shakeMs": 0, "flashMs": 0, "hitstopMs": 0 },
+  "immune": { "windupMs": 80, "mainMs": 220, "tailMs": 90, "shakeMs": 0, "flashMs": 0, "hitstopMs": 0 },
   "pierce": { "windupMs": 150, "mainMs": 320, "tailMs": 100, "shakeMs": 200, "flashMs": 100, "hitstopMs": 60 },
-  "burst": { "windupMs": 180, "mainMs": 380, "tailMs": 140, "shakeMs": 260, "flashMs": 180, "hitstopMs": 70 },
-  "impact": { "windupMs": 100, "mainMs": 360, "tailMs": 160, "shakeMs": 320, "flashMs": 120, "hitstopMs": 80 },
-  "multi": { "windupMs": 100, "mainMs": 420, "tailMs": 140, "shakeMs": 240, "flashMs": 100, "hitstopMs": 50 },
-  "sparkle": { "windupMs": 100, "mainMs": 420, "tailMs": 160, "shakeMs": 0, "flashMs": 0, "hitstopMs": 0 }
+  "sparkle": { "windupMs": 100, "mainMs": 420, "tailMs": 160, "shakeMs": 0, "flashMs": 0, "hitstopMs": 0
+  }
 }

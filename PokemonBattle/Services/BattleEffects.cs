@@ -2,16 +2,71 @@ using PokemonBattle.Models;
 
 namespace PokemonBattle.Services;
 
+public enum BattleEventPhase
+{
+    Message,
+    Announce,
+    Windup,
+    Impact,
+    Recovery,
+    Status,
+    TurnEnd,
+    Switch,
+    Faint
+}
+
 public sealed record BattleEvent(
     string? Message = null,
     int BaseDelayMs = 1400,
     string? EffectKind = null,
     bool AttackerIsHero = false,
     PokemonType? EffectType = null,
-    string? MoveName = null)
+    string? MoveName = null,
+    BattleEventPhase Phase = BattleEventPhase.Message,
+    string? MoveKey = null,
+    string? AttackerActorId = null,
+    string? DefenderActorId = null,
+    string? AttackerSpecies = null,
+    string? DefenderSpecies = null,
+    string? AttackerForm = null,
+    string? DefenderForm = null,
+    string? Target = null,
+    string? MoveCategory = null,
+    string? PresentationKey = null,
+    int HitIndex = 0,
+    int HitCount = 0,
+    int Damage = 0,
+    int HpBefore = 0,
+    int HpAfter = 0,
+    bool IsCritical = false,
+    double Effectiveness = 1.0,
+    string? StatusResult = null,
+    string? AccessibleMessage = null)
 {
     public static BattleEvent MessageLine(string message, int baseDelayMs = 1400) =>
         new(Message: message, BaseDelayMs: baseDelayMs);
+
+    public static BattleEvent TurnEnd(string message, int baseDelayMs = 900) =>
+        new(Message: message, BaseDelayMs: baseDelayMs, Phase: BattleEventPhase.TurnEnd);
+
+    public static BattleEvent ActorStep(
+        BattleEventPhase phase,
+        Pokemon actor,
+        bool actorIsHero,
+        string? message = null) =>
+        new(
+            Message: message,
+            BaseDelayMs: phase == BattleEventPhase.Faint ? 850 : 650,
+            EffectKind: phase == BattleEventPhase.Faint ? "faint" : "switch",
+            AttackerIsHero: actorIsHero,
+            EffectType: actor.Data.Type1,
+            MoveName: actor.Data.Name,
+            Phase: phase,
+            AttackerActorId: actor.ActorId,
+            AttackerSpecies: actor.Data.EnglishName,
+            AttackerForm: actor.FormKey,
+            Target: "self",
+            AccessibleMessage: message);
 
     public static BattleEvent Effect(
         string kind,
@@ -22,7 +77,56 @@ public sealed record BattleEvent(
             EffectKind: kind,
             AttackerIsHero: attackerIsHero,
             EffectType: type,
-            MoveName: moveName);
+            MoveName: moveName,
+            Phase: BattleEventPhase.Impact);
+
+    public static BattleEvent MoveStep(
+        BattleEventPhase phase,
+        Pokemon attacker,
+        Pokemon defender,
+        bool attackerIsHero,
+        Move move,
+        string moveKey,
+        PokemonType attackType,
+        string effectKind,
+        string? message = null,
+        string? target = "opponent",
+        string? presentationKey = null,
+        int hitIndex = 0,
+        int hitCount = 0,
+        int damage = 0,
+        int hpBefore = 0,
+        int hpAfter = 0,
+        bool isCritical = false,
+        double effectiveness = 1.0,
+        string? statusResult = null) =>
+        new(
+            Message: message,
+            BaseDelayMs: phase == BattleEventPhase.Announce ? 1000 : phase == BattleEventPhase.Recovery ? 260 : 700,
+            EffectKind: effectKind,
+            AttackerIsHero: attackerIsHero,
+            EffectType: attackType,
+            MoveName: move.Name,
+            Phase: phase,
+            MoveKey: moveKey,
+            AttackerActorId: attacker.ActorId,
+            DefenderActorId: defender.ActorId,
+            AttackerSpecies: attacker.Data.EnglishName,
+            DefenderSpecies: defender.Data.EnglishName,
+            AttackerForm: attacker.FormKey,
+            DefenderForm: defender.FormKey,
+            Target: target,
+            MoveCategory: move.IsStatus ? "status" : move.IsSpecial ? "special" : "physical",
+            PresentationKey: presentationKey ?? moveKey,
+            HitIndex: hitIndex,
+            HitCount: hitCount,
+            Damage: damage,
+            HpBefore: hpBefore,
+            HpAfter: hpAfter,
+            IsCritical: isCritical,
+            Effectiveness: effectiveness,
+            StatusResult: statusResult,
+            AccessibleMessage: message);
 }
 
 public sealed class BattleTurnResult

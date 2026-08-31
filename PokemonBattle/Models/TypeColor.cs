@@ -14,19 +14,20 @@ public static class TypeColors
     };
 
     public static string GetHex(PokemonType t) => Map[t];
-    //속성군에 따라 5종 이펙트 카테고리 중 하나를 배정 (변화기는 항상 sparkle)
+    //기술 키별 카탈로그가 없는 경우에도 타입/카테고리만으로 안전한 기본 연출을 선택한다.
     public static string GetEffectKind(PokemonType type, bool isStatus)
     {
-        if (isStatus) return "sparkle";
+        if (isStatus) return "status";
 
         return type switch
         {
-            PokemonType.Water or PokemonType.Ice or PokemonType.Dragon or PokemonType.Steel => "pierce",
-            PokemonType.Fire or PokemonType.Electric => "burst",
-            PokemonType.Ground or PokemonType.Rock or PokemonType.Fighting or PokemonType.Normal => "impact",
-            PokemonType.Grass or PokemonType.Bug or PokemonType.Poison or PokemonType.Flying => "multi",
-            PokemonType.Psychic or PokemonType.Ghost or PokemonType.Fairy or PokemonType.Dark => "sparkle",
-            _ => "burst"
+            PokemonType.Water or PokemonType.Ice or PokemonType.Dragon => "projectile",
+            PokemonType.Steel or PokemonType.Electric or PokemonType.Psychic => "beam",
+            PokemonType.Fire or PokemonType.Ghost or PokemonType.Dark => "burst",
+            PokemonType.Fighting or PokemonType.Normal or PokemonType.Flying => "slash",
+            PokemonType.Ground or PokemonType.Rock => "impact",
+            PokemonType.Grass or PokemonType.Bug or PokemonType.Poison or PokemonType.Fairy => "wave",
+            _ => "impact"
         };
     }
 

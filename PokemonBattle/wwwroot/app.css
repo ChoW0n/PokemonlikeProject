@@ -128,16 +128,30 @@ h1 {
 @keyframes lunge-right { 0% { transform: translateX(0); } 50% { transform: translateX(26px) scale(1.05); } 100% { transform: translateX(0); } }
 @keyframes lunge-left { 0% { transform: translateX(0); } 50% { transform: translateX(-26px) scale(1.05); } 100% { transform: translateX(0); } }
 @keyframes shake-x { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+@keyframes switch-slide { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0.1; transform: scale(0.76) translateY(8px); } }
 
 .fighter-sprite.lunge-right { animation: lunge-right var(--lunge-duration, 220ms) ease-out; }
 .fighter-sprite.lunge-left { animation: lunge-left var(--lunge-duration, 220ms) ease-out; }
 .fighter-sprite.is-shaking { animation: shake-x var(--shake-duration, 220ms) ease-in-out; }
+.fighter-sprite.pose-attack { filter: drop-shadow(0 0 14px rgba(255, 204, 51, 0.55)); }
+.fighter-sprite.pose-hit { filter: brightness(1.8) drop-shadow(0 0 12px var(--fx-color, #fff)); }
+.fighter-sprite.is-fainted { opacity: 0.35; filter: grayscale(1) drop-shadow(0 6px 8px rgba(0,0,0,0.3)); }
+.fighter-sprite.is-switching { animation: switch-slide 260ms ease-in forwards; }
+
+.battle-fx-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: inherit;
+}
 
 .move-cast-banner {
-    position: fixed;
+    position: absolute;
     top: 42%;
     left: 50%;
-    z-index: 9997;
+    z-index: 30;
     display: flex;
     align-items: baseline;
     gap: 10px;
@@ -182,7 +196,7 @@ h1 {
 .fx-dynamic {
     position: absolute;
     pointer-events: none;
-    z-index: 9999;
+    z-index: 31;
     opacity: 0;
 }
 .fx-dynamic.is-active { opacity: 1; }
@@ -198,6 +212,22 @@ h1 {
     opacity: 0;
 }
 .fx-beam.is-active .fx-beam-trail { animation: beam-grow var(--fx-duration) ease-out forwards; }
+.fx-projectile-core {
+    position: absolute;
+    right: -8px;
+    top: 50%;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px 5px var(--fx-color);
+    transform: translateY(-50%);
+}
+.fx-projectile { width: var(--fx-distance); }
+.fx-projectile .fx-beam-trail,
+.fx-dash .fx-beam-trail { animation: beam-grow var(--fx-duration) ease-out forwards; }
+.fx-dash { filter: blur(1px) drop-shadow(0 0 10px var(--fx-color)); }
+.fx-dash .fx-projectile-core { width: 30px; height: 30px; }
 @keyframes beam-grow {
     0% { opacity: 0; transform: scaleX(0); }
     20% { opacity: 1; }
@@ -205,7 +235,7 @@ h1 {
     100% { opacity: 0; transform: scaleX(1); }
 }
 
-.fx-slash { width: 100px; height: 100px; transform: translate(-50%, -50%); }
+.fx-slash, .fx-multi { width: 120px; height: 120px; transform: translate(-50%, -50%); }
 .slash-line {
     position: absolute; top: 50%; left: 50%;
     width: 100px; height: 6px;
@@ -214,8 +244,12 @@ h1 {
     filter: drop-shadow(0 0 5px var(--fx-color));
     opacity: 0;
 }
+.fx-slash.is-active .slash-3,
+.fx-multi.is-active .slash-3 { animation: slash-hit-1 calc(var(--fx-duration) * 0.55) ease-out calc(var(--fx-duration) * 0.18) forwards; }
 .fx-slash.is-active .slash-1 { animation: slash-hit-1 calc(var(--fx-duration) * 0.55) ease-out 0ms forwards; }
 .fx-slash.is-active .slash-2 { animation: slash-hit-2 calc(var(--fx-duration) * 0.55) ease-out calc(var(--fx-duration) * 0.35) forwards; }
+.fx-multi.is-active .slash-1 { animation: slash-hit-1 calc(var(--fx-duration) * 0.42) ease-out 0ms forwards; }
+.fx-multi.is-active .slash-2 { animation: slash-hit-2 calc(var(--fx-duration) * 0.42) ease-out calc(var(--fx-duration) * 0.2) forwards; }
 @keyframes slash-hit-1 {
     0% { opacity: 0; transform: translate(-50%,-50%) scale(0.6) rotate(35deg); }
     30% { opacity: 1; transform: translate(-50%,-50%) scale(1.1) rotate(35deg); }
@@ -257,6 +291,120 @@ h1 {
 }
 .fx-sparkle.is-active .ring-1 { animation: ring-expand var(--fx-duration) ease-out 0ms forwards; }
 .fx-sparkle.is-active .ring-2 { animation: ring-expand var(--fx-duration) ease-out calc(var(--fx-duration) * 0.3) forwards; }
+.fx-wave, .fx-quake { width: 130px; height: 130px; transform: translate(-50%, -50%); }
+.wave-ring {
+    position: absolute;
+    inset: 12px;
+    border: 4px solid var(--fx-color);
+    border-radius: 50%;
+    opacity: 0;
+    box-shadow: 0 0 15px var(--fx-color);
+}
+.fx-wave.is-active .ring-1,
+.fx-quake.is-active .ring-1 { animation: ring-expand var(--fx-duration) ease-out forwards; }
+.fx-wave.is-active .ring-2,
+.fx-quake.is-active .ring-2 { animation: ring-expand var(--fx-duration) ease-out 25% forwards; }
+.wave-core, .burst-core {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0 12%, var(--fx-color) 34%, transparent 72%);
+    transform: translate(-50%, -50%) scale(0);
+}
+.fx-wave.is-active .wave-core,
+.fx-quake.is-active .wave-core,
+.fx-burst.is-active .burst-core,
+.fx-orb.is-active .burst-core,
+.fx-impact.is-active .burst-core,
+.fx-recoil.is-active .burst-core { animation: core-pop var(--fx-duration) ease-out forwards; }
+@keyframes core-pop {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+    35% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(2.2); }
+}
+.burst-particle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 28px;
+    border-radius: 999px;
+    background: linear-gradient(#fff, var(--fx-color));
+    transform-origin: 50% 100%;
+    opacity: 0;
+}
+.fx-burst.is-active .burst-particle,
+.fx-orb.is-active .burst-particle,
+.fx-impact.is-active .burst-particle,
+.fx-recoil.is-active .burst-particle { animation: particle-burst var(--fx-duration) ease-out forwards; }
+.burst-particle.p-1 { transform: translate(-50%, -100%) rotate(0deg); }
+.burst-particle.p-2 { transform: translate(-50%, -100%) rotate(90deg); }
+.burst-particle.p-3 { transform: translate(-50%, -100%) rotate(180deg); }
+.burst-particle.p-4 { transform: translate(-50%, -100%) rotate(270deg); }
+@keyframes particle-burst {
+    0% { opacity: 0; scale: 0.2; }
+    22% { opacity: 1; }
+    100% { opacity: 0; scale: 1.4; }
+}
+.fx-heal, .fx-status, .fx-shield { width: 90px; height: 90px; transform: translate(-50%, -50%); }
+.fx-heal .sparkle-ring { border-color: #7dffb2; box-shadow: 0 0 14px #7dffb2; }
+.fx-shield .sparkle-ring { border-color: #8feaff; box-shadow: 0 0 16px #8feaff; }
+.status-sparkles {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    color: #fff;
+    font-size: 2rem;
+    text-shadow: 0 0 12px var(--fx-color);
+    transform: translate(-50%, -50%);
+    animation: sparkle-pop var(--fx-duration) ease-out forwards;
+}
+@keyframes sparkle-pop {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2) rotate(0); }
+    30% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5) rotate(90deg); }
+}
+.impact-crack {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 4px;
+    height: 66px;
+    border-radius: 2px;
+    background: var(--fx-color);
+    box-shadow: 0 0 8px var(--fx-color);
+    opacity: 0;
+    transform-origin: 50% 100%;
+}
+.crack-1 { transform: translate(-50%, -100%) rotate(-55deg); }
+.crack-2 { transform: translate(-50%, -100%) rotate(0deg); }
+.crack-3 { transform: translate(-50%, -100%) rotate(55deg); }
+.fx-impact.is-active .impact-crack,
+.fx-recoil.is-active .impact-crack { animation: crack-hit var(--fx-duration) ease-out forwards; }
+@keyframes crack-hit {
+    0% { opacity: 0; height: 8px; }
+    35% { opacity: 1; height: 66px; }
+    100% { opacity: 0; height: 94px; }
+}
+.damage-badge {
+    position: absolute;
+    z-index: 35;
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 900;
+    text-shadow: 0 2px 4px #111, 0 0 8px var(--fx-color);
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(0.8);
+}
+.damage-badge.is-active { animation: damage-rise 650ms ease-out forwards; }
+.damage-badge.is-critical { color: #fff1a8; font-size: 0.9rem; }
+@keyframes damage-rise {
+    15% { opacity: 1; transform: translate(-50%, 0) scale(1.1); }
+    100% { opacity: 0; transform: translate(-50%, -24px) scale(1); }
+}
 @keyframes ring-expand {
     0% { opacity: 0; transform: scale(0.4); }
     30% { opacity: 1; }
@@ -264,12 +412,12 @@ h1 {
 }
 
 .impact-flash-overlay {
-    position: fixed;
+    position: absolute;
     inset: 0;
     background: #fff;
     opacity: 0;
     pointer-events: none;
-    z-index: 9998;
+    z-index: 34;
     animation: flash-fade var(--fx-duration, 160ms) ease-out forwards;
 }
 @keyframes flash-fade {
@@ -1395,6 +1543,11 @@ button:disabled {
     overflow-wrap: anywhere;
 }
 
+.battle-log-panel .log-prompt {
+    color: #ffde59;
+    font-weight: 800;
+}
+
 .dex-entry-button,
 .preset-entry {
     width: 100%;
@@ -1725,6 +1878,16 @@ button:disabled {
 
     .health-fill.hp-low {
         animation: none;
+    }
+
+    .battle-fx-layer .fx-dynamic,
+    .battle-fx-layer .damage-badge {
+        opacity: 1;
+    }
+
+    .fighter-sprite.pose-attack,
+    .fighter-sprite.pose-hit {
+        filter: none;
     }
 
     .action-tile:hover:not(:disabled),
