@@ -8,18 +8,29 @@ namespace PokemonBattle.Services;
 public sealed class AdminDashboardService
 {
     private readonly AppDbContext _db;
+    private readonly CurrentUserService _currentUser;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         IncludeFields = true
     };
 
-    public AdminDashboardService(AppDbContext db)
+    private static readonly int[] StarterIds = { 1, 4, 7 };
+
+    public AdminDashboardService(AppDbContext db, CurrentUserService currentUser)
     {
         _db = db;
+        _currentUser = currentUser;
     }
 
-    public async Task<AdminDashboardSnapshot> LoadAsync()
+    public async Task<bool> IsCurrentUserAdminAsync()
     {
+        return await GetCurrentAdminAsync() != null;
+    }
+
+    public async Task<AdminDashboardSnapshot?> LoadAsync()
+    {
+        if (await GetCurrentAdminAsync() == null) return null;
+
         var users = await _db.Users.AsNoTracking().OrderBy(user => user.Username).ToListAsync();
         var runs = await _db.PlayerRuns.AsNoTracking().ToListAsync();
         var presets = await _db.UserPresets.AsNoTracking().ToListAsync();
@@ -205,7 +216,200 @@ public sealed class AdminDashboardService
             unlockedNames,
             history);
     }
+
+    public async Task<AdminOperationResult> SetAdminAsync(string username, bool isAdmin)
+    {
+        if (await GetCurrentAdminAsync() == null) return Forbidden();
+
+        var target = await _db.Users.FirstOrDefaultAsync(user => user.Username == username);
+        if (target == null) return Failure("대상 계정을 찾을 수 없습니다.");
+
+        if (!isAdmin && string.Equals(target.Username, _currentUser.Username, StringComparison.Ordinal))
+        {
+            return Failure("현재 로그인한 관리자 계정의 권한은 해제할 수 없습니다.");
+        }
+
+        if (target.IsAdmin == isAdmin)
+        {
+            return Success(isAdmin ? "이미 관리자 권한이 있습니다." : "이미 일반 계정입니다.");
+        }
+
+        if (!isAdmin && await _db.Users.CountAsync(user => user.IsAdmin) <= 1)
+        {
+            return Failure("마지막 관리자 권한은 해제할 수 없습니다.");
+        }
+
+        target.IsAdmin = isAdmin;
+        await _db.SaveChangesAsync();
+        return Success(isAdmin ? $"{username} 계정을 관리자로 지정했습니다." : $"{username} 계정의 관리자 권한을 해제했습니다.");
+    }
+
+    public async Task<AdminOperationResult> ResetPasswordAsync(string username, string newPassword)
+    {
+        if (await GetCurrentAdminAsync() == null) return Forbidden();
+        if (string.IsNullOrWhiteSpace(newPassword))
+        {
+            return Failure("새 비밀번호를 입력해주세요.");
+        }
+
+        var target = await _db.Users.FirstOrDefaultAsync(user => user.Username == username);
+        if (target == null) return Failure("대상 계정을 찾을 수 없습니다.");
+
+        target.PasswordHash = PasswordHasher.Hash(newPassword);
+        await _db.SaveChangesAsync();
+        return Success($"{username} 계정의 비밀번호를 재설정했습니다.");
+    }
+
+    public async Task<AdminOperationResult> DeleteUserAsync(string username)
+    {
+        if (await GetCurrentAdminAsync() == null) return Forbidden();
+        if (string.Equals(username, _currentUser.Username, StringComparison.Ordinal))
+        {
+            return Failure("현재 로그인한 관리자 계정은 삭제할 수 없습니다.");
+        }
+
+        var target = await _db.Users.FirstOrDefaultAsync(user => user.Username == username);
+        if (target == null) return Failure("대상 계정을 찾을 수 없습니다.");
+
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+        await _db.UnlockedPokemons
+            .Where(item => item.Username == username)
+            .ExecuteDeleteAsync();
+        await _db.PlayerRuns
+            .Where(item => item.Username == username)
+            .ExecuteDeleteAsync();
+        await _db.UserPresets
+            .Where(item => item.Username == username)
+            .ExecuteDeleteAsync();
+        _db.Users.Remove(target);
+        await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return Success($"{username} 계정과 저장된 게임 데이터를 삭제했습니다.");
+    }
+
+    public async Task<AdminOperationResult> UnlockAllPokemonAsync(string username)
+    {
+        if (await GetCurrentAdminAsync() == null) return Forbidden();
+        if (!await UserExistsAsync(username)) return Failure("대상 계정을 찾을 수 없습니다.");
+
+        var existingIds = await _db.UnlockedPokemons
+            .Where(item => item.Username == username)
+            .Select(item => item.PokemonId)
+            .ToListAsync();
+        var missingIds = PokemonDatabase.All.Keys
+            .Except(existingIds)
+            .Select(id => new UnlockedPokemon { Username = username, PokemonId = id })
+            .ToList();
+
+        if (missingIds.Count > 0)
+        {
+            _db.UnlockedPokemons.AddRange(missingIds);
+            await _db.SaveChangesAsync();
+        }
+
+        return Success($"{username} 계정에 도감 포켓몬 {PokemonDatabase.All.Count}종을 해금했습니다.");
+    }
+
+    public async Task<AdminOperationResult> ResetUnlocksToStartersAsync(string username)
+    {
+        if (await GetCurrentAdminAsync() == null) return Forbidden();
+        if (!await UserExistsAsync(username)) return Failure("대상 계정을 찾을 수 없습니다.");
+
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+        await _db.UnlockedPokemons
+            .Where(item => item.Username == username)
+            .ExecuteDeleteAsync();
+        _db.UnlockedPokemons.AddRange(
+            StarterIds.Select(id => new UnlockedPokemon { Username = username, PokemonId = id }));
+        await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return Success($"{username} 계정의 해금을 스타터 3종으로 초기화했습니다.");
+    }
+
+    public async Task<AdminOperationResult> ResetRunAsync(string username)
+    {
+        if (await GetCurrentAdminAsync() == null) return Forbidden();
+        if (!await UserExistsAsync(username)) return Failure("대상 계정을 찾을 수 없습니다.");
+
+        var run = await GetOrCreateRunAsync(username);
+        run.CurrentScore = 0;
+        run.LoadoutsJson = "[]";
+        await _db.SaveChangesAsync();
+        return Success($"{username} 계정의 현재 런을 초기화했습니다.");
+    }
+
+    public async Task<AdminOperationResult> SetScoresAsync(string username, int currentScore, int highScore)
+    {
+        if (await GetCurrentAdminAsync() == null) return Forbidden();
+        if (!await UserExistsAsync(username)) return Failure("대상 계정을 찾을 수 없습니다.");
+
+        var run = await GetOrCreateRunAsync(username);
+        run.CurrentScore = Math.Max(0, currentScore);
+        run.HighScore = Math.Max(0, highScore);
+        await _db.SaveChangesAsync();
+        return Success($"{username} 계정의 현재 점수와 최고 기록을 저장했습니다.");
+    }
+
+    public async Task<AdminOperationResult> SetLegendaryProgressAsync(string username, int progressPercent)
+    {
+        if (await GetCurrentAdminAsync() == null) return Forbidden();
+        if (!await UserExistsAsync(username)) return Failure("대상 계정을 찾을 수 없습니다.");
+
+        var run = await GetOrCreateRunAsync(username);
+        run.LegendaryProgressPercent = Math.Clamp(
+            progressPercent,
+            0,
+            LegendaryProgression.MaxProgressPercent);
+        await _db.SaveChangesAsync();
+        return Success($"{username} 계정의 전설 진행도를 {run.LegendaryProgressPercent}%로 저장했습니다.");
+    }
+
+    public async Task<AdminOperationResult> ClearLegendaryHistoryAsync(string username)
+    {
+        if (await GetCurrentAdminAsync() == null) return Forbidden();
+        if (!await UserExistsAsync(username)) return Failure("대상 계정을 찾을 수 없습니다.");
+
+        var run = await GetOrCreateRunAsync(username);
+        run.LegendaryEncounterHistoryJson = "[]";
+        await _db.SaveChangesAsync();
+        return Success($"{username} 계정의 전설 출현 이력을 삭제했습니다.");
+    }
+
+    private async Task<UserAccount?> GetCurrentAdminAsync()
+    {
+        if (!_currentUser.IsLoggedIn) return null;
+        return await _db.Users.FirstOrDefaultAsync(user =>
+            user.Username == _currentUser.Username && user.IsAdmin);
+    }
+
+    private Task<bool> UserExistsAsync(string username) =>
+        _db.Users.AnyAsync(user => user.Username == username);
+
+    private async Task<PlayerRun> GetOrCreateRunAsync(string username)
+    {
+        var run = await _db.PlayerRuns
+            .OrderByDescending(item => item.Id)
+            .FirstOrDefaultAsync(item => item.Username == username);
+        if (run != null) return run;
+
+        run = new PlayerRun { Username = username };
+        _db.PlayerRuns.Add(run);
+        return run;
+    }
+
+    private static AdminOperationResult Forbidden() =>
+        Failure("관리자 권한이 필요합니다.");
+
+    private static AdminOperationResult Success(string message) =>
+        new(true, message);
+
+    private static AdminOperationResult Failure(string message) =>
+        new(false, message);
 }
+
+public sealed record AdminOperationResult(bool Success, string Message);
 
 public sealed record AdminDashboardSnapshot(
     DateTimeOffset GeneratedAtUtc,
