@@ -451,7 +451,7 @@ h1 {
 .panel-heading { margin-bottom: var(--sp-4); }
 .panel-heading h2 { margin-bottom: 0; font-size: 1rem; font-weight: 800; color: #fff; }
 
-.action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+.action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
 .action-tile {
     display: flex; flex-direction: column; align-items: center; gap: var(--sp-1);
     padding: var(--sp-5) var(--sp-3);
@@ -468,9 +468,10 @@ h1 {
 .action-switch:hover:not(:disabled) { background: rgba(96, 165, 250, 0.12); }
 .action-tile:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.move-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+.move-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
 .move-button {
     display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+    min-width: 0;
     min-height: 58px; padding: var(--sp-3);
     border: 1px solid rgba(140, 150, 200, 0.16);
     border-radius: 14px;
@@ -550,11 +551,12 @@ h1 {
     flex-shrink: 0;
 }
 
-.move-name-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+.move-name-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
 .move-name-button {
     display: flex;
     align-items: center;
     gap: 6px;
+    min-width: 0;
     padding: var(--sp-3);
     border: 1px solid rgba(140, 150, 200, 0.16);
     border-radius: 14px;
@@ -567,7 +569,7 @@ h1 {
 .move-name-button.is-pending { border-color: var(--accent); background: var(--accent-soft); }
 .move-name-button:disabled { opacity: 0.4; cursor: not-allowed; }
 .move-name-button:focus-visible { outline: 3px solid #8feaff; outline-offset: 3px; }
-.move-name-text { flex: 1; text-align: left; }
+.move-name-text { min-width: 0; flex: 1; overflow-wrap: anywhere; text-align: left; }
 .move-pp-num { font-size: 0.68rem; color: #a0abc9; font-weight: 600; }
 
 .move-detail-panel {
@@ -785,11 +787,72 @@ h1 {
 .preset-delete:hover { background: rgba(255,107,107,0.14); }
 .preset-empty { margin: 0; color: #8993b8; font-size: 0.78rem; }
 
-.order-buttons { display: flex; gap: 4px; justify-content: center; margin-top: 6px; }
-.order-buttons button {
-    padding: 4px 10px; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;
-    background: rgba(255,255,255,0.05); color: #fff; cursor: pointer; font-size: 0.75rem;
+.team-order-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-2);
 }
+
+.team-order-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--sp-2);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.04);
+}
+
+.team-order-summary {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: 42px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: center;
+    column-gap: var(--sp-2);
+}
+
+.team-order-summary .dex-number {
+    grid-column: 1 / -1;
+    margin-bottom: 2px;
+}
+
+.team-order-sprite {
+    grid-row: 2;
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+.team-order-summary .dex-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    text-align: left;
+}
+
+.order-buttons {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.order-buttons button {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 4px 6px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.8rem;
+    line-height: 1;
+}
+
 .order-buttons button:disabled { opacity: 0.3; cursor: not-allowed; }
 .remove-btn { border-color: rgba(255,107,107,0.4) !important; color: #ff9b9b !important; }
 
@@ -1605,15 +1668,6 @@ button:disabled {
     margin-top: var(--sp-1);
 }
 
-.team-order-entry {
-    cursor: default;
-}
-
-.order-buttons button {
-    min-width: 44px;
-    min-height: 44px;
-}
-
 .auth-form {
     display: flex;
     flex-direction: column;
@@ -1653,6 +1707,7 @@ button:disabled {
 
 @media (min-width: 701px) {
     .battle-page {
+        width: min(calc(100% - 48px), 1120px);
         padding-bottom: max(var(--sp-8), env(safe-area-inset-bottom));
     }
 
@@ -1663,6 +1718,12 @@ button:disabled {
     .command-panel {
         display: grid;
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .team-order {
+        justify-content: center;
+        overflow-x: auto;
+        padding: 2px 0;
     }
 
     .preview-page,
@@ -1731,6 +1792,10 @@ button:disabled {
     .team-order {
         flex-wrap: wrap;
         margin: var(--sp-3) 0;
+    }
+
+    .team-order-list {
+        grid-template-columns: 1fr;
     }
 
     .command-panel {
@@ -1836,9 +1901,11 @@ button:disabled {
         text-align: center;
     }
 
-    .move-grid { grid-template-columns: 1fr; }
-    .action-grid { grid-template-columns: 1fr; }
-    .move-name-grid { grid-template-columns: 1fr; }
+    .move-grid,
+    .action-grid,
+    .move-name-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 380px) {
@@ -1855,6 +1922,10 @@ button:disabled {
 
     .dex-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .team-order-card {
+        padding: var(--sp-2) 6px;
     }
 
     .hud-name {
