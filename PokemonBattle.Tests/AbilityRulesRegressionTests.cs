@@ -500,6 +500,107 @@ public sealed class AbilityRulesRegressionTests
     }
 
     [Fact]
+    public void Accuracy_and_evasion_stages_apply_in_the_expected_order()
+    {
+        Assert.True(AbilityDatabase.IsImplemented("날카로운눈"));
+        Assert.True(AbilityDatabase.IsImplemented("갈지자걸음"));
+        Assert.True(AbilityDatabase.IsImplemented("발광"));
+        Assert.True(AbilityDatabase.IsImplemented("미라클스킨"));
+
+        var move = MoveDatabase.All["tackle"];
+        var normalTarget = CreatePokemon(132, "tackle");
+        normalTarget.ChangeStage("evasion", 1);
+        var normalAttacker = CreatePokemon(132, "tackle");
+        normalAttacker.ChangeStage("accuracy", -1);
+
+        // 100% base accuracy × 3/4 attacker accuracy × 3/4 defender evasion.
+        Assert.Equal(56.25, MoveRuleMetadata.EffectiveAccuracy(
+            "tackle", move, normalAttacker, normalTarget));
+
+        var keenEye = CreatePokemon(83, "tackle", ability: "날카로운눈");
+        keenEye.ChangeStage("accuracy", -1, causedByOpponent: true);
+        Assert.Equal(0, keenEye.StatStages["accuracy"]);
+        keenEye.ChangeStage("accuracy", -1);
+        Assert.Equal(-1, keenEye.StatStages["accuracy"]);
+
+        var confusedTangledFeet = CreatePokemon(83, "tackle", ability: "갈지자걸음");
+        confusedTangledFeet.ApplyConfusion(new FixedRandom(0));
+        Assert.True(confusedTangledFeet.IsConfused);
+        Assert.Equal(50, MoveRuleMetadata.EffectiveAccuracy(
+            "tackle", move, CreatePokemon(132, "tackle"), confusedTangledFeet));
+
+        // Illuminate has no battle accuracy modifier in the supported ruleset.
+        var illuminate = CreatePokemon(120, "tackle", ability: "발광");
+        Assert.Equal(100, MoveRuleMetadata.EffectiveAccuracy(
+            "tackle", move, CreatePokemon(132, "tackle"), illuminate));
+    }
+
+    [Fact]
+    public async Task Accuracy_moves_update_stages_and_keen_eye_blocks_the_drop()
+    {
+        var accuracyDropper = CreatePokemon(83, "sand-attack");
+        var target = CreatePokemon(132, "tackle");
+        var events = new List<BattleEvent>();
+
+        await CreateFullEngine(new FixedRandom(0)).TakeTurnAsync(
+            accuracyDropper, target, "sand-attack", true, Capture(events));
+
+        Assert.Equal(-1, target.StatStages["accuracy"]);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("명중률", StringComparison.Ordinal) == true);
+
+        var keenEyeTarget = CreatePokemon(132, "tackle", ability: "날카로운눈");
+        events.Clear();
+        await CreateFullEngine(new FixedRandom(0)).TakeTurnAsync(
+            CreatePokemon(83, "sand-attack"), keenEyeTarget, "sand-attack", true, Capture(events));
+
+        Assert.Equal(0, keenEyeTarget.StatStages["accuracy"]);
+        Assert.DoesNotContain(events, battleEvent =>
+            battleEvent.Message?.Contains("명중률이(가) 하락했다", StringComparison.Ordinal) == true);
+
+        var evasionBooster = CreatePokemon(132, "double-team");
+        await CreateFullEngine(new FixedRandom(0)).TakeTurnAsync(
+            evasionBooster, CreatePokemon(83, "tackle"), "double-team", true, _ => Task.CompletedTask);
+        Assert.Equal(1, evasionBooster.StatStages["evasion"]);
+    }
+
+    [Fact]
+    public async Task Miracle_skin_halves_opponent_status_accuracy_but_not_attacks_or_self_moves()
+    {
+        var miracleSkin = CreatePokemon(132, "tackle", ability: "미라클스킨");
+        var statusEvents = new List<BattleEvent>();
+
+        await CreateFullEngine(new FixedRandom(99)).TakeTurnAsync(
+            CreatePokemon(1, "sleep-powder"),
+            miracleSkin,
+            "sleep-powder",
+            true,
+            Capture(statusEvents));
+
+        Assert.Equal(StatusCondition.None, miracleSkin.Status);
+        Assert.Contains(statusEvents, battleEvent =>
+            battleEvent.Message?.Contains("빗나갔다", StringComparison.Ordinal) == true);
+
+        var attackTarget = CreatePokemon(132, "tackle", ability: "미라클스킨");
+        await CreateFullEngine(new FixedRandom(99)).TakeTurnAsync(
+            CreatePokemon(132, "tackle"),
+            attackTarget,
+            "tackle",
+            true,
+            _ => Task.CompletedTask);
+        Assert.True(attackTarget.CurrentHp < attackTarget.MaxHp);
+
+        var selfMoveUser = CreatePokemon(132, "double-team", ability: "미라클스킨");
+        await CreateFullEngine(new FixedRandom(99)).TakeTurnAsync(
+            selfMoveUser,
+            CreatePokemon(83, "tackle"),
+            "double-team",
+            true,
+            _ => Task.CompletedTask);
+        Assert.Equal(1, selfMoveUser.StatStages["evasion"]);
+    }
+
+    [Fact]
     public void Ally_support_abilities_have_an_explicit_1v1_boundary()
     {
         var supportAbilities = new[]

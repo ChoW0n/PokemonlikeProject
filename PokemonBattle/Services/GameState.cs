@@ -16,6 +16,11 @@ public class GameState
     public int CurrentRunLevel => Math.Max(1, CurrentScore + 1);
     public int CurrentRunDifficultyAdjustment { get; private set; }
     public double SkillRating { get; private set; } = SkillRatingCalculator.DefaultRating;
+    public double ResultSkillRating { get; private set; } = SkillRatingCalculator.DefaultRating;
+    public double LastSkillRatingChange { get; private set; }
+    public bool HasPendingSkillRatingUpdate => LastBattleWon && _roundPerformances.Count > 0;
+    public int NextRunDifficultyAdjustment =>
+        SkillRatingCalculator.CalculateDifficultyAdjustment(ResultSkillRating);
     public int HighScore { get; private set; }
     public int LegendaryProgressPercent { get; private set; }
     public int LastLegendaryProgressReward { get; private set; }
@@ -77,6 +82,8 @@ public class GameState
         _roundPerformances.AddRange(roundPerformances);
         var storedRating = await _skillRatings.GetOrCreateAsync(_currentUser.Username!);
         SkillRating = storedRating.Rating;
+        ResultSkillRating = SkillRating;
+        LastSkillRatingChange = 0;
         CurrentRunDifficultyAdjustment = Math.Clamp(
             difficultyAdjustment,
             SkillRatingCalculator.MinimumDifficultyAdjustment,
@@ -225,6 +232,11 @@ public class GameState
     public async Task WinRound(int turns = 0, IEnumerable<Pokemon>? playerTeam = null)
     {
         RecordRoundPerformance(turns, playerTeam, cleared: true);
+        ResultSkillRating = SkillRatingCalculator.PreviewRating(
+            SkillRating,
+            _roundPerformances,
+            won: true);
+        LastSkillRatingChange = ResultSkillRating - SkillRating;
         int progressBefore = LegendaryProgressPercent;
         int progressReward = LegendaryEncounterConsumed
             ? 0
@@ -354,15 +366,13 @@ public class GameState
     {
         if (!_currentUser.IsLoggedIn || _roundPerformances.Count == 0) return;
 
-        var summary = new RunPerformanceSummary(
-            _roundPerformances.Count(performance => performance.Cleared),
-            _roundPerformances.Count,
-            _roundPerformances.Average(performance => performance.PlayerHpRatio),
-            _roundPerformances.Average(performance => performance.Turns),
-            won);
+        var summary = SkillRatingCalculator.SummarizeRun(_roundPerformances, won);
+        double previousRating = SkillRating;
         SkillRating = await _skillRatings.UpdateForRunAsync(
             _currentUser.Username!,
             summary);
+        ResultSkillRating = SkillRating;
+        LastSkillRatingChange = SkillRating - previousRating;
         _roundPerformances.Clear();
     }
 

@@ -278,6 +278,12 @@ public class ProgressionRegressionTests
                 var runAfterRound = await new RunStore(db).Load(winner);
                 var recorded = Assert.Single(runAfterRound.roundPerformances);
                 Assert.True(recorded.Cleared);
+                Assert.True(state.ResultSkillRating > SkillRatingCalculator.DefaultRating);
+                Assert.True(state.LastSkillRatingChange > 0);
+                Assert.True(
+                    state.NextRunDifficultyAdjustment
+                    >= SkillRatingCalculator.CalculateDifficultyAdjustment(
+                        SkillRatingCalculator.DefaultRating));
 
                 await state.ResetForNewRun();
                 Assert.Empty((await new RunStore(db).Load(winner)).roundPerformances);
@@ -299,6 +305,8 @@ public class ProgressionRegressionTests
                 await state.LoadRunForCurrentUser();
                 await state.LoseBattle();
                 Assert.True(state.SkillRating < SkillRatingCalculator.DefaultRating);
+                Assert.Equal(state.SkillRating, state.ResultSkillRating);
+                Assert.True(state.LastSkillRatingChange < 0);
             }
         });
     }

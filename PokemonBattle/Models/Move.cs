@@ -281,6 +281,29 @@ public static class MoveRuleMetadata
         return resolvedType;
     }
 
+    public static double AuraMultiplier(
+        PokemonType attackType,
+        Pokemon? attacker,
+        Pokemon? defender)
+    {
+        if (attackType is not (PokemonType.Fairy or PokemonType.Dark)) return 1.0;
+
+        bool auraActive = HasActiveAbility(attacker, attackType == PokemonType.Fairy
+                ? "페어리오라"
+                : "다크오라")
+            || HasActiveAbility(defender, attackType == PokemonType.Fairy
+                ? "페어리오라"
+                : "다크오라");
+        if (!auraActive) return 1.0;
+
+        bool auraBroken = HasActiveAbility(attacker, "오라브레이크")
+            || HasActiveAbility(defender, "오라브레이크");
+        return auraBroken ? 0.75 : 4.0 / 3.0;
+    }
+
+    private static bool HasActiveAbility(Pokemon? pokemon, string ability) =>
+        pokemon != null && !pokemon.IsFainted && pokemon.SelectedAbility == ability;
+
     public static double EffectivePower(string moveKey, Move move)
         => EffectivePowerBase(moveKey, move, weatherSuppressed: false);
 
@@ -378,20 +401,56 @@ public static class MoveRuleMetadata
         Pokemon? defender = null)
     {
         double accuracy = move.Accuracy;
-        if (BattleWeather.AreEffectsSuppressed(attacker, defender)) return accuracy;
-
-        if (moveKey is "thunder" or "hurricane")
+        bool weatherSuppressed = BattleWeather.AreEffectsSuppressed(attacker, defender);
+        if (!weatherSuppressed && moveKey is ("thunder" or "hurricane"))
         {
-            if (BattleWeather.Current == BattleWeather.Rain) return 100;
-            if (BattleWeather.Current == BattleWeather.Sun) return 50;
+            if (BattleWeather.Current == BattleWeather.Rain) accuracy = 100;
+            else if (BattleWeather.Current == BattleWeather.Sun) accuracy = 50;
         }
-        else if (moveKey == "blizzard")
+        else if (!weatherSuppressed && moveKey == "blizzard")
         {
-            if (BattleWeather.Current == BattleWeather.Hail) return 100;
-            if (BattleWeather.Current == BattleWeather.Sun) return 50;
+            if (BattleWeather.Current == BattleWeather.Hail) accuracy = 100;
+            else if (BattleWeather.Current == BattleWeather.Sun) accuracy = 50;
+        }
+
+        if (attacker != null)
+        {
+            if (attacker.SelectedAbility == "의욕" && !move.IsStatus && !move.IsSpecial) accuracy *= 0.8;
+            if (attacker.SelectedAbility == "복안") accuracy *= 1.3;
+            if (attacker.SelectedAbility == "승리의별") accuracy *= 1.1;
+            accuracy *= AccuracyStageMultiplier(attacker.StatStages["accuracy"]);
+        }
+
+        if (defender != null)
+        {
+            if (!weatherSuppressed
+                && defender.SelectedAbility == "모래숨기"
+                && BattleWeather.Current == BattleWeather.Sand) accuracy *= 0.8;
+            if (!weatherSuppressed
+                && defender.SelectedAbility == "눈숨기"
+                && BattleWeather.Current == BattleWeather.Hail) accuracy *= 0.8;
+            if (defender.SelectedAbility == "갈지자걸음" && defender.IsConfused) accuracy *= 0.5;
+            accuracy /= AccuracyStageMultiplier(defender.StatStages["evasion"]);
+            if (defender.SelectedAbility == "미라클스킨"
+                && move.IsStatus
+                && TargetsOpponent(move)
+                && !move.AlwaysHits)
+            {
+                accuracy *= 0.5;
+            }
         }
 
         return accuracy;
+    }
+
+    private static double AccuracyStageMultiplier(int stage) =>
+        stage >= 0 ? (3.0 + stage) / 3.0 : 3.0 / (3.0 - stage);
+
+    private static bool TargetsOpponent(Move move)
+    {
+        if (!move.IsStatus) return true;
+        if (move.AilmentName != "none") return true;
+        return move.StatChanges.Any(change => !change.TargetsSelf);
     }
 
     public static int RecoveryAmount(

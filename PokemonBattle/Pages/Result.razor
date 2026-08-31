@@ -8,6 +8,22 @@
 <PageTitle>배틀 결과</PageTitle>
 
 <main class="result-page">
+    <section class="result-skill-summary" aria-label="실력 평점 결과">
+        <h2>실력 평점</h2>
+        <p>
+            현재 평점:
+            <strong>@State.ResultSkillRating.ToString("0")</strong>
+            <span class="rating-change @(State.LastSkillRatingChange >= 0 ? "is-positive" : "is-negative")">
+                (@RatingChangeText(State.LastSkillRatingChange))
+            </span>
+        </p>
+        <p>다음 런 상대 레벨 보정: <strong>@DifficultyText(State.NextRunDifficultyAdjustment)</strong></p>
+        @if (State.HasPendingSkillRatingUpdate)
+        {
+            <small>이번 승리의 평점은 새 런을 시작할 때 확정됩니다.</small>
+        }
+    </section>
+
     @if (State.LastBattleWon)
     {
         <h1 class="result-win">승리!</h1>
@@ -58,7 +74,10 @@
         }
 
         <button type="button" @onclick="NextRound">다음 상대와 계속하기</button>
-        <button type="button" @onclick="RestartGame">새 런 시작</button>
+        <details class="result-secondary-actions">
+            <summary>추가 메뉴</summary>
+            <button type="button" @onclick="RestartGame">새 런 시작</button>
+        </details>
     }
     else
     {
@@ -136,5 +155,15 @@
         await State.ResetForNewRun();
         Nav.NavigateTo("/starter");
     }
+
+    private static string RatingChangeText(double change) =>
+        change >= 0 ? $"+{change:0}" : change.ToString("0");
+
+    private static string DifficultyText(int adjustment) =>
+        adjustment == 0
+            ? "기본 레벨과 동일"
+            : adjustment > 0
+                ? $"기본 레벨 +{adjustment}"
+                : $"기본 레벨 {adjustment}";
 
 }

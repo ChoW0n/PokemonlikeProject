@@ -144,7 +144,8 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
 
         if (move.IsStatus && move.HealingPercent > 0 && context.MoveKey != "swallow")
         {
-            int heal = MoveRuleMetadata.RecoveryAmount(context.MoveKey, move, attacker.MaxHp);
+            int heal = MoveRuleMetadata.RecoveryAmount(
+                context.MoveKey, move, attacker.MaxHp, attacker, defender);
             attacker.CurrentHp = Math.Min(attacker.MaxHp, attacker.CurrentHp + heal);
             await context.ShowMessage($"{attacker.Data.Name}은(는) HP를 회복했다!");
         }
@@ -547,6 +548,8 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         "special-attack" => "특공",
         "special-defense" => "특방",
         "speed" => "속도",
+        "accuracy" => "명중률",
+        "evasion" => "회피율",
         _ => stat
     };
 }
