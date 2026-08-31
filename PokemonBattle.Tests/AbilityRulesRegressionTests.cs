@@ -13,8 +13,9 @@ public sealed class AbilityRulesRegressionTests
         var sniper = CreatePokemon(132, moveKey, ability: "스나이퍼");
         var target = CreatePokemon(202, "tackle");
         int hpBefore = target.CurrentHp;
-        int scaledPower = (int)(MoveDatabase.All[moveKey].Power
-            * ((double)sniper.EffectiveSpAtk / target.EffectiveSpDef));
+        int scaledPower = (int)(((2.0 * sniper.Level / 5 + 2)
+            * MoveDatabase.All[moveKey].Power
+            * ((double)sniper.EffectiveSpAtk / target.EffectiveSpDef)) / 50) + 2;
         int expectedSniperDamage = (int)((int)(scaledPower * 1.5) * 1.5);
         var events = new List<BattleEvent>();
 
@@ -29,8 +30,9 @@ public sealed class AbilityRulesRegressionTests
         var normalAttacker = CreatePokemon(132, moveKey);
         var armoredTarget = CreatePokemon(202, "tackle", ability: "조가비갑옷");
         hpBefore = armoredTarget.CurrentHp;
-        int expectedNormalDamage = (int)(MoveDatabase.All[moveKey].Power
-            * ((double)normalAttacker.EffectiveSpAtk / armoredTarget.EffectiveSpDef));
+        int expectedNormalDamage = (int)(((2.0 * normalAttacker.Level / 5 + 2)
+            * MoveDatabase.All[moveKey].Power
+            * ((double)normalAttacker.EffectiveSpAtk / armoredTarget.EffectiveSpDef)) / 50) + 2;
         events.Clear();
 
         await CreateFullEngine().TakeTurnAsync(

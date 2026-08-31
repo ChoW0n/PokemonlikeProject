@@ -397,7 +397,9 @@ public sealed class BattleRulesRegressionTests
         var move = MoveDatabase.All[moveKey];
         int attack = move.IsSpecial ? attacker.EffectiveSpAtk : attacker.EffectiveAtk;
         int defense = move.IsSpecial ? defender.EffectiveSpDef : defender.EffectiveDef;
-        return Math.Max(0, (int)(move.Power * ((double)attack / Math.Max(defense, 1))));
+        return Math.Max(0, (int)(((2.0 * attacker.Level / 5 + 2)
+            * move.Power
+            * ((double)attack / Math.Max(defense, 1))) / 50) + 2);
     }
 
     private sealed class DamageResultSnapshotHandler : IBattleEffectHandler

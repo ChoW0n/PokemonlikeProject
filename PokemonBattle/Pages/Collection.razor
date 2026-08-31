@@ -1,0 +1,84 @@
+@page "/collection"
+@using PokemonBattle.Models
+@using PokemonBattle.Services
+@inject CurrentUserService CurrentUser
+@inject UnlockService Unlocks
+@inject NavigationManager Nav
+
+<PageTitle>획득한 포켓몬</PageTitle>
+
+<main class="dex-page collection-page">
+    <div class="pokedex-shell">
+        <div class="pokedex-top">
+            <div class="pokedex-lens"></div>
+            <div class="pokedex-lights">
+                <span class="light red"></span>
+                <span class="light yellow"></span>
+                <span class="light green"></span>
+            </div>
+        </div>
+
+        <div class="pokedex-screen">
+            <div class="collection-header">
+                <div>
+                    <h1>획득한 포켓몬</h1>
+                    <p class="intro">지금까지 모은 포켓몬을 확인하세요.</p>
+                </div>
+                <strong class="collection-count">@(OwnedPokemon.Count)마리</strong>
+            </div>
+
+            @if (OwnedPokemon.Count == 0)
+            {
+                <p class="collection-empty">아직 획득한 포켓몬이 없습니다.</p>
+            }
+            else
+            {
+                <div class="dex-grid collection-grid" role="list" aria-label="획득한 포켓몬 목록">
+                    @foreach (var entry in OwnedPokemon)
+                    {
+                        <article class="dex-entry collection-card" role="listitem">
+                            <span class="dex-number">No.@entry.Key.ToString("D3")</span>
+                            <img src="@entry.Value.EffectiveImageUrl" alt="@entry.Value.Name" class="dex-sprite" />
+                            <span class="dex-name">@entry.Value.Name</span>
+                            <span class="dex-type-icons" aria-label="타입">
+                                <img src="@TypeIcons.GetUrl(entry.Value.Type1)" class="type-icon-img small" alt="@entry.Value.Type1" />
+                                @if (entry.Value.Type2 != null)
+                                {
+                                    <img src="@TypeIcons.GetUrl(entry.Value.Type2.Value)" class="type-icon-img small" alt="@entry.Value.Type2" />
+                                }
+                            </span>
+                        </article>
+                    }
+                </div>
+            }
+
+            <div class="collection-actions">
+                <button type="button" @onclick="GoHome">홈으로</button>
+                <button type="button" @onclick="GoTeamSelect">팀 편성하기</button>
+            </div>
+        </div>
+    </div>
+</main>
+
+@code {
+    private List<KeyValuePair<int, PokemonData>> OwnedPokemon = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CurrentUser.IsLoggedIn)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        var unlockedIds = await Unlocks.GetUnlockedIds();
+        OwnedPokemon = unlockedIds
+            .Where(PokemonDatabase.All.ContainsKey)
+            .OrderBy(id => id)
+            .Select(id => new KeyValuePair<int, PokemonData>(id, PokemonDatabase.All[id]))
+            .ToList();
+    }
+
+    private void GoHome() => Nav.NavigateTo("/");
+    private void GoTeamSelect() => Nav.NavigateTo("/select");
+}

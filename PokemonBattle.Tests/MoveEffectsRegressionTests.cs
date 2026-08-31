@@ -73,9 +73,12 @@ public sealed class MoveEffectsRegressionTests
         await engine.TakeTurnAsync(attacker, defender, "outrage", true, Capture(events));
         Assert.Equal(ppBefore - 1, attacker.CurrentPP["outrage"]);
         Assert.Equal("outrage", attacker.RampageMoveKey);
+        attacker.CurrentPP["outrage"] = 0;
+        Assert.True(attacker.CanUseMove("outrage"));
+        Assert.False(attacker.CanUseMove("tackle"));
 
         await engine.TakeTurnAsync(attacker, defender, "tackle", true, Capture(events));
-        Assert.Equal(ppBefore - 1, attacker.CurrentPP["outrage"]);
+        Assert.Equal(0, attacker.CurrentPP["outrage"]);
         Assert.DoesNotContain(events, battleEvent =>
             battleEvent.Message?.Contains("그 기술을 사용할 수 없다", StringComparison.Ordinal) == true);
 

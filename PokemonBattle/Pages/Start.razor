@@ -21,6 +21,7 @@
     }
 
     <button type="button" @onclick="StartGame">시작하기</button>
+    <button type="button" @onclick="OpenCollection">획득한 포켓몬 전체 보기</button>
 </main>
 
 @code {
@@ -37,9 +38,17 @@
 
     private void StartGame()
     {
+        if (State.PlayerLoadouts.Count == 0)
+        {
+            State.GoTo(GameScreen.StarterSelect);
+            Nav.NavigateTo("/starter");
+            return;
+        }
+
         State.GoTo(GameScreen.EnemyPreview);
         Nav.NavigateTo("/preview");
     }
 
     private void OpenAdminConsole() => Nav.NavigateTo("/admin");
+    private void OpenCollection() => Nav.NavigateTo("/collection");
 }

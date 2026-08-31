@@ -380,7 +380,7 @@
 
         DraftAbility = existing?.ChosenAbility ?? PokemonDatabase.All[id].AbilityNames.FirstOrDefault() ?? "";
         DraftItem = existing?.ChosenItem ?? "없음";
-        DraftLevel = existing?.Level ?? 1;
+        DraftLevel = existing?.Level ?? State.CurrentRunLevel;
     }
 
     private void ViewOrToggleMove(string moveKey)
@@ -495,7 +495,9 @@
                     ChosenMoveNames = l.ChosenMoveNames.Where(m => validKeys.Contains(m)).ToList(),
                     ChosenAbility = l.ChosenAbility,
                     ChosenItem = l.ChosenItem,
-                    Level = currentLevels.TryGetValue(l.PokemonId, out var level) ? level : 1
+                    Level = currentLevels.TryGetValue(l.PokemonId, out var level)
+                        ? level
+                        : State.CurrentRunLevel
                 };
             }).ToList();
 

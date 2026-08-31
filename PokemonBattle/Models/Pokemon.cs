@@ -259,7 +259,7 @@ public class Pokemon
 
     public bool CanUseMove(string moveName)
     {
-        if (RampageMoveKey != null && RampageMoveKey != moveName) return false;
+        if (RampageMoveKey != null) return RampageMoveKey == moveName;
         if (!CurrentPP.TryGetValue(moveName, out var pp) || pp <= 0) return false;
         if (DisabledMoveKey == moveName) return false;
         if (ImprisonedMoveKeys.Contains(moveName)) return false;
@@ -283,8 +283,11 @@ public class Pokemon
     public bool TryUseMove(string moveName)
     {
         if (!CanUseMove(moveName)) return false;
-        CurrentPP[moveName]--;
-        if (IsChoiceItem) ChoiceLockedMove ??= moveName;
+        if (RampageMoveKey == null)
+        {
+            CurrentPP[moveName]--;
+            if (IsChoiceItem) ChoiceLockedMove ??= moveName;
+        }
         return true;
     }
 

@@ -650,7 +650,9 @@ public sealed class BattleEngine
                     await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 공격이 급소에 맞았다!"));
                 }
                 int hpBefore = defender.CurrentHp;
-                int scaledPower = (int)(power * ((double)attackStat / Math.Max(defenseStat, 1)));
+                int scaledPower = (int)(((2.0 * attacker.Level / 5 + 2)
+                    * power
+                    * ((double)attackStat / Math.Max(defenseStat, 1))) / 50) + 2;
                 if (isCritical && attacker.SelectedAbility == "스나이퍼") scaledPower = (int)(scaledPower * 1.5);
                 defender.TakeDamage(
                     scaledPower,

@@ -88,7 +88,6 @@
 @code {
     private List<PokemonLoadout> EnemyLoadouts = new();
     private int? SelectedId;
-    private Random rng = new Random();
     private bool ContainsLegendary => EnemyLoadouts.Any(loadout => EnemyTeamProvider.IsLegendary(loadout.PokemonId));
 
     protected override async Task OnInitializedAsync()
@@ -100,7 +99,7 @@
             ? 721
             : Math.Clamp(20 + unlocked.Count * 8, 30, 721);
         int teamSize = Math.Clamp(unlocked.Count, 1, 6);
-        int enemyLevel = 1 + State.CurrentScore;
+        int enemyLevel = State.CurrentRunLevel;
 
         var team = EnemyTeamProvider.GetRandomTeam(teamSize, poolSize, firstStageOnly, unlocked, State.LegendaryUnlocked);
 
@@ -108,13 +107,11 @@
         EnemyLoadouts = team.Select(e =>
         {
             var moves = EnemyTeamProvider.PickProMoveset(e.Value);
-            string ability = e.Value.AbilityNames.Length > 0 ? e.Value.AbilityNames[rng.Next(e.Value.AbilityNames.Length)] : "";
+            string ability = EnemyTeamProvider.PickProAbility(e.Value, moves);
             var availableItems = ItemDatabase.GetAvailableItems(e.Value.Name)
                 .Where(item => item.Name == TeamLoadoutRules.NoItem || !usedItems.Contains(item.Name))
                 .ToList();
-            string item = availableItems.Count == 0
-                ? TeamLoadoutRules.NoItem
-                : availableItems[rng.Next(availableItems.Count)].Name;
+            string item = EnemyTeamProvider.PickProItem(moves, availableItems, usedItems);
             if (item != TeamLoadoutRules.NoItem)
             {
                 usedItems.Add(item);

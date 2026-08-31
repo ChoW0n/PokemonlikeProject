@@ -12,6 +12,7 @@ public class GameState
 
     public GameScreen CurrentScreen { get; private set; } = GameScreen.Start;
     public int CurrentScore { get; private set; }
+    public int CurrentRunLevel => Math.Max(1, CurrentScore + 1);
     public int HighScore { get; private set; }
     public int LegendaryProgressPercent { get; private set; }
     public int LastLegendaryProgressReward { get; private set; }
@@ -231,7 +232,7 @@ public class GameState
         EnemyTeamIds = new List<int>();
         LegendaryEncounterConsumed = false;
         await PersistRun();
-        CurrentScreen = GameScreen.Start;
+        CurrentScreen = GameScreen.StarterSelect;
         NotifyChange();
     }
 
