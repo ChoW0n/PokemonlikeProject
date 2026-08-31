@@ -43,7 +43,7 @@
                              aria-pressed="@(existingInTeam != null ? "true" : "false")"
                              @onclick="() => StartConfiguring(entry.Key, isUnlocked)">
                             <span class="dex-number">No.@entry.Key.ToString("D3") @(existingInTeam != null ? $"Lv.{existingInTeam.Level}" : "")</span>
-                            <img src="@entry.Value.ImageUrl" alt="@entry.Value.Name" class="dex-sprite" />
+                            <img src="@entry.Value.EffectiveImageUrl" alt="@entry.Value.Name" class="dex-sprite" />
                             <span class="dex-name">@(isUnlocked ? entry.Value.Name : "???")</span>
                             @if (isUnlocked)
                             {
@@ -77,7 +77,7 @@
                             var data = PokemonDatabase.All[TeamLoadouts[idx].PokemonId];
                             <div class="dex-entry team-order-entry">
                                 <span class="dex-number">#@(idx + 1) Lv.@TeamLoadouts[idx].Level</span>
-                                <img src="@data.ImageUrl" alt="@data.Name" class="dex-sprite" />
+                                <img src="@data.EffectiveImageUrl" alt="@data.Name" class="dex-sprite" />
                                 <span class="dex-name">@data.Name</span>
                                 <div class="order-buttons">
                                      <button type="button" aria-label="@($"{data.Name} 팀 순서 위로 이동")" disabled="@(idx == 0)" @onclick="() => MoveOrderUp(idx)">↑</button>

@@ -15,7 +15,7 @@
         {
             var data = PokemonDatabase.All[loadout.PokemonId];
         <article class="enemy-card" role="listitem">
-            <img src="@data.ImageUrl" alt="@data.Name" class="enemy-sprite" />
+                <img src="@data.EffectiveImageUrl" alt="@data.Name" class="enemy-sprite" />
                 <h3>@data.Name</h3>
                 <p>Lv.@loadout.Level</p>
         </article>

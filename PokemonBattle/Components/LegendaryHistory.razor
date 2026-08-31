@@ -14,8 +14,8 @@
             @foreach (var entry in State.LegendaryEncounterHistory.OrderByDescending(item => item.CycleNumber))
             {
                 <li>
-                    <strong>@entry.CycleNumber주기</strong>
-                    <span>@entry.Stage스테이지 · @LegendaryNames(entry.PokemonIds)</span>
+                    <strong>@(entry.CycleNumber)주기</strong>
+                    <span>@(entry.Stage)스테이지 · @LegendaryNames(entry.PokemonIds)</span>
                     <time datetime="@entry.EncounteredAtUtc.ToString("O")">@entry.EncounteredAtUtc.ToLocalTime().ToString("yyyy.MM.dd HH:mm")</time>
                 </li>
             }

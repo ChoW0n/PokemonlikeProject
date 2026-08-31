@@ -15,6 +15,11 @@
 
     <LegendaryHistory />
 
+    @if (CurrentUser.IsAdmin)
+    {
+        <button type="button" class="admin-link" @onclick="OpenAdminConsole">관리자 콘솔 열기</button>
+    }
+
     <button type="button" @onclick="StartGame">시작하기</button>
 </main>
 
@@ -35,4 +40,6 @@
         State.GoTo(GameScreen.EnemyPreview);
         Nav.NavigateTo("/preview");
     }
+
+    private void OpenAdminConsole() => Nav.NavigateTo("/admin");
 }

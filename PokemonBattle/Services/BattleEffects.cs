@@ -7,13 +7,22 @@ public sealed record BattleEvent(
     int BaseDelayMs = 1400,
     string? EffectKind = null,
     bool AttackerIsHero = false,
-    PokemonType? EffectType = null)
+    PokemonType? EffectType = null,
+    string? MoveName = null)
 {
     public static BattleEvent MessageLine(string message, int baseDelayMs = 1400) =>
         new(Message: message, BaseDelayMs: baseDelayMs);
 
-    public static BattleEvent Effect(string kind, bool attackerIsHero, PokemonType type) =>
-        new(EffectKind: kind, AttackerIsHero: attackerIsHero, EffectType: type);
+    public static BattleEvent Effect(
+        string kind,
+        bool attackerIsHero,
+        PokemonType type,
+        string? moveName = null) =>
+        new(
+            EffectKind: kind,
+            AttackerIsHero: attackerIsHero,
+            EffectType: type,
+            MoveName: moveName);
 }
 
 public sealed class BattleTurnResult

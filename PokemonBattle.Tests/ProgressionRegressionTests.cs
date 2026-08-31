@@ -236,7 +236,17 @@ public class ProgressionRegressionTests
 
             await using (var db = CreateDbContext(schema))
             {
-                await new RunStore(db).Save(username, 23, 31, loadouts, 68);
+                var history = new List<LegendaryEncounterHistoryEntry>
+                {
+                    new()
+                    {
+                        CycleNumber = 2,
+                        Stage = 24,
+                        PokemonIds = new List<int> { 144 },
+                        EncounteredAtUtc = new DateTimeOffset(2026, 8, 31, 0, 0, 0, TimeSpan.Zero)
+                    }
+                };
+                await new RunStore(db).Save(username, 23, 31, loadouts, 68, history);
             }
 
             await using (var freshDb = CreateDbContext(schema))
@@ -246,6 +256,10 @@ public class ProgressionRegressionTests
                 Assert.Equal(23, restored.score);
                 Assert.Equal(31, restored.highScore);
                 Assert.Equal(68, restored.legendaryProgressPercent);
+                var restoredHistory = Assert.Single(restored.legendaryEncounterHistory);
+                Assert.Equal(2, restoredHistory.CycleNumber);
+                Assert.Equal(24, restoredHistory.Stage);
+                Assert.Equal(new[] { 144 }, restoredHistory.PokemonIds);
                 var restoredLoadout = Assert.Single(restored.loadouts);
                 Assert.Equal(1, restoredLoadout.PokemonId);
                 Assert.Equal(7, restoredLoadout.Level);
@@ -353,6 +367,10 @@ public class ProgressionRegressionTests
 
                 Assert.Equal(0, state.LegendaryProgressPercent);
                 Assert.True(state.LegendaryEncounterConsumed);
+                var history = Assert.Single(state.LegendaryEncounterHistory);
+                Assert.Equal(1, history.CycleNumber);
+                Assert.Equal(8, history.Stage);
+                Assert.Equal(new[] { 144 }, history.PokemonIds);
 
                 //ConfirmTeamAndGo can submit the same fixed lineup again without a second consumption.
                 await state.SetEnemyLoadouts(new List<PokemonLoadout>
@@ -368,12 +386,14 @@ public class ProgressionRegressionTests
 
                 await state.ResetForNewRun();
                 Assert.Equal(0, state.LegendaryProgressPercent);
+                Assert.Single(state.LegendaryEncounterHistory);
             }
 
             await using (var freshDb = CreateDbContext(schema))
             {
                 var restored = await new RunStore(freshDb).Load(username);
                 Assert.Equal(0, restored.legendaryProgressPercent);
+                Assert.Single(restored.legendaryEncounterHistory);
             }
         });
     }
@@ -466,7 +486,7 @@ public class ProgressionRegressionTests
                     """);
                 await db.Database.ExecuteSqlRawAsync("""
                     ALTER TABLE "PlayerRuns"
-                        ADD COLUMN IF NOT EXISTS "LegendaryProgressPercent" INTEGER NOT NULL DEFAULT 0;
+                        ADD COLUMN IF NOT EXISTS "LegendaryEncounterHistoryJson" TEXT NOT NULL DEFAULT '[]';
                     """);
             }
 
@@ -478,6 +498,7 @@ public class ProgressionRegressionTests
                 Assert.Equal(0, restored.highScore);
                 Assert.Empty(restored.loadouts);
                 Assert.Equal(0, restored.legendaryProgressPercent);
+                Assert.Empty(restored.legendaryEncounterHistory);
             }
         });
     }
@@ -524,7 +545,8 @@ public class ProgressionRegressionTests
                 "CurrentScore" INTEGER NOT NULL,
                 "HighScore" INTEGER NOT NULL DEFAULT 0,
                 "LoadoutsJson" TEXT NOT NULL,
-                "LegendaryProgressPercent" INTEGER NOT NULL DEFAULT 0
+                "LegendaryProgressPercent" INTEGER NOT NULL DEFAULT 0,
+                "LegendaryEncounterHistoryJson" TEXT NOT NULL DEFAULT '[]'
             );
             """);
     }

@@ -47,7 +47,7 @@ window.battleEffects = {
         });
     },
 
-    async play(kind, attackerSide, colorHex) {
+    async play(kind, attackerSide, colorHex, moveName = '기술', attackerName = '', typeLabel = '') {
         const cfg = await this.load();
         const t = cfg[kind] || cfg.burst;
         const defenderSide = attackerSide === 'hero' ? 'enemy' : 'hero';
@@ -55,6 +55,15 @@ window.battleEffects = {
         const attackerSprite = document.getElementById('sprite-' + attackerSide);
         const defenderSprite = document.getElementById('sprite-' + defenderSide);
         if (!attackerSprite || !defenderSprite) return;
+
+        const banner = document.createElement('div');
+        banner.className = 'move-cast-banner';
+        banner.setAttribute('role', 'status');
+        banner.style.setProperty('--fx-color', colorHex);
+        banner.innerHTML = `<span class="move-cast-attacker">${attackerName}</span><strong class="move-cast-name">${moveName}</strong><span class="move-cast-type" style="--fx-color:${colorHex}">${typeLabel}</span>`;
+        document.body.appendChild(banner);
+        requestAnimationFrame(() => banner.classList.add('is-active'));
+        setTimeout(() => banner.classList.remove('is-active'), Math.max(260, t.windupMs + t.mainMs - 40));
 
         attackerSprite.style.setProperty('--lunge-duration', t.windupMs + 'ms');
         attackerSprite.classList.add(attackerSide === 'hero' ? 'lunge-right' : 'lunge-left');
@@ -131,5 +140,6 @@ window.battleEffects = {
         fx.remove();
         attackerSprite.classList.remove('lunge-right', 'lunge-left');
         defenderSprite.classList.remove('is-shaking');
+        banner.remove();
     }
 };
