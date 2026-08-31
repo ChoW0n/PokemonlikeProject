@@ -363,14 +363,28 @@ public sealed class BattleEngine
             await ExecuteMoveAsync(attacker, defender, move, executingMoveKey, attackerIsHero, emit, result, isContinuation);
         }
 
-        if (attacker.IsFainted && !defender.IsFainted) result.FaintedPokemon = attacker;
+        if (attacker.IsFainted && defender.IsFainted)
+        {
+            result.FaintedPokemon = attacker;
+            result.OtherFaintedPokemon = defender;
+        }
+        else if (attacker.IsFainted) result.FaintedPokemon = attacker;
         else if (defender.IsFainted) result.FaintedPokemon = defender;
+
         if (result.FaintedPokemon != null)
         {
             await emit(BattleEvent.ActorStep(
                 BattleEventPhase.Faint,
                 result.FaintedPokemon,
                 ReferenceEquals(result.FaintedPokemon, attacker) ? attackerIsHero : !attackerIsHero));
+        }
+
+        if (result.OtherFaintedPokemon != null)
+        {
+            await emit(BattleEvent.ActorStep(
+                BattleEventPhase.Faint,
+                result.OtherFaintedPokemon,
+                ReferenceEquals(result.OtherFaintedPokemon, attacker) ? attackerIsHero : !attackerIsHero));
         }
         return result;
     }

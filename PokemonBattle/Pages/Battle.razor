@@ -536,6 +536,21 @@
         }
         if (result.FaintedPokemon == null) return false;
 
+        if (result.OtherFaintedPokemon != null)
+        {
+            // 더블 KO(예: 대폭발/자폭으로 공격자·방어자 동시 기절).
+            // 방어자는 데미지로 쓰러진 것이므로 안내 메시지 필요. 상대 쪽을 먼저
+            // 처리(자동 교체/승리 판정)한 뒤 내 쪽(교체 선택/패배 판정)을 처리한다.
+            await ShowMessage(FaintLine(defender));
+            var enemyFainted = attackerIsHero ? defender : attacker;
+            var heroFainted = attackerIsHero ? attacker : defender;
+            
+            await HandleFaint(enemyFainted, false);
+            if (EnemyTeam.All(p => p.IsFainted)) return true; // 승리 처리 후 이미 이동됨
+            
+            return await HandleFaint(heroFainted, true);
+        }
+
         bool faintedIsAttacker = ReferenceEquals(result.FaintedPokemon, attacker);
         if (!faintedIsAttacker)
         {
@@ -735,10 +750,6 @@
         {
             await ShowMessage(message, 1000);
         }
-
-        string? enemyMoveKey = Rules.PickEnemyMove(Enemy, EnemyMoveKeys, Hero);
-        if (await RunTurn(Enemy, Hero, enemyMoveKey, false)) return;
-        if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }
 
         await Rules.ApplyEndOfTurnEffectsAsync(new[] { Hero, Enemy }, PlayBattleEvent);
         if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }

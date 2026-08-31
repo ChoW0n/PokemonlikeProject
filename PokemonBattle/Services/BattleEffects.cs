@@ -132,6 +132,7 @@ public sealed record BattleEvent(
 public sealed class BattleTurnResult
 {
     public Pokemon? FaintedPokemon { get; set; }
+    public Pokemon? OtherFaintedPokemon { get; set; }
     public Pokemon? ForcedSwitchPokemon { get; set; }
     public string? ForcedSwitchReason { get; set; }
 }
@@ -215,11 +216,16 @@ public sealed class BattlePowerContext
 public sealed class BattleEndOfTurnContext
 {
     public Pokemon Pokemon { get; }
+    public Pokemon? Opponent { get; }
     public Func<BattleEvent, Task> Emit { get; }
 
-    public BattleEndOfTurnContext(Pokemon pokemon, Func<BattleEvent, Task> emit)
+    public BattleEndOfTurnContext(
+        Pokemon pokemon,
+        Func<BattleEvent, Task> emit,
+        Pokemon? opponent = null)
     {
         Pokemon = pokemon;
+        Opponent = opponent;
         Emit = emit;
     }
 
