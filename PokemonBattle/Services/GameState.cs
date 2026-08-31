@@ -85,6 +85,12 @@ public class GameState
         _runLoaded = true;
     }
 
+    public async Task ReloadRunForCurrentUser()
+    {
+        _runLoaded = false;
+        await LoadRunForCurrentUser();
+    }
+
 
     private async Task PersistRun()
     {

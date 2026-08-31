@@ -55,3 +55,6 @@ PokemonBattle/bin/
 PokemonBattle/obj/
 .vs/
 *.user
+
+# External Claude upload bundle
+/claude-context-bundle.md

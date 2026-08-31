@@ -1,7 +1,25 @@
-# Pokemon Battle — Claude Sonnet 인수인계
+# Pokemon Battle — Claude 앱/웹 Sonnet 인수인계
 
 > 이 문서는 현재 작업의 읽기 쉬운 요약입니다. 최신 파일 상태는 항상
-> `bash scripts/claude-context.sh`와 실제 `git diff`로 다시 확인하세요.
+> `bash scripts/export-claude-context.sh`로 번들을 다시 생성하고 실제 변경 내용을 확인하세요.
+
+## Claude 앱/웹 접근 방식
+
+Claude 앱/웹은 Replit 작업공간의 로컬 파일을 자동으로 읽을 수 없습니다.
+Replit Shell에서 다음 명령을 실행한 후 생성된 `claude-context-bundle.md`를 Claude 대화에 업로드하세요.
+
+```bash
+bash scripts/export-claude-context.sh
+```
+
+전체 소스가 필요한 대규모 작업은 다음 명령을 사용합니다.
+
+```bash
+bash scripts/export-claude-context.sh full
+```
+
+새 변경을 반영하려면 번들을 다시 생성해 재업로드해야 합니다. 실시간 자동 동기화가 필요하면
+GitHub 저장소 연결을 별도로 구성해야 하며, 이 문서만으로 외부 Claude에 접근 권한이 생기지는 않습니다.
 
 ## 제품과 목표
 
@@ -83,6 +101,7 @@ Unity 없이 순수 C#/.NET 8 Blazor Server로 만든 싱글플레이 포켓몬 
 4. 날씨·필드 상태를 만지는 모든 테스트는 `Reset()`을 호출하고 테스트 간 공유 상태가 섞이지 않게 유지하세요.
 5. 서버 코드 변경 후에는 기존 워크플로를 재시작하고 `/healthz`, 빌드, 전체 테스트를 다시 확인하세요.
 6. 작업 완료 시 이 문서의 `현재 변경 파일`·`검증된 상태`를 최신 사실에 맞게 갱신하세요.
+7. Claude 앱/웹에서 작업했다면 변경 후 새 번들을 생성해 다음 대화에 전달하세요.
 
 ## 충돌 방지 규칙
 

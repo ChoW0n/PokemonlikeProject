@@ -9,6 +9,7 @@ public sealed class AdminOperationsService
 {
     private readonly AppDbContext _db;
     private readonly CurrentUserService _currentUser;
+    private static readonly int[] StarterIds = { 1, 4, 7 };
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         IncludeFields = true
@@ -141,6 +142,36 @@ public sealed class AdminOperationsService
         return await SaveWithAuditAsync("전체 포켓몬 해금", username, $"{PokemonDatabase.All.Count}종 해금 상태로 설정함");
     }
 
+    public async Task<AdminActionResult> ResetUnlocksToStartersAsync(string targetUsername)
+    {
+        var target = await FindTargetAsync(targetUsername, allowSelf: true);
+        if (target == null)
+        {
+            return Failure("대상 계정을 찾을 수 없거나 작업 권한이 없습니다.");
+        }
+
+        string username = target.Username;
+        var unlocks = await _db.UnlockedPokemons
+            .Where(unlock => unlock.Username == username)
+            .ToListAsync();
+        _db.UnlockedPokemons.RemoveRange(unlocks.Where(unlock => !StarterIds.Contains(unlock.PokemonId)));
+
+        var existingIds = unlocks.Select(unlock => unlock.PokemonId).ToHashSet();
+        foreach (int starterId in StarterIds)
+        {
+            if (!existingIds.Contains(starterId) && PokemonDatabase.All.ContainsKey(starterId))
+            {
+                _db.UnlockedPokemons.Add(new UnlockedPokemon
+                {
+                    Username = username,
+                    PokemonId = starterId
+                });
+            }
+        }
+
+        return await SaveWithAuditAsync("스타터 해금 복원", username, "스타터만 남기도록 도감을 초기화함");
+    }
+
     public async Task<AdminActionResult> SetLegendaryProgressAsync(string targetUsername, int progressPercent)
     {
         var target = await FindTargetAsync(targetUsername, allowSelf: true);
@@ -153,6 +184,19 @@ public sealed class AdminOperationsService
         var run = await GetOrCreateRunAsync(target.Username);
         run.LegendaryProgressPercent = safeProgress;
         return await SaveWithAuditAsync("전설 진행률 변경", target.Username, $"{safeProgress}%로 설정함");
+    }
+
+    public async Task<AdminActionResult> ClearLegendaryHistoryAsync(string targetUsername)
+    {
+        var target = await FindTargetAsync(targetUsername, allowSelf: true);
+        if (target == null)
+        {
+            return Failure("대상 계정을 찾을 수 없거나 작업 권한이 없습니다.");
+        }
+
+        var run = await GetOrCreateRunAsync(target.Username);
+        run.LegendaryEncounterHistoryJson = "[]";
+        return await SaveWithAuditAsync("전설 출현 이력 삭제", target.Username, "저장된 전설 출현 이력을 모두 삭제함");
     }
 
     public async Task<AdminActionResult> SetScoresAsync(string targetUsername, int currentScore, int highScore)
@@ -221,7 +265,10 @@ public sealed class AdminOperationsService
 
     private async Task<UserAccount?> FindTargetAsync(string targetUsername, bool allowSelf)
     {
-        if (!_currentUser.IsAdmin || string.IsNullOrWhiteSpace(targetUsername))
+        if (!_currentUser.IsLoggedIn
+            || string.IsNullOrWhiteSpace(targetUsername)
+            || !await _db.Users.AnyAsync(user =>
+                user.Username == _currentUser.Username && user.IsAdmin))
         {
             return null;
         }
