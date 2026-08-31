@@ -318,7 +318,7 @@
             .Where(user => string.IsNullOrWhiteSpace(UserSearch)
                 || user.Username.Contains(UserSearch.Trim(), StringComparison.OrdinalIgnoreCase))
             .ToList()
-        ?? Array.Empty<AdminUserSnapshot>();
+        ?? new List<AdminUserSnapshot>();
 
     protected override async Task OnInitializedAsync()
     {

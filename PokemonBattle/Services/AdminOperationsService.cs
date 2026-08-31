@@ -120,10 +120,11 @@ public sealed class AdminOperationsService
         }
 
         string username = target.Username;
-        var owned = await _db.UnlockedPokemons
+        var owned = (await _db.UnlockedPokemons
             .Where(unlock => unlock.Username == username)
             .Select(unlock => unlock.PokemonId)
-            .ToHashSetAsync();
+            .ToListAsync())
+            .ToHashSet();
 
         foreach (int pokemonId in PokemonDatabase.All.Keys)
         {
