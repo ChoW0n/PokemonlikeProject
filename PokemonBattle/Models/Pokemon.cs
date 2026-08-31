@@ -22,6 +22,8 @@ public class Pokemon
     public bool IsAlternateForm { get; private set; }
     public bool HasConsumedBerry { get; private set; }
     public bool HasPickedUpItem { get; private set; }
+    public bool IsSteelType => Data.Type1 == PokemonType.Steel || Data.Type2 == PokemonType.Steel;
+    public bool CanBeForcedSwitched => SelectedAbility != "흡반";
     private string? ConsumedBerryName { get; set; }
     public bool LastHitWasCritical { get; private set; }
     public bool IsProtected { get; private set; }

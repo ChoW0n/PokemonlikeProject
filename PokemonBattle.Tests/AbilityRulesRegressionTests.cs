@@ -288,6 +288,59 @@ public sealed class AbilityRulesRegressionTests
     }
 
     [Fact]
+    public void Run_away_allows_wild_escape_and_magnet_pull_only_traps_steel()
+    {
+        var engine = CreateFullEngine();
+        var wildOpponent = CreatePokemon(132, "tackle");
+        var runner = CreatePokemon(132, "tackle", ability: "도주");
+
+        Assert.True(engine.CanEscape(runner, wildOpponent));
+        Assert.True(engine.CanEscape(CreatePokemon(132, "tackle"), wildOpponent));
+        Assert.False(engine.CanEscape(runner, wildOpponent, isWildBattle: false));
+
+        var magnetPull = CreatePokemon(81, "tackle", ability: "자력");
+        var steelTarget = CreatePokemon(81, "tackle");
+        var nonSteelTarget = CreatePokemon(132, "tackle");
+
+        Assert.False(engine.CanSwitch(steelTarget, magnetPull));
+        Assert.True(engine.CanSwitch(nonSteelTarget, magnetPull));
+        Assert.True(engine.CanSwitch(
+            CreatePokemon(81, "tackle", ability: "자력"),
+            magnetPull));
+    }
+
+    [Fact]
+    public async Task Suction_cups_blocks_forced_switch_but_not_regular_switch()
+    {
+        var engine = CreateFullEngine();
+        var suctionCups = CreatePokemon(686, "tackle", ability: "흡반");
+        var attacker = CreatePokemon(95, "dragon-tail");
+        var events = new List<BattleEvent>();
+
+        Assert.False(suctionCups.CanBeForcedSwitched);
+        Assert.True(engine.CanSwitch(suctionCups, attacker));
+
+        var blocked = await engine.TakeTurnAsync(
+            attacker, suctionCups, "dragon-tail", true, Capture(events));
+
+        Assert.Null(blocked.ForcedSwitchPokemon);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("흡반", StringComparison.Ordinal) == true);
+
+        var switchingAttacker = CreatePokemon(113, "u-turn");
+        var freshSuctionCups = CreatePokemon(686, "tackle", ability: "흡반");
+        var switchResult = await engine.TakeTurnAsync(
+            switchingAttacker, freshSuctionCups, "u-turn", true, _ => Task.CompletedTask);
+        Assert.Same(switchingAttacker, switchResult.ForcedSwitchPokemon);
+
+        var normalTarget = CreatePokemon(132, "tackle");
+        var allowed = await engine.TakeTurnAsync(
+            CreatePokemon(95, "dragon-tail"), normalTarget, "dragon-tail", true, _ => Task.CompletedTask);
+
+        Assert.Same(normalTarget, allowed.ForcedSwitchPokemon);
+    }
+
+    [Fact]
     public async Task Form_change_abilities_update_stats_and_emit_logs()
     {
         var aegislash = CreatePokemon(681, "tackle", "kings-shield", ability: "배틀스위치");

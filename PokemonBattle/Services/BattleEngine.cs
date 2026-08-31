@@ -41,7 +41,23 @@ public sealed class BattleEngine
             && active.Data.Type2 != PokemonType.Flying
             && !isGhostType
             && active.SelectedAbility != "부유") return false;
+        if (opponent.SelectedAbility == "자력"
+            && active.IsSteelType
+            && active.SelectedAbility != "자력") return false;
         return true;
+    }
+
+    /// <summary>
+    /// Determines whether the active Pokémon can leave a wild battle.
+    /// This is a permission check for the escape action; a regular wild
+    /// encounter is allowed when no trapping condition applies, while Run
+    /// Away explicitly bypasses those conditions.
+    /// </summary>
+    public bool CanEscape(Pokemon active, Pokemon opponent, bool isWildBattle = true)
+    {
+        if (!isWildBattle || active.IsFainted) return false;
+        if (active.SelectedAbility == "도주") return true;
+        return CanSwitch(active, opponent);
     }
 
     public double PreviewMultiplier(Move move, Pokemon target, Pokemon? attacker = null)
