@@ -3,4 +3,5 @@
 - [Blazor EF Core context concurrency](blazor-dbcontext-concurrency.md) — await scoped database saves before navigation; fire-and-forget writes can crash the next component's query.
 - [PostgreSQL persistence tests](postgres-persistence-tests.md) — isolate integration data in a temporary schema and always drop it during cleanup.
 - [Blazor ARIA booleans](blazor-aria-boolean-attributes.md) — render dynamic aria-expanded/pressed states as explicit "true"/"false" strings.
+- [Blazor browser test timing](blazor-browser-test-timing.md) — use event-aware input and stable rendered markers around Interactive Server UI actions.
 - [Post-merge workspace setup](post-merge-workspace-setup.md) — recover catalog lockfile drift, but never force an empty Drizzle schema over Blazor EF tables.
