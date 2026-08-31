@@ -59,7 +59,7 @@ public sealed record BattleEvent(
             BaseDelayMs: phase == BattleEventPhase.Faint ? 850 : 650,
             EffectKind: phase == BattleEventPhase.Faint ? "faint" : "switch",
             AttackerIsHero: actorIsHero,
-            EffectType: actor.Data.Type1,
+            EffectType: actor.CurrentType1,
             MoveName: actor.Data.Name,
             Phase: phase,
             AttackerActorId: actor.ActorId,

@@ -119,10 +119,11 @@ public sealed class StatusAndItemRegressionTests
             attacker, defender, "thunderbolt", attackerIsHero: true,
             _ => Task.CompletedTask);
 
-        int expectedDamage = (int)(move.Power
+        int expectedDamage = (int)(((2.0 * attacker.Level / 5 + 2)
+            * move.Power
             * 1.5 // Electric STAB.
             * 1.2 // 자석.
-            * ((double)attacker.EffectiveSpAtk / defender.EffectiveSpDef));
+            * ((double)attacker.EffectiveSpAtk / defender.EffectiveSpDef)) / 50) + 2;
 
         Assert.Equal(expectedDamage, hpBefore - defender.CurrentHp);
         Assert.False(defender.IsFainted);

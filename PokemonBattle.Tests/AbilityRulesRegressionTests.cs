@@ -13,8 +13,9 @@ public sealed class AbilityRulesRegressionTests
         var sniper = CreatePokemon(132, moveKey, ability: "스나이퍼");
         var target = CreatePokemon(202, "tackle");
         int hpBefore = target.CurrentHp;
-        int scaledPower = (int)(MoveDatabase.All[moveKey].Power
-            * ((double)sniper.EffectiveSpAtk / target.EffectiveSpDef));
+        int scaledPower = (int)(((2.0 * sniper.Level / 5 + 2)
+            * MoveDatabase.All[moveKey].Power
+            * ((double)sniper.EffectiveSpAtk / target.EffectiveSpDef)) / 50) + 2;
         int expectedSniperDamage = (int)((int)(scaledPower * 1.5) * 1.5);
         var events = new List<BattleEvent>();
 
@@ -29,8 +30,9 @@ public sealed class AbilityRulesRegressionTests
         var normalAttacker = CreatePokemon(132, moveKey);
         var armoredTarget = CreatePokemon(202, "tackle", ability: "조가비갑옷");
         hpBefore = armoredTarget.CurrentHp;
-        int expectedNormalDamage = (int)(MoveDatabase.All[moveKey].Power
-            * ((double)normalAttacker.EffectiveSpAtk / armoredTarget.EffectiveSpDef));
+        int expectedNormalDamage = (int)(((2.0 * normalAttacker.Level / 5 + 2)
+            * MoveDatabase.All[moveKey].Power
+            * ((double)normalAttacker.EffectiveSpAtk / armoredTarget.EffectiveSpDef)) / 50) + 2;
         events.Clear();
 
         await CreateFullEngine().TakeTurnAsync(
@@ -386,6 +388,107 @@ public sealed class AbilityRulesRegressionTests
         Assert.True(darmanitan.SpAtk > standardSpecialAttack);
         Assert.Contains(events, battleEvent =>
             battleEvent.Message?.Contains("달마모드", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task Multitype_uses_plate_type_for_judgment_stab_and_effectiveness()
+    {
+        Assert.True(AbilityDatabase.IsImplemented("멀티타입"));
+        var arceus = CreatePokemon(
+            493, "judgment", ability: "멀티타입", heldItem: "불꽃플레이트");
+        var grassTarget = CreatePokemon(1, "tackle");
+
+        Assert.Equal(PokemonType.Fire, arceus.CurrentType1);
+        Assert.Null(arceus.CurrentType2);
+        Assert.Equal(
+            PokemonType.Fire,
+            MoveRuleMetadata.ResolveMoveType("judgment", MoveDatabase.All["judgment"], arceus));
+
+        var events = new List<BattleEvent>();
+        await CreateFullEngine().TakeTurnAsync(
+            arceus, grassTarget, "judgment", true, Capture(events));
+
+        Assert.Equal(PokemonType.Fire, events.First(e =>
+            e.Phase == BattleEventPhase.Impact && e.MoveKey == "judgment").EffectType);
+        Assert.Equal(2.0, grassTarget.LastMultiplier);
+
+        arceus.HeldItem = "물방울플레이트";
+        Assert.Equal(PokemonType.Water, arceus.CurrentType1);
+        Assert.Equal(
+            PokemonType.Water,
+            MoveRuleMetadata.ResolveMoveType("judgment", MoveDatabase.All["judgment"], arceus));
+    }
+
+    [Fact]
+    public async Task Protean_changes_type_before_the_move_and_resets_on_switch()
+    {
+        Assert.True(AbilityDatabase.IsImplemented("변환자재"));
+        var protean = CreatePokemon(352, "shadow-claw", ability: "변환자재");
+        var target = CreatePokemon(6, "tackle");
+        var events = new List<BattleEvent>();
+
+        Assert.Equal(PokemonType.Normal, protean.CurrentType1);
+        await CreateFullEngine().TakeTurnAsync(
+            protean, target, "shadow-claw", true, Capture(events));
+
+        Assert.Equal(PokemonType.Ghost, protean.CurrentType1);
+        Assert.Null(protean.CurrentType2);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Phase == BattleEventPhase.Announce
+            && battleEvent.EffectType == PokemonType.Ghost);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("변환자재", StringComparison.Ordinal) == true);
+
+        CreateFullEngine().PrepareSwitchOut(protean);
+        Assert.Equal(PokemonType.Normal, protean.CurrentType1);
+        Assert.False(protean.IsTransformed);
+    }
+
+    [Fact]
+    public async Task Color_change_uses_the_received_type_for_future_matchups()
+    {
+        Assert.True(AbilityDatabase.IsImplemented("변색"));
+        var colorChanger = CreatePokemon(352, "tackle", ability: "변색");
+        var waterAttacker = CreatePokemon(7, "water-gun");
+        var events = new List<BattleEvent>();
+
+        await CreateFullEngine().TakeTurnAsync(
+            waterAttacker, colorChanger, "water-gun", false, Capture(events));
+
+        Assert.Equal(PokemonType.Water, colorChanger.CurrentType1);
+        Assert.Null(colorChanger.CurrentType2);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("변색", StringComparison.Ordinal) == true);
+
+        var electricMove = MoveDatabase.All["thunder-shock"];
+        Assert.Equal(2.0, CreateFullEngine().PreviewMultiplier(
+            electricMove, colorChanger, CreatePokemon(25, "thunder-shock")));
+    }
+
+    [Fact]
+    public void Imposter_copies_species_form_moves_and_types_without_changing_hp_or_ability()
+    {
+        Assert.True(AbilityDatabase.IsImplemented("괴짜"));
+        var ditto = CreatePokemon(132, "tackle", ability: "괴짜");
+        var plateArceus = CreatePokemon(
+            493, "judgment", ability: "멀티타입", heldItem: "불꽃플레이트");
+        int dittoMaxHp = ditto.MaxHp;
+        var messages = CreateFullEngine().ActivateSwitchIn(ditto, plateArceus);
+
+        Assert.True(ditto.IsTransformed);
+        Assert.Equal("아르세우스", ditto.Data.Name);
+        Assert.Equal("괴짜", ditto.SelectedAbility);
+        Assert.Equal(PokemonType.Fire, ditto.CurrentType1);
+        Assert.Equal(dittoMaxHp, ditto.MaxHp);
+        Assert.True(ditto.CanUseMove("judgment"));
+        Assert.Contains(messages, message => message.Contains("괴짜", StringComparison.Ordinal));
+
+        CreateFullEngine().PrepareSwitchOut(ditto);
+        Assert.False(ditto.IsTransformed);
+        Assert.Equal("메타몽", ditto.Data.Name);
+        Assert.Equal(PokemonType.Normal, ditto.CurrentType1);
+        Assert.True(ditto.CanUseMove("tackle"));
+        Assert.False(ditto.CanUseMove("judgment"));
     }
 
     [Fact]

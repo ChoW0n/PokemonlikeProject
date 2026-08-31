@@ -32,13 +32,12 @@ public sealed class BattleEngine
     public bool CanSwitch(Pokemon active, Pokemon opponent)
     {
         if (active.Ingrained || active.BindingTurnsRemaining > 0) return false;
-        bool isGhostType = active.Data.Type1 == PokemonType.Ghost || active.Data.Type2 == PokemonType.Ghost;
+        bool isGhostType = active.HasType(PokemonType.Ghost);
         if (opponent.SelectedAbility == "그림자밟기"
             && !isGhostType
             && active.SelectedAbility != "그림자밟기") return false;
         if (opponent.SelectedAbility == "개미지옥"
-            && active.Data.Type1 != PokemonType.Flying
-            && active.Data.Type2 != PokemonType.Flying
+            && !active.HasType(PokemonType.Flying)
             && !isGhostType
             && active.SelectedAbility != "부유") return false;
         if (opponent.SelectedAbility == "자력"
@@ -63,8 +62,8 @@ public sealed class BattleEngine
     public double PreviewMultiplier(Move move, Pokemon target, Pokemon? attacker = null)
     {
         PokemonType attackType = attacker?.ResolveMoveType(move) ?? move.Type;
-        double multiplier = TypeChart.GetMultiplier(attackType, target.Data.Type1);
-        if (target.Data.Type2 != null) multiplier *= TypeChart.GetMultiplier(attackType, target.Data.Type2.Value);
+        double multiplier = TypeChart.GetMultiplier(attackType, target.CurrentType1);
+        if (target.CurrentType2 != null) multiplier *= TypeChart.GetMultiplier(attackType, target.CurrentType2.Value);
         if (target.IsImmuneToMoveType(attackType)) multiplier = 0;
         if (target.SelectedAbility == "불가사의부적" && multiplier > 0 && multiplier < 2.0) multiplier = 0;
         return multiplier;
@@ -88,6 +87,12 @@ public sealed class BattleEngine
     {
         var messages = new List<string>();
         entrant.ResetFieldCounter();
+
+        string originalName = entrant.Data.Name;
+        if (entrant.TryTransformInto(opponent))
+        {
+            messages.Add($"{originalName}의 괴짜로 {entrant.Data.Name}으로 변신했다!");
+        }
 
         string? weather = entrant.SelectedAbility switch
         {
@@ -184,7 +189,7 @@ public sealed class BattleEngine
             {
                 PokemonType attackType = MoveRuleMetadata.ResolveMoveType(key, move, enemy);
                 double averageHits = (move.MinHits + move.MaxHits) / 2.0;
-                bool stab = attackType == enemy.Data.Type1 || enemy.Data.Type2 == attackType;
+                bool stab = enemy.HasType(attackType);
                 score = MoveRuleMetadata.EffectivePower(key, move) * averageHits * (stab ? 1.5 : 1.0)
                     * PreviewMultiplier(move, hero, enemy)
                     * ((move.AlwaysHits ? 100 : MoveRuleMetadata.EffectiveAccuracy(key, move)) / 100.0);
@@ -328,6 +333,11 @@ public sealed class BattleEngine
 
             attacker.MarkMoveUsed(executingMoveKey);
             var announceType = MoveRuleMetadata.ResolveMoveType(executingMoveKey, move, attacker);
+            if (attacker.TryChangeTypeForMove(announceType))
+            {
+                await emit(BattleEvent.MessageLine(
+                    $"{attacker.Data.Name}의 변환자재로 {announceType}타입으로 변했다!"));
+            }
             await emit(BattleEvent.MoveStep(
                 BattleEventPhase.Announce,
                 attacker,
@@ -616,7 +626,7 @@ public sealed class BattleEngine
             int attackStat = GetAttackStat(attacker, defender, moveKey, move);
             int defenseStat = GetDefenseStat(defender, moveKey, move);
             double power = MoveRuleMetadata.EffectivePower(moveKey, move, attacker, defender);
-            bool stab = attackType == attacker.Data.Type1 || attacker.Data.Type2 == attackType;
+            bool stab = attacker.HasType(attackType);
             if (stab) power *= 1.5;
             if (attacker.ChargeBoostActive && attackType == PokemonType.Electric)
             {
@@ -640,7 +650,9 @@ public sealed class BattleEngine
                     await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 공격이 급소에 맞았다!"));
                 }
                 int hpBefore = defender.CurrentHp;
-                int scaledPower = (int)(power * ((double)attackStat / Math.Max(defenseStat, 1)));
+                int scaledPower = (int)(((2.0 * attacker.Level / 5 + 2)
+                    * power
+                    * ((double)attackStat / Math.Max(defenseStat, 1))) / 50) + 2;
                 if (isCritical && attacker.SelectedAbility == "스나이퍼") scaledPower = (int)(scaledPower * 1.5);
                 defender.TakeDamage(
                     scaledPower,
@@ -649,8 +661,7 @@ public sealed class BattleEngine
                     isCritical,
                     MoveRuleMetadata.SecondaryAttackType(moveKey),
                     moveKey == "freeze-dry"
-                        && (defender.Data.Type1 == PokemonType.Water
-                            || defender.Data.Type2 == PokemonType.Water) ? 2.0 : 1.0,
+                        && defender.HasType(PokemonType.Water) ? 2.0 : 1.0,
                     ignoresGroundImmunity: bypassesGroundImmunity);
                 context.LastHitDamage = hpBefore - defender.CurrentHp;
                 context.TotalDamage += context.LastHitDamage;

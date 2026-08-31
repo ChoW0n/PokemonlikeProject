@@ -4,6 +4,7 @@ namespace PokemonBattle.Models;
 public enum GameScreen
 {
     Start,        //타이틀 화면
+    StarterSelect,//새 런 스타터 선택
     EnemyPreview, //상대 라인업 미리보기
     TeamSelect,   //포켓몬 도감/선택 화면
     Battle,       //전투 화면

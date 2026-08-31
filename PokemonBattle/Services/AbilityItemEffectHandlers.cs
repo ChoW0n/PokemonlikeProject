@@ -26,7 +26,7 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
             && (move.AilmentChance > 0 || move.FlinchChance > 0 || move.StatChanges.Count > 0)) context.Power *= 1.3;
         if (attacker.SelectedAbility is "프리즈스킨" or "페어리스킨" && move.Type == PokemonType.Normal) context.Power *= 1.2;
         if (attacker.SelectedAbility == "적응력"
-            && (attackType == attacker.Data.Type1 || attacker.Data.Type2 == attackType))
+            && attacker.HasType(attackType))
         {
             // STAB is applied by BattleEngine before handlers; replace 1.5x with 2x.
             context.Power *= 2.0 / 1.5;
@@ -144,8 +144,8 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
 
     private static double BattleTypeMultiplier(PokemonType attackType, Pokemon defender)
     {
-        double multiplier = TypeChart.GetMultiplier(attackType, defender.Data.Type1);
-        if (defender.Data.Type2 != null) multiplier *= TypeChart.GetMultiplier(attackType, defender.Data.Type2.Value);
+        double multiplier = TypeChart.GetMultiplier(attackType, defender.CurrentType1);
+        if (defender.CurrentType2 != null) multiplier *= TypeChart.GetMultiplier(attackType, defender.CurrentType2.Value);
         return multiplier;
     }
 }
@@ -157,6 +157,13 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
     public async Task AfterHitAsync(BattleEffectContext context)
     {
         if (context.LastHitDamage <= 0) return;
+
+        if (!context.Defender.IsFainted
+            && context.Defender.TryChangeTypeFromHit(context.AttackType))
+        {
+            await context.ShowMessage(
+                $"{context.Defender.Data.Name}의 변색으로 {context.AttackType}타입으로 변했다!");
+        }
 
         if (!context.Defender.IsFainted && context.AttackType == PokemonType.Dark
             && context.Defender.SelectedAbility == "정의의마음")
@@ -287,10 +294,11 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
 
         if (pokemon.IsFainted || pokemon.SelectedAbility is "매직가드" or "방진") return;
         bool sandDamage = BattleWeather.Current == "모래바람"
-            && pokemon.Data.Type1 is not (PokemonType.Rock or PokemonType.Ground or PokemonType.Steel)
-            && pokemon.Data.Type2 is not (PokemonType.Rock or PokemonType.Ground or PokemonType.Steel);
+            && !pokemon.HasType(PokemonType.Rock)
+            && !pokemon.HasType(PokemonType.Ground)
+            && !pokemon.HasType(PokemonType.Steel);
         bool hailDamage = BattleWeather.Current == "싸라기눈"
-            && pokemon.Data.Type1 != PokemonType.Ice && pokemon.Data.Type2 != PokemonType.Ice;
+            && !pokemon.HasType(PokemonType.Ice);
         if (sandDamage || hailDamage)
         {
             await DamageAsync(context, Math.Max(1, pokemon.MaxHp / 16),

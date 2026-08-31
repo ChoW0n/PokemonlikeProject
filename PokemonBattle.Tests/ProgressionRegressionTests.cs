@@ -75,6 +75,52 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public void ProItemExcludesChoiceItemsWhenMovesetHasAStatusMove()
+    {
+        var items = new[]
+        {
+            ItemDatabase.GeneralItems.First(item => item.Name == "구애머리띠"),
+            ItemDatabase.GeneralItems.First(item => item.Name == "구애안경"),
+            ItemDatabase.GeneralItems.First(item => item.Name == "구애스카프"),
+            ItemDatabase.GeneralItems.First(item => item.Name == "생명의구슬")
+        };
+
+        var selected = EnemyTeamProvider.PickProItem(
+            new[] { "tackle", "growl" },
+            items);
+
+        Assert.Equal("생명의구슬", selected);
+    }
+
+    [Fact]
+    public void ProItemMatchesChoiceItemToPurePhysicalMoveset()
+    {
+        var items = new[]
+        {
+            ItemDatabase.GeneralItems.First(item => item.Name == "구애머리띠"),
+            ItemDatabase.GeneralItems.First(item => item.Name == "구애안경"),
+            ItemDatabase.GeneralItems.First(item => item.Name == "생명의구슬")
+        };
+
+        var selected = EnemyTeamProvider.PickProItem(
+            new[] { "tackle" },
+            items);
+
+        Assert.Equal("구애머리띠", selected);
+    }
+
+    [Fact]
+    public void ProAbilityOnlySelectsImplementedAbilities()
+    {
+        var data = PokemonDatabase.All.Values
+            .First(pokemon => pokemon.AbilityNames.Any(AbilityDatabase.IsImplemented));
+
+        var selected = EnemyTeamProvider.PickProAbility(data, new[] { "tackle", "growl" });
+
+        Assert.True(AbilityDatabase.IsImplemented(selected));
+    }
+
+    [Fact]
     public async Task InMemoryPresetsUpdateDeleteAndIsolateUsers()
     {
         var currentUser = new CurrentUserService();

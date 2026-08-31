@@ -72,6 +72,8 @@
         <LegendaryHistory />
         <button type="button" @onclick="RestartGame">처음부터 다시 시작</button>
     }
+
+    <button type="button" @onclick="OpenCollection">획득한 포켓몬 전체 보기</button>
 </main>
 
 @code {
@@ -132,6 +134,8 @@
     private async Task RestartGame()
     {
         await State.ResetForNewRun();
-        Nav.NavigateTo("/");
+        Nav.NavigateTo("/starter");
     }
+
+    private void OpenCollection() => Nav.NavigateTo("/collection");
 }

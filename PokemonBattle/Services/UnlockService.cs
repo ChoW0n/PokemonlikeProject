@@ -27,20 +27,27 @@ public class UnlockService
             .Select(u => u.PokemonId)
             .ToListAsync();
 
-        if (owned.Count == 0) //해금한 게 하나도 없으면(신규 유저) 스타터 지급
+        if (owned.Count < StarterIds.Length) //해금한 포켓몬이 3마리 미만인 신규 유저에게 스타터 보충
         {
-            await EnsureStarters();
-            owned = StarterIds.ToList();
+            await EnsureStarters(owned);
+            owned = owned
+                .Concat(StarterIds)
+                .Distinct()
+                .ToList();
         }
 
         return owned.ToHashSet();
     }
 
-    private async Task EnsureStarters()
+    private async Task EnsureStarters(IEnumerable<int> ownedIds)
     {
+        var owned = ownedIds.ToHashSet();
         foreach (var id in StarterIds)
         {
-            _db.UnlockedPokemons.Add(new UnlockedPokemon { Username = _currentUser.Username!, PokemonId = id });
+            if (!owned.Contains(id))
+            {
+                _db.UnlockedPokemons.Add(new UnlockedPokemon { Username = _currentUser.Username!, PokemonId = id });
+            }
         }
         await _db.SaveChangesAsync();
     }

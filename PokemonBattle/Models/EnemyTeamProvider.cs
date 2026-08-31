@@ -4,6 +4,38 @@ public static class EnemyTeamProvider
 {
     private static readonly Random rng = new Random();
 
+    private static readonly HashSet<string> OffensiveAbilities = new()
+    {
+        "근성", "독폭주", "우격다짐", "이판사판", "철주먹", "테크니션",
+        "색안경", "노가드", "의욕", "적응력", "자기과신", "천하장사",
+        "순수한힘", "단단한발톱", "메가런처", "옹골찬턱", "프리즈스킨",
+        "페어리스킨", "스나이퍼", "투쟁심", "승기", "피뢰침", "마중물",
+        "선파워", "맹화", "급류", "벌레의알림", "가뭄", "모래의힘",
+        "다운로드"
+    };
+
+    private static readonly HashSet<string> PhysicalOffensiveAbilities = new()
+    {
+        "근성", "독폭주", "우격다짐", "이판사판", "철주먹", "테크니션",
+        "의욕", "천하장사", "순수한힘", "단단한발톱", "옹골찬턱", "투쟁심"
+    };
+
+    private static readonly HashSet<string> SpecialOffensiveAbilities = new()
+    {
+        "색안경", "적응력", "승기", "피뢰침", "마중물", "선파워", "맹화",
+        "급류", "벌레의알림", "모래의힘", "다운로드", "메가런처"
+    };
+
+    private static readonly HashSet<string> DefensiveAbilities = new()
+    {
+        "멀티스케일", "재생력", "포이즌힐", "매직가드", "옹골참", "필터",
+        "하드록", "퍼코트", "이상한비늘", "두꺼운지방", "내열", "저수",
+        "축전", "자연회복", "촉촉바디", "아이스바디", "수의베일", "면역",
+        "불면", "마이페이스", "유연", "조가비갑옷", "전투무장", "방진",
+        "부유", "에어록", "날씨부정", "풀모피", "하얀연기", "클리어바디",
+        "괴력집게", "방탄", "불굴의마음"
+    };
+
     //전설/환상 포켓몬 도감번호. 진행률 100% 달성 전까지 일반 랜덤 조우에서 제외
     private static readonly HashSet<int> LegendaryIds = new()
     {
@@ -128,5 +160,199 @@ public static class EnemyTeamProvider
         }
 
         return chosen.Take(4).ToList();
+    }
+
+    public static string PickProAbility(PokemonData data, IEnumerable<string> moveKeys)
+    {
+        var abilities = data.AbilityNames
+            .Where(AbilityDatabase.IsImplemented)
+            .Distinct()
+            .ToList();
+
+        if (abilities.Count == 0)
+        {
+            return data.AbilityNames.FirstOrDefault() ?? "";
+        }
+
+        var profile = AnalyzeMoveset(moveKeys);
+        return WeightedPick(abilities, ability => AbilityWeight(ability, profile));
+    }
+
+    public static string PickProItem(
+        IEnumerable<string> moveKeys,
+        IEnumerable<Item> availableItems,
+        ISet<string>? usedItemNames = null)
+    {
+        var available = availableItems
+            .Where(item => usedItemNames == null || !usedItemNames.Contains(item.Name))
+            .GroupBy(item => item.Name, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .ToList();
+
+        if (available.Count == 0)
+        {
+            return "없음";
+        }
+
+        var profile = AnalyzeMoveset(moveKeys);
+        var weightedItems = available
+            .Select(item => (Item: item, Weight: ItemWeight(item.Name, profile)))
+            .Where(item => item.Weight > 0)
+            .ToList();
+
+        return weightedItems.Count == 0
+            ? "없음"
+            : WeightedPick(weightedItems, item => item.Weight).Item.Name;
+    }
+
+    private static double AbilityWeight(string ability, MoveProfile profile)
+    {
+        double weight = 1.0;
+        bool physicalFocused = profile.PhysicalCount > profile.SpecialCount;
+        bool specialFocused = profile.SpecialCount > profile.PhysicalCount;
+
+        if (OffensiveAbilities.Contains(ability))
+        {
+            weight += 2.0;
+        }
+
+        if (physicalFocused && PhysicalOffensiveAbilities.Contains(ability))
+        {
+            weight += 2.5;
+        }
+
+        if (specialFocused && SpecialOffensiveAbilities.Contains(ability))
+        {
+            weight += 2.5;
+        }
+
+        if (DefensiveAbilities.Contains(ability))
+        {
+            weight += profile.IsSurvivalFocused ? 3.5 : 0.5;
+        }
+
+        if (profile.HasStatusMove && ability == "짓궂은마음")
+        {
+            weight += 3.0;
+        }
+
+        return weight;
+    }
+
+    private static double ItemWeight(string itemName, MoveProfile profile)
+    {
+        if (itemName is "구애머리띠" or "구애안경" or "구애스카프")
+        {
+            if (profile.HasStatusMove)
+            {
+                return 0;
+            }
+
+            if (profile.IsPurePhysical)
+            {
+                return itemName switch
+                {
+                    "구애머리띠" => 10,
+                    "구애스카프" => 6,
+                    _ => 0
+                };
+            }
+
+            if (profile.IsPureSpecial)
+            {
+                return itemName switch
+                {
+                    "구애안경" => 10,
+                    "구애스카프" => 6,
+                    _ => 0
+                };
+            }
+
+            return 0;
+        }
+
+        if (profile.HasStatusMove)
+        {
+            return itemName switch
+            {
+                "생명의구슬" => 7,
+                "기합의띠" => 6,
+                "먹다남은음식" => 4,
+                "자뭉열매" or "오랭열매" or "무화열매" or "리샘열매" => 2.5,
+                "없음" => 0.5,
+                _ => 1
+            };
+        }
+
+        if (profile.IsPurePhysical || profile.IsPureSpecial)
+        {
+            return itemName switch
+            {
+                "생명의구슬" => 4,
+                "기합의띠" => 3,
+                "먹다남은음식" => 2,
+                "없음" => 0.5,
+                _ => 1
+            };
+        }
+
+        return itemName switch
+        {
+            "생명의구슬" => 4,
+            "기합의띠" => 3,
+            "먹다남은음식" => 2,
+            "없음" => 0.5,
+            _ => 1
+        };
+    }
+
+    private static MoveProfile AnalyzeMoveset(IEnumerable<string> moveKeys)
+    {
+        var moves = moveKeys
+            .Select(key => MoveDatabase.All.TryGetValue(key, out var move) ? move : null)
+            .Where(move => move != null)
+            .Cast<Move>()
+            .ToList();
+
+        int physicalCount = moves.Count(move => !move.IsStatus && !move.IsSpecial && move.Power > 0);
+        int specialCount = moves.Count(move => !move.IsStatus && move.IsSpecial && move.Power > 0);
+        bool hasStatus = moves.Any(move => move.IsStatus);
+        bool hasRecovery = moves.Any(move => move.HealingPercent > 0 || move.DrainPercent > 0);
+
+        return new MoveProfile(
+            physicalCount,
+            specialCount,
+            hasStatus,
+            hasRecovery);
+    }
+
+    private static T WeightedPick<T>(IReadOnlyList<T> values, Func<T, double> weightSelector)
+    {
+        double totalWeight = values.Sum(value => weightSelector(value));
+        double roll = rng.NextDouble() * totalWeight;
+
+        foreach (var value in values)
+        {
+            roll -= weightSelector(value);
+            if (roll <= 0) return value;
+        }
+
+        return values[^1];
+    }
+
+    private sealed record MoveProfile(
+        int PhysicalCount,
+        int SpecialCount,
+        bool HasStatusMove,
+        bool HasRecoveryMove)
+    {
+        public bool IsPurePhysical =>
+            !HasStatusMove && PhysicalCount > 0 && SpecialCount == 0;
+
+        public bool IsPureSpecial =>
+            !HasStatusMove && SpecialCount > 0 && PhysicalCount == 0;
+
+        public bool IsSurvivalFocused =>
+            HasStatusMove || HasRecoveryMove || PhysicalCount + SpecialCount <= 1;
     }
 }
