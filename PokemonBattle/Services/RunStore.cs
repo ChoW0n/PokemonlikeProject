@@ -18,19 +18,36 @@ public class RunStore
         _db = db;
     }
 
-    public async Task<(int score, int highScore, List<PokemonLoadout> loadouts, int legendaryProgressPercent)> Load(string username)
+    public async Task<(
+        int score,
+        int highScore,
+        List<PokemonLoadout> loadouts,
+        int legendaryProgressPercent,
+        List<LegendaryEncounterHistoryEntry> legendaryEncounterHistory)> Load(string username)
     {
         var run = await _db.PlayerRuns.FirstOrDefaultAsync(r => r.Username == username);
-        if (run == null) return (0, 0, new List<PokemonLoadout>(), 0);
+        if (run == null)
+        {
+            return (
+                0,
+                0,
+                new List<PokemonLoadout>(),
+                0,
+                new List<LegendaryEncounterHistoryEntry>());
+        }
 
         var loadouts = JsonSerializer.Deserialize<List<PokemonLoadout>>(
             run.LoadoutsJson,
             LoadoutJsonOptions) ?? new List<PokemonLoadout>();
+        var legendaryEncounterHistory = JsonSerializer.Deserialize<List<LegendaryEncounterHistoryEntry>>(
+            run.LegendaryEncounterHistoryJson,
+            LoadoutJsonOptions) ?? new List<LegendaryEncounterHistoryEntry>();
         return (
             run.CurrentScore,
             Math.Max(0, run.HighScore),
             loadouts,
-            Math.Clamp(run.LegendaryProgressPercent, 0, LegendaryProgression.MaxProgressPercent));
+            Math.Clamp(run.LegendaryProgressPercent, 0, LegendaryProgression.MaxProgressPercent),
+            legendaryEncounterHistory);
     }
 
     public async Task Save(
@@ -38,10 +55,14 @@ public class RunStore
         int score,
         int highScore,
         List<PokemonLoadout> loadouts,
-        int legendaryProgressPercent)
+        int legendaryProgressPercent,
+        IReadOnlyList<LegendaryEncounterHistoryEntry>? legendaryEncounterHistory = null)
     {
         var run = await _db.PlayerRuns.FirstOrDefaultAsync(r => r.Username == username);
         string json = JsonSerializer.Serialize(loadouts, LoadoutJsonOptions);
+        string historyJson = JsonSerializer.Serialize(
+            legendaryEncounterHistory ?? new List<LegendaryEncounterHistoryEntry>(),
+            LoadoutJsonOptions);
         int safeHighScore = Math.Max(0, highScore);
         int safeProgress = Math.Clamp(legendaryProgressPercent, 0, LegendaryProgression.MaxProgressPercent);
 
@@ -53,7 +74,8 @@ public class RunStore
                 CurrentScore = score,
                 HighScore = safeHighScore,
                 LoadoutsJson = json,
-                LegendaryProgressPercent = safeProgress
+                LegendaryProgressPercent = safeProgress,
+                LegendaryEncounterHistoryJson = historyJson
             });
         }
         else
@@ -62,6 +84,10 @@ public class RunStore
             run.HighScore = Math.Max(run.HighScore, safeHighScore);
             run.LoadoutsJson = json;
             run.LegendaryProgressPercent = safeProgress;
+            if (legendaryEncounterHistory != null)
+            {
+                run.LegendaryEncounterHistoryJson = historyJson;
+            }
         }
 
         await _db.SaveChangesAsync();

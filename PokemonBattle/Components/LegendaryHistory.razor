@@ -1,0 +1,36 @@
+@using PokemonBattle.Models
+@using PokemonBattle.Services
+@inject GameState State
+
+<section class="legendary-history" aria-labelledby="legendary-history-title">
+    <h2 id="legendary-history-title">전설 출현 주기 이력</h2>
+    @if (State.LegendaryEncounterHistory.Count == 0)
+    {
+        <p>아직 완료한 전설 출현 주기가 없습니다.</p>
+    }
+    else
+    {
+        <ol class="legendary-history-list">
+            @foreach (var entry in State.LegendaryEncounterHistory.OrderByDescending(item => item.CycleNumber))
+            {
+                <li>
+                    <strong>@entry.CycleNumber주기</strong>
+                    <span>@entry.Stage스테이지 · @LegendaryNames(entry.PokemonIds)</span>
+                    <time datetime="@entry.EncounteredAtUtc.ToString("O")">@entry.EncounteredAtUtc.ToLocalTime().ToString("yyyy.MM.dd HH:mm")</time>
+                </li>
+            }
+        </ol>
+    }
+</section>
+
+@code {
+    private static string LegendaryNames(IEnumerable<int> pokemonIds)
+    {
+        var names = pokemonIds
+            .Where(PokemonDatabase.All.ContainsKey)
+            .Select(id => PokemonDatabase.All[id].Name)
+            .ToList();
+
+        return names.Count == 0 ? "전설 라인업" : string.Join(", ", names);
+    }
+}

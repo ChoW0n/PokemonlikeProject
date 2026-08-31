@@ -51,7 +51,8 @@ using (var scope = app.Services.CreateScope())
             ""CurrentScore"" INTEGER NOT NULL,
             ""HighScore"" INTEGER NOT NULL DEFAULT 0,
             ""LoadoutsJson"" TEXT NOT NULL,
-            ""LegendaryProgressPercent"" INTEGER NOT NULL DEFAULT 0
+            ""LegendaryProgressPercent"" INTEGER NOT NULL DEFAULT 0,
+            ""LegendaryEncounterHistoryJson"" TEXT NOT NULL DEFAULT '[]'
         );
         CREATE TABLE IF NOT EXISTS ""UserPresets"" (
             ""Id"" SERIAL PRIMARY KEY,
@@ -66,6 +67,8 @@ using (var scope = app.Services.CreateScope())
             ADD COLUMN IF NOT EXISTS ""HighScore"" INTEGER NOT NULL DEFAULT 0;
         ALTER TABLE ""PlayerRuns""
             ADD COLUMN IF NOT EXISTS ""LegendaryProgressPercent"" INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE ""PlayerRuns""
+            ADD COLUMN IF NOT EXISTS ""LegendaryEncounterHistoryJson"" TEXT NOT NULL DEFAULT '[]';
     ");
 
     if (!db.Users.Any(u => u.Username == "admin"))
