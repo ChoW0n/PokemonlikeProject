@@ -53,6 +53,8 @@ Thumbs.db
 # .NET
 PokemonBattle/bin/
 PokemonBattle/obj/
+PokemonBattle.Tests/bin/
+PokemonBattle.Tests/obj/
 .vs/
 *.user
 

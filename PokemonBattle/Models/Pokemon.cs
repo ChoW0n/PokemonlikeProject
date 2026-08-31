@@ -2,7 +2,10 @@ namespace PokemonBattle.Models;
 
 public class Pokemon
 {
+    private static int nextActorNumber;
+
     public PokemonData Data;
+    public string ActorId { get; }
     public int Level;
     public int CurrentHp;
     public bool IsFainted;
@@ -56,6 +59,8 @@ public class Pokemon
     public HashSet<string> UsedMoveKeys { get; } = new();
     public int StockpileCount { get; private set; }
     public bool RageActive { get; private set; }
+
+    public string FormKey => IsAlternateForm ? "alternate" : "default";
 
     public StatusCondition Status = StatusCondition.None;
     public int SleepTurnsRemaining;
@@ -193,6 +198,7 @@ public class Pokemon
     public Pokemon(PokemonData data, List<string>? chosenMoves = null, string ability = "", string item = "없음", int level = 1)
     {
         Data = data;
+        ActorId = $"{data.EnglishName}-{Interlocked.Increment(ref nextActorNumber)}";
         Level = level;
         CurrentHp = MaxHp;
         IsFainted = false;

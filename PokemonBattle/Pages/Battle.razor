@@ -22,6 +22,7 @@
 
     <section class="arena-stage" aria-label="배틀 상태" aria-describedby="battle-state-summary">
         <p id="battle-state-summary" class="visually-hidden">상대와 내 포켓몬의 이름, 레벨, 타입, 현재 HP와 상태 이상을 표시합니다.</p>
+        <div id="battle-fx-layer" class="battle-fx-layer" aria-hidden="true"></div>
         <div class="stage-slot slot-top">
             <div class="hud-plate" aria-label="@($"{Enemy.Data.Name} 상태: HP {Enemy.CurrentHp}/{Enemy.MaxHp}{(StatusText(Enemy) == "" ? "" : $", {StatusText(Enemy)}")}")">
                 <span class="hud-name">@Enemy.Data.Name</span>
@@ -44,11 +45,19 @@
                 }
             </div>
             <div class="platform-shadow"></div>
-            <img id="sprite-enemy" src="@Enemy.Data.EffectiveImageUrl" alt="@Enemy.Data.Name" class="fighter-sprite" />
+            <img id="sprite-enemy" src="@Enemy.Data.EffectiveImageUrl" alt="@Enemy.Data.Name"
+                 @key="Enemy.ActorId"
+                 class="fighter-sprite @(Enemy.IsFainted ? "is-fainted" : "")"
+                 data-slot="enemy" data-actor-id="@Enemy.ActorId" data-species="@Enemy.Data.EnglishName"
+                 data-form="@Enemy.FormKey" data-state="@(Enemy.IsFainted ? "fainted" : "idle")" />
         </div>
 
         <div class="stage-slot slot-bottom">
-            <img id="sprite-hero" src="@Hero.Data.EffectiveBackImageUrl" alt="@Hero.Data.Name" class="fighter-sprite" />
+            <img id="sprite-hero" src="@Hero.Data.EffectiveBackImageUrl" alt="@Hero.Data.Name"
+                 @key="Hero.ActorId"
+                 class="fighter-sprite @(Hero.IsFainted ? "is-fainted" : "")"
+                 data-slot="hero" data-actor-id="@Hero.ActorId" data-species="@Hero.Data.EnglishName"
+                 data-form="@Hero.FormKey" data-state="@(Hero.IsFainted ? "fainted" : "idle")" />
             <div class="platform-shadow"></div>
             <div class="hud-plate" aria-label="@($"{Hero.Data.Name} 상태: HP {Hero.CurrentHp}/{Hero.MaxHp}{(StatusText(Hero) == "" ? "" : $", {StatusText(Hero)}")}")">
                 <span class="hud-name">@Hero.Data.Name</span>
@@ -220,10 +229,17 @@
         }
 
         <div class="battle-log-panel" role="log" aria-live="polite" aria-atomic="false" aria-label="전투 로그">
-            @foreach (var entry in LogHistory)
+            @for (int logIndex = 0; logIndex < LogHistory.Count; logIndex++)
             {
-                <p class="log-line @(entry == LogHistory[^1] ? "is-latest" : "is-fading")">
+                var entry = LogHistory[logIndex];
+                <p class="log-line @(logIndex == LogHistory.Count - 1 ? "is-latest" : "is-fading")">
                     <span class="log-marker"></span><span class="log-text" data-full="@entry">@entry</span>
+                </p>
+            }
+            @if (!string.IsNullOrWhiteSpace(PromptText))
+            {
+                <p class="log-line log-prompt" role="status">
+                    <span class="log-marker"></span><span class="log-text">@PromptText</span>
                 </p>
             }
         </div>
@@ -249,15 +265,31 @@
 
     private int Turn;
     private bool IsBusy;
+    private int narrationCursor;
 
-    private List<string> LogHistory = new() { "행동을 선택하세요." };
+    private List<string> LogHistory = new();
+    private string? PromptText = "행동을 선택하세요.";
 
     private double SpeedMultiplier = 1.0;
-    private string SpeedLabel => SpeedMultiplier == 1.0 ? "x1" : SpeedMultiplier == 1.6 ? "x1.6" : "x2.4";
+    private string SpeedLabel => SpeedMultiplier switch
+    {
+        1.0 => "x1",
+        1.6 => "x1.6",
+        2.4 => "x2.4",
+        3.5 => "x3.5",
+        _ => "x5"
+    };
 
     private void CycleSpeed()
     {
-        SpeedMultiplier = SpeedMultiplier == 1.0 ? 1.6 : SpeedMultiplier == 1.6 ? 2.4 : 1.0;
+        SpeedMultiplier = SpeedMultiplier switch
+        {
+            1.0 => 1.6,
+            1.6 => 2.4,
+            2.4 => 3.5,
+            3.5 => 5.0,
+            _ => 1.0
+        };
     }
 
     private Random rng = new Random();
@@ -319,6 +351,32 @@
         return string.Join(", ", parts);
     }
 
+    private string FaintLine(Pokemon pokemon)
+    {
+        string[] variants =
+        {
+            $"{pokemon.Data.Name}은(는) 쓰러졌다!",
+            $"{pokemon.Data.Name}은(는) 전투 불능이 되었다!",
+            $"{pokemon.Data.Name}의 힘이 다했다!"
+        };
+        return variants[narrationCursor++ % variants.Length];
+    }
+
+    private async Task BeginEffects()
+    {
+        await JS.InvokeVoidAsync("battleEffects.beginSequence");
+    }
+
+    private async Task EndEffects()
+    {
+        await JS.InvokeVoidAsync("battleEffects.endSequence");
+    }
+
+    private async Task CancelEffects()
+    {
+        await JS.InvokeVoidAsync("battleEffects.cancel");
+    }
+
     protected override void OnInitialized()
     {
         if (State.PlayerLoadouts.Count > 0)
@@ -357,10 +415,10 @@
         if (initialAbilityMessages.Count > 0)
         {
             LogHistory = initialAbilityMessages
-                .Append("행동을 선택하세요.")
                 .TakeLast(4)
                 .ToList();
         }
+        PromptText = "행동을 선택하세요.";
     }
 
     private Pokemon BuildRandomEnemy(int id, int level)
@@ -396,6 +454,7 @@
     //메시지 추가 + 타이핑 재생 + 읽을 시간 대기 (전부 배속 반영)
     private async Task ShowMessage(string message, int baseDelayMs = 1400)
     {
+        PromptText = null;
         LogHistory.Add(message);
         if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
 
@@ -409,15 +468,18 @@
         await Task.Delay((int)readDelay);
     }
 
-    private async Task PlayEffect(string kind, bool attackerIsHero, PokemonType type)
-    {
-        await JS.InvokeVoidAsync("battleEffects.play", kind, attackerIsHero ? "hero" : "enemy", TypeColors.GetHex(type));
-    }
-
     private async Task PlayBattleEvent(BattleEvent battleEvent)
     {
+        if (battleEvent.Message != null)
+        {
+            await ShowMessage(battleEvent.Message, battleEvent.BaseDelayMs);
+        }
+
         if (battleEvent.EffectKind != null && battleEvent.EffectType != null)
         {
+            //Damage/status fields are applied by the rules before the impact
+            //event; paint the HUD before waiting for the visual effect.
+            StateHasChanged();
             string attackerName = battleEvent.AttackerIsHero ? Hero.Data.Name : Enemy.Data.Name;
             await JS.InvokeVoidAsync(
                 "battleEffects.play",
@@ -426,11 +488,18 @@
                 TypeColors.GetHex(battleEvent.EffectType.Value),
                 battleEvent.MoveName ?? "기술",
                 attackerName,
-                TypeKor(battleEvent.EffectType.Value));
-        }
-        else if (battleEvent.Message != null)
-        {
-            await ShowMessage(battleEvent.Message, battleEvent.BaseDelayMs);
+                TypeKor(battleEvent.EffectType.Value),
+                battleEvent.Phase.ToString().ToLowerInvariant(),
+                SpeedMultiplier,
+                battleEvent.PresentationKey ?? battleEvent.MoveKey ?? "",
+                battleEvent.Target ?? "opponent",
+                battleEvent.HitIndex,
+                battleEvent.HitCount,
+                battleEvent.Damage,
+                battleEvent.Effectiveness,
+                battleEvent.IsCritical,
+                battleEvent.AttackerActorId ?? "",
+                battleEvent.DefenderActorId ?? "");
         }
     }
 
@@ -470,7 +539,7 @@
         bool faintedIsAttacker = ReferenceEquals(result.FaintedPokemon, attacker);
         if (!faintedIsAttacker)
         {
-            await ShowMessage($"{result.FaintedPokemon.Data.Name}은(는) 쓰러졌다!");
+            await ShowMessage(FaintLine(result.FaintedPokemon));
         }
 
         return await HandleFaint(
@@ -482,9 +551,9 @@
     {
         if (isHero)
         {
+            await CancelEffects();
             Menu = BattleMenu.ForcedSwitch;
-            LogHistory.Add("기술의 효과로 교체할 포켓몬을 선택하세요.");
-            if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
+            PromptText = "기술의 효과로 교체할 포켓몬을 선택하세요.";
             IsBusy = false;
             StateHasChanged();
             return true;
@@ -496,6 +565,7 @@
             return false;
         }
 
+        await PlayBattleEvent(BattleEvent.ActorStep(BattleEventPhase.Switch, Enemy, actorIsHero: false));
         Rules.PrepareSwitchOut(Enemy);
         EnemyTeamIndex++;
         EnemyMoveKeys = ResolveMoveKeys(Enemy);
@@ -507,13 +577,13 @@
 
     private async Task<bool> HandleFaint(Pokemon fainted, bool faintedIsHero)
     {
+        await CancelEffects();
         if (faintedIsHero)
         {
             if (PlayerTeam.Any(p => !p.IsFainted))
             {
                 Menu = BattleMenu.ForcedSwitch;
-                LogHistory.Add("쓰러진 포켓몬 대신 내보낼 포켓몬을 선택하세요.");
-                if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
+                PromptText = "쓰러진 포켓몬 대신 내보낼 포켓몬을 선택하세요.";
                 IsBusy = false;
                 StateHasChanged();
                 return true;
@@ -534,8 +604,7 @@
                 {
                     await ShowMessage(message, 1000);
                 }
-                LogHistory.Add("행동을 선택하세요.");
-                if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
+                PromptText = "행동을 선택하세요.";
                 IsBusy = false;
                 Menu = BattleMenu.Main;
                 StateHasChanged();
@@ -567,6 +636,7 @@
 
         PendingMoveKey = null;
         IsBusy = true;
+        await BeginEffects();
         Menu = BattleMenu.Main;
         Turn++;
 
@@ -594,19 +664,21 @@
         if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }
         if (Enemy.IsFainted) { if (await HandleFaint(Enemy, false)) return; }
 
-        LogHistory.Add("행동을 선택하세요.");
-        if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
+        PromptText = "행동을 선택하세요.";
         IsBusy = false;
+        await EndEffects();
         StateHasChanged();
     }
 
     private async void SwitchTo(int newIndex)
     {
         IsBusy = true;
+        await BeginEffects();
         Menu = BattleMenu.Main;
         Turn++;
 
         var outgoing = Hero;
+        await PlayBattleEvent(BattleEvent.ActorStep(BattleEventPhase.Switch, outgoing, actorIsHero: true));
         int hpBeforeSwitch = outgoing.CurrentHp;
         var statusBeforeSwitch = outgoing.Status;
         Rules.PrepareSwitchOut(outgoing);
@@ -632,9 +704,9 @@
         await Rules.ApplyEndOfTurnEffectsAsync(new[] { Hero, Enemy }, PlayBattleEvent);
         if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }
 
-        LogHistory.Add("행동을 선택하세요.");
-        if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
+        PromptText = "행동을 선택하세요.";
         IsBusy = false;
+        await EndEffects();
         StateHasChanged();
     }
 
@@ -643,7 +715,10 @@
         if (idx < 0 || idx >= PlayerTeam.Count || PlayerTeam[idx].IsFainted)
             return;
 
+        IsBusy = true;
+        await BeginEffects();
         var outgoing = Hero;
+        await PlayBattleEvent(BattleEvent.ActorStep(BattleEventPhase.Switch, outgoing, actorIsHero: true));
         int hpBeforeSwitch = outgoing.CurrentHp;
         var statusBeforeSwitch = outgoing.Status;
         Rules.PrepareSwitchOut(outgoing);
@@ -669,9 +744,9 @@
         if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }
         if (Enemy.IsFainted) { if (await HandleFaint(Enemy, false)) return; }
 
-        LogHistory.Add("행동을 선택하세요.");
-        if (LogHistory.Count > 4) LogHistory.RemoveAt(0);
+        PromptText = "행동을 선택하세요.";
         IsBusy = false;
+        await EndEffects();
         StateHasChanged();
     }
 }

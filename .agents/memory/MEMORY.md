@@ -6,3 +6,4 @@
 - [Blazor browser test timing](blazor-browser-test-timing.md) — use event-aware input and stable rendered markers around Interactive Server UI actions.
 - [Post-merge workspace setup](post-merge-workspace-setup.md) — recover catalog lockfile drift, but never force an empty Drizzle schema over Blazor EF tables.
 - [Battle environment state](battle-environment-state.md) — shared weather/terrain state requires reset and serialized tests.
+- [Battle FX contracts](battle-fx-contracts.md) — presentation keys must share the CSS/config vocabulary and normalize legacy aliases.
