@@ -28,6 +28,8 @@ public sealed record BattleEvent(
 public sealed class BattleTurnResult
 {
     public Pokemon? FaintedPokemon { get; set; }
+    public Pokemon? ForcedSwitchPokemon { get; set; }
+    public string? ForcedSwitchReason { get; set; }
 }
 
 public sealed record BattleTurnPlan(string? EnemyMoveKey, bool HeroFirst);
@@ -47,6 +49,9 @@ public sealed class BattleEffectContext
     public int LastHitDamage { get; set; }
     public int ActualHits { get; set; }
     public bool WasAbsorbed { get; set; }
+    public bool RequestSwitch { get; set; }
+    public Pokemon? SwitchPokemon { get; set; }
+    public string? SwitchReason { get; set; }
 
     public BattleEffectContext(
         Pokemon attacker,

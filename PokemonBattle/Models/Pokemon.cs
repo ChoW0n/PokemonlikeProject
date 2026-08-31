@@ -20,6 +20,42 @@ public class Pokemon
     public bool HasConsumedBerry { get; private set; }
     public bool LastHitWasCritical { get; private set; }
     public bool IsProtected { get; private set; }
+    public int ProtectionStreak { get; private set; }
+    public string? PendingMoveKey { get; private set; }
+    public string? PendingDelayedAttackKey { get; private set; }
+    public int PendingDelayedAttackTurns { get; private set; }
+    public Pokemon? PendingDelayedTarget { get; private set; }
+    public bool MustRecharge { get; private set; }
+    public bool IsSemiInvulnerable { get; private set; }
+    public bool WasDamagedThisTurn { get; private set; }
+    public bool LastDamageTakenThisTurn => WasDamagedThisTurn;
+    public bool IsBadlyPoisoned { get; private set; }
+    public int ToxicTurns { get; private set; }
+    public bool LeechSeeded { get; private set; }
+    public Pokemon? LeechSeedSource { get; private set; }
+    public bool Ingrained { get; private set; }
+    public string? BindingMoveKey { get; private set; }
+    public int BindingTurnsRemaining { get; private set; }
+    public int YawnTurnsRemaining { get; private set; }
+    public int PerishTurnsRemaining { get; private set; }
+    public int HealBlockTurnsRemaining { get; private set; }
+    public int TauntTurnsRemaining { get; private set; }
+    public int TormentTurnsRemaining { get; private set; }
+    public int ThroatChopTurnsRemaining { get; private set; }
+    public int EmbargoTurnsRemaining { get; private set; }
+    public string? EncoreMoveKey { get; private set; }
+    public int EncoreTurnsRemaining { get; private set; }
+    public HashSet<string> ImprisonedMoveKeys { get; } = new();
+    public bool IsInfatuated { get; private set; }
+    public bool UproarActive { get; private set; }
+    public int UproarTurnsRemaining { get; private set; }
+    public bool NightmareActive { get; private set; }
+    public bool ChargeBoostActive { get; private set; }
+    public bool TypeImmunityRevealed { get; private set; }
+    public string? LastMoveKey { get; private set; }
+    public HashSet<string> UsedMoveKeys { get; } = new();
+    public int StockpileCount { get; private set; }
+    public bool RageActive { get; private set; }
 
     public StatusCondition Status = StatusCondition.None;
     public int SleepTurnsRemaining;
@@ -187,8 +223,21 @@ public class Pokemon
     {
         if (!CurrentPP.TryGetValue(moveName, out var pp) || pp <= 0) return false;
         if (DisabledMoveKey == moveName) return false;
+        if (ImprisonedMoveKeys.Contains(moveName)) return false;
         if (IsChoiceItem && ChoiceLockedMove != null && ChoiceLockedMove != moveName) return false;
         if (moveName == "belch" && !HasConsumedBerry) return false;
+        if (moveName is "snore" or "dream-eater" && Status != StatusCondition.Sleep) return false;
+        if (moveName == "fake-out" && TurnsOnField > 0) return false;
+        if (moveName == "last-resort"
+            && CurrentPP.Keys.Any(key => key != "last-resort" && !UsedMoveKeys.Contains(key))) return false;
+        if (HealBlockTurnsRemaining > 0 && MoveDatabase.All.TryGetValue(moveName, out var blockedMove)
+            && blockedMove.HealingPercent > 0) return false;
+        if (TauntTurnsRemaining > 0 && MoveDatabase.All.TryGetValue(moveName, out var tauntMove)
+            && tauntMove.IsStatus) return false;
+        if (TormentTurnsRemaining > 0 && LastMoveKey == moveName) return false;
+        if (EncoreTurnsRemaining > 0 && EncoreMoveKey != null && EncoreMoveKey != moveName) return false;
+        if (ThroatChopTurnsRemaining > 0 && moveName is "uproar" or "snore" or "hyper-voice"
+            or "boomburst" or "sing" or "supersonic" or "roar" or "screech") return false;
         return true;
     }
 
@@ -212,6 +261,39 @@ public class Pokemon
         TurnsOnField = 0;
         IsAlternateForm = false;
         IsProtected = false;
+        ProtectionStreak = 0;
+        PendingMoveKey = null;
+        // Future Sight/Doom Desire remain pending when their user switches out.
+        // The immediate charge move below is cancelled by switching.
+        MustRecharge = false;
+        IsSemiInvulnerable = false;
+        WasDamagedThisTurn = false;
+        IsBadlyPoisoned = false;
+        ToxicTurns = 0;
+        LeechSeeded = false;
+        LeechSeedSource = null;
+        Ingrained = false;
+        BindingMoveKey = null;
+        BindingTurnsRemaining = 0;
+        YawnTurnsRemaining = 0;
+        PerishTurnsRemaining = 0;
+        HealBlockTurnsRemaining = 0;
+        TauntTurnsRemaining = 0;
+        TormentTurnsRemaining = 0;
+        ThroatChopTurnsRemaining = 0;
+        EmbargoTurnsRemaining = 0;
+        EncoreMoveKey = null;
+        EncoreTurnsRemaining = 0;
+        ImprisonedMoveKeys.Clear();
+        IsInfatuated = false;
+        UproarActive = false;
+        UproarTurnsRemaining = 0;
+        NightmareActive = false;
+        ChargeBoostActive = false;
+        TypeImmunityRevealed = false;
+        LastMoveKey = null;
+        StockpileCount = 0;
+        RageActive = false;
     }
 
     public bool CanChangeStage(string stat, int delta, bool causedByOpponent = false)
@@ -235,7 +317,20 @@ public class Pokemon
     {
         TurnsOnField++;
         IsProtected = false;
+        Flinched = false;
+        WasDamagedThisTurn = false;
         if (DisabledTurnsRemaining > 0 && --DisabledTurnsRemaining == 0) DisabledMoveKey = null;
+        if (HealBlockTurnsRemaining > 0) HealBlockTurnsRemaining--;
+        if (TauntTurnsRemaining > 0) TauntTurnsRemaining--;
+        if (TormentTurnsRemaining > 0) TormentTurnsRemaining--;
+        if (ThroatChopTurnsRemaining > 0) ThroatChopTurnsRemaining--;
+        if (EmbargoTurnsRemaining > 0) EmbargoTurnsRemaining--;
+        if (EncoreTurnsRemaining > 0 && --EncoreTurnsRemaining == 0) EncoreMoveKey = null;
+        if (BindingTurnsRemaining > 0 && --BindingTurnsRemaining == 0) BindingMoveKey = null;
+        if (YawnTurnsRemaining > 0) YawnTurnsRemaining--;
+        if (UproarTurnsRemaining > 0 && --UproarTurnsRemaining == 0) UproarActive = false;
+        if (PendingDelayedAttackKey != null && PendingDelayedAttackTurns > 0)
+            PendingDelayedAttackTurns--;
     }
 
     public void ResetFieldCounter() => TurnsOnField = 0;
@@ -259,6 +354,8 @@ public class Pokemon
 
     public bool IsImmuneToAilment(string ailmentName)
     {
+        if (ailmentName == "toxic") ailmentName = "poison";
+        if (ailmentName == "sleep" && UproarActive) return true;
         if (BattleField.Current is BattleField.Electric or BattleField.Misty)
         {
             if (ailmentName is "sleep" or "poison" or "paralysis" or "burn" or "freeze")
@@ -277,7 +374,7 @@ public class Pokemon
     public bool IsImmuneToConfusion() =>
         SelectedAbility == "마이페이스" || BattleField.Current == BattleField.Misty;
 
-    public void ApplyAilment(string ailmentName)
+    public void ApplyAilment(string ailmentName, Random? random = null)
     {
         if (Status != StatusCondition.None) return;
         if (IsImmuneToAilment(ailmentName)) return;
@@ -289,20 +386,27 @@ public class Pokemon
             "burn" => StatusCondition.Burn,
             "sleep" => StatusCondition.Sleep,
             "freeze" => StatusCondition.Freeze,
+            "toxic" => StatusCondition.Poison,
             _ => StatusCondition.None
         };
-        if (Status == StatusCondition.Sleep) SleepTurnsRemaining = rng.Next(1, 4);
+        if (Status == StatusCondition.Poison && ailmentName == "toxic")
+        {
+            IsBadlyPoisoned = true;
+            ToxicTurns = 1;
+        }
+        if (Status == StatusCondition.Sleep) SleepTurnsRemaining = (random ?? rng).Next(1, 4);
     }
 
-    public void ApplyConfusion()
+    public void ApplyConfusion(Random? random = null)
     {
         if (IsConfused || IsImmuneToConfusion()) return;
         IsConfused = true;
-        ConfusionTurnsRemaining = rng.Next(1, 5);
+        ConfusionTurnsRemaining = (random ?? rng).Next(1, 5);
     }
 
-    public (bool canAct, string? message) CheckActionPrevention()
+    public (bool canAct, string? message) CheckActionPrevention(Random? random = null)
     {
+        random ??= rng;
         if (IsConfused)
         {
             ConfusionTurnsRemaining--;
@@ -310,7 +414,7 @@ public class Pokemon
             {
                 IsConfused = false;
             }
-            else if (rng.Next(100) < 33)
+            else if (random.Next(100) < 33)
             {
                 int selfDamage = Math.Max(1, (int)(((2.0 * Level / 5 + 2) * 40 * ((double)Atk / Math.Max(Def, 1))) / 50) + 2);
                 CurrentHp = Math.Max(0, CurrentHp - selfDamage);
@@ -318,6 +422,9 @@ public class Pokemon
                 return (false, $"{Data.Name}은(는) 혼란해서 자기 자신을 공격했다!");
             }
         }
+
+        if (IsInfatuated && random.Next(100) < 50)
+            return (false, $"{Data.Name}은(는) 헤롱헤롱해서 움직일 수 없다!");
 
         switch (Status)
         {
@@ -331,7 +438,7 @@ public class Pokemon
                 return (false, $"{Data.Name}은(는) 잠들어 있다...");
 
             case StatusCondition.Freeze:
-                if (rng.Next(100) < 20)
+                if (random.Next(100) < 20)
                 {
                     Status = StatusCondition.None;
                     return (true, $"{Data.Name}의 얼음이 녹았다!");
@@ -339,7 +446,7 @@ public class Pokemon
                 return (false, $"{Data.Name}은(는) 얼어붙어 움직일 수 없다!");
 
             case StatusCondition.Paralysis:
-                if (rng.Next(100) < 25)
+                if (random.Next(100) < 25)
                 {
                     return (false, $"{Data.Name}은(는) 몸이 저려서 움직일 수 없다!");
                 }
@@ -372,7 +479,9 @@ public class Pokemon
         }
         if (Status == StatusCondition.Poison)
         {
-            int dmg = Math.Max(1, MaxHp / 8);
+            int dmg = IsBadlyPoisoned
+                ? Math.Max(1, MaxHp * Math.Min(16, Math.Max(1, ToxicTurns++)) / 16)
+                : Math.Max(1, MaxHp / 8);
             CurrentHp = Math.Max(0, CurrentHp - dmg);
             if (CurrentHp == 0) IsFainted = true;
             return $"{Data.Name}은(는) 독으로 데미지를 입었다!";
@@ -428,15 +537,51 @@ public class Pokemon
         return (false, null);
     }
 
-    public void TakeDamage(int rawDamage, PokemonType attackType, bool isSpecial = false, bool isCritical = false)
+    public void TakeDamage(
+        int rawDamage,
+        PokemonType attackType,
+        bool isSpecial = false,
+        bool isCritical = false,
+        PokemonType? secondaryAttackType = null,
+        double moveEffectivenessMultiplier = 1.0,
+        bool ignoresGroundImmunity = false)
     {
         double multiplier = TypeChart.GetMultiplier(attackType, Data.Type1);
         if (Data.Type2 != null)
         {
             multiplier *= TypeChart.GetMultiplier(attackType, Data.Type2.Value);
         }
+        if (secondaryAttackType != null)
+        {
+            multiplier *= TypeChart.GetMultiplier(secondaryAttackType.Value, Data.Type1);
+            if (Data.Type2 != null)
+                multiplier *= TypeChart.GetMultiplier(secondaryAttackType.Value, Data.Type2.Value);
+        }
+        multiplier *= moveEffectivenessMultiplier;
 
         if (IsImmuneToMoveType(attackType)) multiplier = 0;
+        if (ignoresGroundImmunity && attackType == PokemonType.Ground
+            && (Data.Type1 == PokemonType.Flying || Data.Type2 == PokemonType.Flying))
+        {
+            multiplier = Data.Type1 == PokemonType.Flying
+                ? 1
+                : TypeChart.GetMultiplier(attackType, Data.Type1);
+            if (Data.Type2 != null && Data.Type2 != PokemonType.Flying)
+                multiplier *= TypeChart.GetMultiplier(attackType, Data.Type2.Value);
+        }
+        if (TypeImmunityRevealed && multiplier == 0
+            && attackType is PokemonType.Normal or PokemonType.Fighting or PokemonType.Psychic)
+        {
+            // Foresight/Odor Sleuth/Miracle Eye remove the relevant type
+            // immunity, while preserving ordinary resistances.
+            multiplier = TypeChart.GetMultiplier(attackType, Data.Type1);
+            if (multiplier == 0) multiplier = 1;
+            if (Data.Type2 != null)
+            {
+                double second = TypeChart.GetMultiplier(attackType, Data.Type2.Value);
+                multiplier *= second == 0 ? 1 : second;
+            }
+        }
 
         bool wasFullHp = CurrentHp == MaxHp;
         SurvivedByEndure = false;
@@ -456,6 +601,8 @@ public class Pokemon
         int finalDamage = (int)(rawDamage * multiplier * dmgMultiplier);
 
         CurrentHp -= finalDamage;
+        if (finalDamage > 0) WasDamagedThisTurn = true;
+        if (finalDamage > 0 && RageActive) ChangeStage("attack", 1);
         if (CurrentHp <= 0)
         {
             bool sturdySave = (SelectedAbility == "옹골참" || HeldItem == "기합의띠") && wasFullHp;
@@ -497,6 +644,136 @@ public class Pokemon
 
     public void ActivateProtection() => IsProtected = true;
 
+    public bool TryActivateProtection(Random random)
+    {
+        // Consecutive protection uses rapidly become unreliable. The first
+        // attempt always succeeds; the following one succeeds 1/2, then 1/4.
+        bool success = ProtectionStreak == 0 || random.Next(1 << Math.Min(ProtectionStreak, 4)) == 0;
+        if (success)
+        {
+            ProtectionStreak++;
+            IsProtected = true;
+        }
+        else
+        {
+            ProtectionStreak = 0;
+        }
+        return success;
+    }
+
+    public void ResetProtectionStreak() => ProtectionStreak = 0;
+
+    public void SetPendingMove(string moveKey, bool semiInvulnerable = false)
+    {
+        PendingMoveKey = moveKey;
+        IsSemiInvulnerable = semiInvulnerable;
+    }
+
+    public string? ConsumePendingMove()
+    {
+        string? key = PendingMoveKey;
+        PendingMoveKey = null;
+        IsSemiInvulnerable = false;
+        return key;
+    }
+
+    public void SetPendingDelayedAttack(string moveKey, Pokemon target, int turns)
+    {
+        PendingDelayedAttackKey = moveKey;
+        PendingDelayedTarget = target;
+        PendingDelayedAttackTurns = turns;
+    }
+
+    public string? ConsumePendingDelayedAttack(out Pokemon? target)
+    {
+        target = PendingDelayedTarget;
+        string? key = PendingDelayedAttackTurns <= 0 ? PendingDelayedAttackKey : null;
+        if (key != null)
+        {
+            PendingDelayedAttackKey = null;
+            PendingDelayedAttackTurns = 0;
+            PendingDelayedTarget = null;
+        }
+        return key;
+    }
+
+    public void SetMustRecharge() => MustRecharge = true;
+    public void ClearRecharge() => MustRecharge = false;
+    public void MarkMoveUsed(string moveKey)
+    {
+        LastMoveKey = moveKey;
+        UsedMoveKeys.Add(moveKey);
+    }
+
+    public void MarkLeechSeeded(Pokemon? source = null)
+    {
+        LeechSeeded = true;
+        LeechSeedSource = source;
+    }
+    public void ClearLeechSeed()
+    {
+        LeechSeeded = false;
+        LeechSeedSource = null;
+    }
+    public void SetIngrained() => Ingrained = true;
+    public void SetBinding(string moveKey, int turns)
+    {
+        BindingMoveKey = moveKey;
+        BindingTurnsRemaining = turns;
+    }
+    public void SetYawn() => YawnTurnsRemaining = 2;
+    public void SetPerish(int turns) => PerishTurnsRemaining = turns;
+    public void SetHealBlock(int turns) => HealBlockTurnsRemaining = turns;
+    public void SetTaunt(int turns) => TauntTurnsRemaining = turns;
+    public void SetTorment(int turns) => TormentTurnsRemaining = turns;
+    public void SetThroatChop(int turns) => ThroatChopTurnsRemaining = turns;
+    public void SetEmbargo(int turns) => EmbargoTurnsRemaining = turns;
+    public void SetEncore(string moveKey, int turns)
+    {
+        EncoreMoveKey = moveKey;
+        EncoreTurnsRemaining = turns;
+    }
+    public void AddImprisonedMoves(IEnumerable<string> moveKeys) =>
+        ImprisonedMoveKeys.UnionWith(moveKeys);
+    public void SetInfatuated() => IsInfatuated = true;
+    public void SetUproar()
+    {
+        UproarActive = true;
+        UproarTurnsRemaining = 3;
+    }
+    public void SetNightmare() => NightmareActive = true;
+    public void SetChargeBoost() => ChargeBoostActive = true;
+    public void ClearChargeBoost() => ChargeBoostActive = false;
+    public void RevealTypeImmunity() => TypeImmunityRevealed = true;
+    public bool TryStockpile()
+    {
+        if (StockpileCount >= 3) return false;
+        StockpileCount++;
+        return true;
+    }
+    public int ConsumeStockpile()
+    {
+        int count = StockpileCount;
+        StockpileCount = 0;
+        return count;
+    }
+    public void SetRage() => RageActive = true;
+    public void ClearBinding()
+    {
+        BindingMoveKey = null;
+        BindingTurnsRemaining = 0;
+    }
+    public void MarkFainted()
+    {
+        CurrentHp = 0;
+        IsFainted = true;
+    }
+
+    public void ClearStatStages()
+    {
+        foreach (var stat in StatStages.Keys.ToList()) StatStages[stat] = 0;
+    }
+
     public bool UpdateFormAtEndOfTurn()
     {
         if (SelectedAbility != "달마모드" || Data.Name != "불비달마") return false;
@@ -513,7 +790,7 @@ public class Pokemon
     public bool TryConsumeBerry(out string? message)
     {
         message = null;
-        if (!IsBerry(HeldItem)) return false;
+        if (EmbargoTurnsRemaining > 0 || !IsBerry(HeldItem)) return false;
 
         bool shouldEat = HeldItem switch
         {
@@ -585,12 +862,14 @@ public class Pokemon
 
     public PokemonType ResolveMoveType(Move move)
     {
-        if (SelectedAbility == "노말스킨") return PokemonType.Normal;
-        if (move.Type == PokemonType.Normal && SelectedAbility == "프리즈스킨") return PokemonType.Ice;
-        if (move.Type == PokemonType.Normal && SelectedAbility == "페어리스킨") return PokemonType.Fairy;
-        return move.Name == "웨더볼"
-            ? MoveRuleMetadata.ResolveMoveType("weather-ball", move)
-            : move.Type;
+        string key = move.Name switch
+        {
+            "웨더볼" => "weather-ball",
+            "심판의뭉치" => "judgment",
+            "테크노버스터" => "techno-blast",
+            _ => ""
+        };
+        return MoveRuleMetadata.ResolveMoveType(key, move, this);
     }
 
     public void DisableMove(string moveName)
@@ -599,5 +878,11 @@ public class Pokemon
         DisabledTurnsRemaining = 5;
     }
 
-    public void ClearPrimaryStatus() => Status = StatusCondition.None;
+    public void ClearPrimaryStatus()
+    {
+        Status = StatusCondition.None;
+        IsBadlyPoisoned = false;
+        ToxicTurns = 0;
+        SleepTurnsRemaining = 0;
+    }
 }
