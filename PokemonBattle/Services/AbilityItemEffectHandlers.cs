@@ -93,7 +93,7 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
 
         int recoil = Math.Max(1, attacker.MaxHp / 10);
         attacker.CurrentHp = Math.Max(0, attacker.CurrentHp - recoil);
-        if (attacker.CurrentHp == 0) attacker.IsFainted = true;
+        if (attacker.CurrentHp == 0) attacker.MarkFainted();
         return Task.CompletedTask;
     }
 
@@ -309,7 +309,7 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
     private static async Task DamageAsync(BattleEndOfTurnContext context, int damage, string message)
     {
         context.Pokemon.CurrentHp = Math.Max(0, context.Pokemon.CurrentHp - damage);
-        if (context.Pokemon.CurrentHp == 0) context.Pokemon.IsFainted = true;
+        if (context.Pokemon.CurrentHp == 0) context.Pokemon.MarkFainted();
         await context.ShowMessage(message, 900);
     }
 
@@ -354,7 +354,7 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
         if (reflectedDamage != null)
         {
             context.Attacker.CurrentHp = Math.Max(0, context.Attacker.CurrentHp - reflectedDamage.Value);
-            if (context.Attacker.CurrentHp == 0) context.Attacker.IsFainted = true;
+            if (context.Attacker.CurrentHp == 0) context.Attacker.MarkFainted();
             await context.ShowMessage($"{context.Attacker.Data.Name}은(는) {context.Defender.SelectedAbility}에 상처를 입었다!");
         }
 
@@ -369,7 +369,7 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
         {
             int damage = Math.Max(1, context.Attacker.MaxHp / 4);
             context.Attacker.CurrentHp = Math.Max(0, context.Attacker.CurrentHp - damage);
-            if (context.Attacker.CurrentHp == 0) context.Attacker.IsFainted = true;
+            if (context.Attacker.CurrentHp == 0) context.Attacker.MarkFainted();
             await context.ShowMessage($"{context.Attacker.Data.Name}은(는) 유폭으로 데미지를 입었다!");
         }
 

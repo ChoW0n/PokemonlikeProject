@@ -157,6 +157,42 @@ public sealed class StatusAndItemRegressionTests
         }
     }
 
+    [Fact]
+    public async Task Endure_takes_normal_damage_but_prevents_a_lethal_hit()
+    {
+        const string moveKey = "regression-endure-lethal";
+        RegisterMove(moveKey, new Move(
+            "회귀 일격", 250, PokemonType.Normal, 5, 100, true, 0,
+            false, false, "none", 0, 0, new List<StatChangeEntry>(), 0,
+            "회귀 테스트용 강한 공격", 0, 0, 1, 1));
+
+        try
+        {
+            var attacker = CreatePokemon(25, moveKey);
+            var defender = CreatePokemon(10, "endure");
+            var events = new List<BattleEvent>();
+            var engine = CreateFullEngine();
+
+            await engine.TakeTurnAsync(
+                defender, attacker, "endure", attackerIsHero: false, Capture(events));
+            int hpBeforeAttack = defender.CurrentHp;
+
+            await engine.TakeTurnAsync(
+                attacker, defender, moveKey, attackerIsHero: true, Capture(events));
+
+            Assert.True(hpBeforeAttack - defender.CurrentHp > 0);
+            Assert.Equal(1, defender.CurrentHp);
+            Assert.False(defender.IsFainted);
+            Assert.True(defender.SurvivedByEndure);
+            Assert.Contains(events, battleEvent =>
+                battleEvent.Message?.Contains("버텨냈다", StringComparison.Ordinal) == true);
+        }
+        finally
+        {
+            MoveDatabase.All.Remove(moveKey);
+        }
+    }
+
     private static void RegisterMove(string moveKey, Move move) =>
         MoveDatabase.All[moveKey] = move;
 
