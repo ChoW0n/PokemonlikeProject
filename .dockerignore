@@ -1,0 +1,12 @@
+.git
+.github
+.local
+.cache
+**/bin
+**/obj
+**/TestResults
+node_modules
+*.user
+*.suo
+*.log
+claude-context-bundle.md

@@ -25,7 +25,8 @@ public class RunStore
         int legendaryProgressPercent,
         List<LegendaryEncounterHistoryEntry> legendaryEncounterHistory,
         int difficultyAdjustment,
-        List<RunRoundPerformance> roundPerformances)> Load(string username)
+        List<RunRoundPerformance> roundPerformances,
+        RunMetaState metaState)> Load(string username)
     {
         var run = await _db.PlayerRuns.FirstOrDefaultAsync(r => r.Username == username);
         if (run == null)
@@ -37,7 +38,8 @@ public class RunStore
                 0,
                 new List<LegendaryEncounterHistoryEntry>(),
                 0,
-                new List<RunRoundPerformance>());
+                new List<RunRoundPerformance>(),
+                new RunMetaState());
         }
 
         var loadouts = JsonSerializer.Deserialize<List<PokemonLoadout>>(
@@ -49,6 +51,9 @@ public class RunStore
         var roundPerformances = JsonSerializer.Deserialize<List<RunRoundPerformance>>(
             run.RoundPerformancesJson,
             LoadoutJsonOptions) ?? new List<RunRoundPerformance>();
+        var metaState = JsonSerializer.Deserialize<RunMetaState>(
+            run.RunMetaStateJson,
+            LoadoutJsonOptions) ?? new RunMetaState();
         return (
             run.CurrentScore,
             Math.Max(0, run.HighScore),
@@ -59,7 +64,8 @@ public class RunStore
                 run.DifficultyAdjustment,
                 SkillRatingCalculator.MinimumDifficultyAdjustment,
                 SkillRatingCalculator.MaximumDifficultyAdjustment),
-            roundPerformances);
+            roundPerformances,
+            RunMetaCatalog.Normalize(metaState));
     }
 
     public async Task Save(
@@ -70,7 +76,8 @@ public class RunStore
         int legendaryProgressPercent,
         IReadOnlyList<LegendaryEncounterHistoryEntry>? legendaryEncounterHistory = null,
         int? difficultyAdjustment = null,
-        IReadOnlyList<RunRoundPerformance>? roundPerformances = null)
+        IReadOnlyList<RunRoundPerformance>? roundPerformances = null,
+        RunMetaState? metaState = null)
     {
         var run = await _db.PlayerRuns.FirstOrDefaultAsync(r => r.Username == username);
         string json = JsonSerializer.Serialize(loadouts, LoadoutJsonOptions);
@@ -79,6 +86,9 @@ public class RunStore
             LoadoutJsonOptions);
         string roundPerformancesJson = JsonSerializer.Serialize(
             roundPerformances ?? new List<RunRoundPerformance>(),
+            LoadoutJsonOptions);
+        string metaStateJson = JsonSerializer.Serialize(
+            RunMetaCatalog.Normalize(metaState),
             LoadoutJsonOptions);
         int safeHighScore = Math.Max(0, highScore);
         int safeProgress = Math.Clamp(legendaryProgressPercent, 0, LegendaryProgression.MaxProgressPercent);
@@ -98,7 +108,8 @@ public class RunStore
                 LegendaryProgressPercent = safeProgress,
                 LegendaryEncounterHistoryJson = historyJson,
                 DifficultyAdjustment = safeDifficulty,
-                RoundPerformancesJson = roundPerformancesJson
+                RoundPerformancesJson = roundPerformancesJson,
+                RunMetaStateJson = metaStateJson
             });
         }
         else
@@ -118,6 +129,10 @@ public class RunStore
             if (roundPerformances != null)
             {
                 run.RoundPerformancesJson = roundPerformancesJson;
+            }
+            if (metaState != null)
+            {
+                run.RunMetaStateJson = metaStateJson;
             }
         }
 

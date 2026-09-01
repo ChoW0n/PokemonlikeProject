@@ -12,4 +12,5 @@ public class PlayerRun
     public string LegendaryEncounterHistoryJson { get; set; } = "[]";
     public int DifficultyAdjustment { get; set; }
     public string RoundPerformancesJson { get; set; } = "[]";
+    public string RunMetaStateJson { get; set; } = "{}";
 }

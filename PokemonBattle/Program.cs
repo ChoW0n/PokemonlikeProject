@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-string connectionString = BuildConnectionString();
+string connectionString = BuildConnectionString(builder.Configuration);
 builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 
 builder.Services.AddScoped<CurrentUserService>();
@@ -58,7 +58,8 @@ using (var scope = app.Services.CreateScope())
             ""LegendaryProgressPercent"" INTEGER NOT NULL DEFAULT 0,
             ""LegendaryEncounterHistoryJson"" TEXT NOT NULL DEFAULT '[]',
             ""DifficultyAdjustment"" INTEGER NOT NULL DEFAULT 0,
-            ""RoundPerformancesJson"" TEXT NOT NULL DEFAULT '[]'
+            ""RoundPerformancesJson"" TEXT NOT NULL DEFAULT '[]',
+            ""RunMetaStateJson"" TEXT NOT NULL DEFAULT '{{}}'
         );
         CREATE TABLE IF NOT EXISTS ""PlayerSkillRatings"" (
             ""Id"" SERIAL PRIMARY KEY,
@@ -94,6 +95,8 @@ using (var scope = app.Services.CreateScope())
             ADD COLUMN IF NOT EXISTS ""DifficultyAdjustment"" INTEGER NOT NULL DEFAULT 0;
         ALTER TABLE ""PlayerRuns""
             ADD COLUMN IF NOT EXISTS ""RoundPerformancesJson"" TEXT NOT NULL DEFAULT '[]';
+        ALTER TABLE ""PlayerRuns""
+            ADD COLUMN IF NOT EXISTS ""RunMetaStateJson"" TEXT NOT NULL DEFAULT '{{}}';
         CREATE UNIQUE INDEX IF NOT EXISTS ""IX_PlayerSkillRatings_Username""
             ON ""PlayerSkillRatings"" (""Username"");
         CREATE TABLE IF NOT EXISTS ""PlayerProgressions"" (
@@ -129,12 +132,18 @@ using (var scope = app.Services.CreateScope())
             ON ""TechnicalMachines"" (""Username"", ""MoveKey"");
     ");
 
-    if (!db.Users.Any(u => u.Username == "admin"))
+    string? bootstrapAdminPassword =
+        Environment.GetEnvironmentVariable("ADMIN_BOOTSTRAP_PASSWORD");
+    string bootstrapAdminUsername =
+        Environment.GetEnvironmentVariable("ADMIN_BOOTSTRAP_USERNAME") ?? "admin";
+
+    if (!string.IsNullOrWhiteSpace(bootstrapAdminPassword)
+        && !db.Users.Any(u => u.Username == bootstrapAdminUsername))
     {
         db.Users.Add(new UserAccount
         {
-            Username = "admin",
-            PasswordHash = PasswordHasher.Hash("admin"),
+            Username = bootstrapAdminUsername,
+            PasswordHash = PasswordHasher.Hash(bootstrapAdminPassword),
             IsAdmin = true
         });
         db.SaveChanges();
@@ -168,32 +177,47 @@ app.MapRazorComponents<App>()
 
 app.Run();
 
-string BuildConnectionString()
+string BuildConnectionString(IConfiguration configuration)
 {
-    string? raw = Environment.GetEnvironmentVariable("DATABASE_URL");
+    string? raw = new[]
+    {
+        Environment.GetEnvironmentVariable("DATABASE_URL"),
+        Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection"),
+        configuration.GetConnectionString("DefaultConnection")
+    }.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     if (string.IsNullOrEmpty(raw))
     {
-        throw new Exception("DATABASE_URL 환경변수가 없습니다. Replit에서 Database 도구를 먼저 활성화해주세요.");
+        throw new InvalidOperationException(
+            "데이터베이스 연결 설정이 없습니다. DATABASE_URL 또는 ConnectionStrings__DefaultConnection 환경변수를 설정하세요.");
+    }
+
+    if (!raw.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
+        && !raw.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    {
+        return raw;
     }
 
     var uri = new Uri(raw);
-    var userInfo = uri.UserInfo.Split(':');
-    string user = userInfo[0];
-    string password = userInfo.Length > 1 ? userInfo[1] : "";
+    int userInfoSeparator = uri.UserInfo.IndexOf(':');
+    string user = Uri.UnescapeDataString(
+        userInfoSeparator >= 0 ? uri.UserInfo[..userInfoSeparator] : uri.UserInfo);
+    string password = userInfoSeparator >= 0
+        ? Uri.UnescapeDataString(uri.UserInfo[(userInfoSeparator + 1)..])
+        : "";
     string host = uri.Host;
     int port = uri.Port > 0 ? uri.Port : 5432;
-    string database = uri.AbsolutePath.TrimStart('/');
+    string database = Uri.UnescapeDataString(uri.AbsolutePath.TrimStart('/'));
 
-    string sslMode = "Disable";
+    string sslMode = "Prefer";
     if (!string.IsNullOrEmpty(uri.Query))
     {
         var queryParams = uri.Query.TrimStart('?').Split('&');
         foreach (var p in queryParams)
         {
-            var kv = p.Split('=');
+            var kv = p.Split('=', 2);
             if (kv.Length == 2 && kv[0].Equals("sslmode", StringComparison.OrdinalIgnoreCase))
             {
-                sslMode = kv[1];
+                sslMode = Uri.UnescapeDataString(kv[1]);
             }
         }
     }
