@@ -144,8 +144,12 @@
                 </div>
 
                 <p class="config-label">기술 선택 (@DraftMoves.Count / 4) — 눌러서 자세히 볼 수 있습니다</p>
+                @if (State.TechnicalMachines.Any(machine => machine.Quantity > 0))
+                {
+                    <p class="config-label">보유 기술머신과 호환되는 기술은 기술 목록에 TM으로 표시됩니다.</p>
+                }
                 <div class="dex-grid">
-                    @foreach (var moveKey in picked.MoveNames)
+                @foreach (var moveKey in CompatibleMoveKeys(picked))
                     {
                         var move = MoveDatabase.All[moveKey];
                         <button type="button" class="dex-entry dex-entry-button move-tile @(DraftMoves.Contains(moveKey) ? "is-selected" : string.Empty) @(ViewingMoveKey == moveKey ? "is-viewing" : "")"
@@ -154,7 +158,7 @@
                              aria-expanded="@(ViewingMoveKey == moveKey ? "true" : "false")"
                              @onclick="() => ViewOrToggleMove(moveKey)">
                             <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
-                            <span class="dex-name">@move.Name @(move.Priority > 0 ? "⚡" : "")</span>
+                             <span class="dex-name">@move.Name @(move.Priority > 0 ? "⚡" : "") @(IsTechnicalMachineMove(picked, moveKey) ? "· TM" : "")</span>
                             <span class="dex-type">@(move.IsStatus ? "변화기" : "공격기")</span>
                         </button>
                     }
@@ -169,7 +173,7 @@
                         }
                         <GaugeBar Label="명중" Percent="@(vmove.AlwaysHits ? 100 : StatBarHelper.AccuracyPercent(vmove.Accuracy))" ColorClass="@(vmove.AlwaysHits ? "gauge-vhigh" : StatBarHelper.AccuracyColor(vmove.Accuracy))" DisplayText="@(vmove.AlwaysHits ? "필중" : $"{vmove.Accuracy}%")" />
                         <p class="info-desc">@(string.IsNullOrWhiteSpace(vmove.Description) ? "설명 없음" : vmove.Description)</p>
-                         <button type="button" class="info-select-btn @(DraftMoves.Contains(ViewingMoveKey) ? "is-active" : "")" aria-pressed="@(DraftMoves.Contains(ViewingMoveKey) ? "true" : "false")" @onclick="() => ToggleMove(ViewingMoveKey)">
+                             <button type="button" class="info-select-btn @(DraftMoves.Contains(ViewingMoveKey) ? "is-active" : "")" aria-pressed="@(DraftMoves.Contains(ViewingMoveKey) ? "true" : "false")" @onclick="() => ToggleMove(ViewingMoveKey)">
                             @(DraftMoves.Contains(ViewingMoveKey) ? "선택 해제" : "이 기술 선택")
                         </button>
                     </div>
@@ -373,7 +377,7 @@
 
         var existing = TeamLoadouts.FirstOrDefault(l => l.PokemonId == id);
 
-        var validKeys = PokemonDatabase.All[id].MoveNames.ToHashSet();
+        var validKeys = CompatibleMoveKeys(PokemonDatabase.All[id]).ToHashSet();
         DraftMoves = existing != null
             ? existing.ChosenMoveNames.Where(m => validKeys.Contains(m)).ToList()
             : new List<string>();
@@ -405,7 +409,7 @@
         ConfiguringId = null;
     }
 
-    private void ConfirmConfiguring()
+    private async Task ConfirmConfiguring()
     {
         if (ConfiguringId == null) return;
 
@@ -413,6 +417,24 @@
         {
             PresetMessage = "이미 다른 팀원이 사용 중인 도구입니다. 다른 도구를 선택해주세요.";
             return;
+        }
+
+        var existing = TeamLoadouts.FirstOrDefault(l => l.PokemonId == ConfiguringId.Value);
+        var availableMachineMoves = State.TechnicalMachines
+            .Where(machine => machine.Quantity > 0)
+            .Select(machine => machine.MoveKey)
+            .ToHashSet(StringComparer.Ordinal);
+        var newlyLearnedMachineMoves = DraftMoves
+            .Where(availableMachineMoves.Contains)
+            .Where(moveKey => existing == null || !existing.ChosenMoveNames.Contains(moveKey))
+            .ToList();
+        foreach (var moveKey in newlyLearnedMachineMoves)
+        {
+            if (!await State.TryLearnTechnicalMachineAsync(moveKey))
+            {
+                PresetMessage = "기술머신 보유 수량이 부족합니다. 다시 선택해주세요.";
+                return;
+            }
         }
 
         TeamLoadouts.RemoveAll(l => l.PokemonId == ConfiguringId.Value);
@@ -519,7 +541,24 @@
         if (!CanStart) return;
 
         await State.SetPlayerLoadouts(TeamLoadouts);
+        State.BeginBattle();
         State.GoTo(GameScreen.Battle);
         Nav.NavigateTo("/battle");
     }
+
+    private List<string> CompatibleMoveKeys(PokemonData data) =>
+        data.MoveNames
+            .Concat(State.TechnicalMachineMovesFor(
+                PokemonDatabase.All.First(entry => ReferenceEquals(entry.Value, data)).Key))
+            .Concat(TeamLoadouts
+                .FirstOrDefault(loadout => PokemonDatabase.All.TryGetValue(loadout.PokemonId, out var owned)
+                    && ReferenceEquals(owned, data))
+                ?.ChosenMoveNames ?? Enumerable.Empty<string>())
+            .Where(MoveDatabase.All.ContainsKey)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+    private bool IsTechnicalMachineMove(PokemonData data, string moveKey) =>
+        State.TechnicalMachines.Any(machine =>
+            machine.MoveKey == moveKey && machine.Quantity > 0);
 }

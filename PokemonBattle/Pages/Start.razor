@@ -12,6 +12,7 @@
     <p>@CurrentUser.Username 님, 환영합니다!</p>
     <p>최고 기록: @State.HighScore</p>
     <p>현재 점수: @State.CurrentScore</p>
+    <p>일반 전투 완료: @State.CompletedBattles 회</p>
 
     <LegendaryHistory />
 
@@ -21,6 +22,13 @@
     }
 
     <button type="button" @onclick="StartGame">시작하기</button>
+    <button type="button" @onclick="OpenMailbox">
+        보관함
+        @if (State.UnreadMailboxCount > 0)
+        {
+            <span aria-label="@($"{State.UnreadMailboxCount}개 읽지 않은 메시지")"> (@State.UnreadMailboxCount)</span>
+        }
+    </button>
     <button type="button" @onclick="OpenCollection">획득한 포켓몬 전체 보기</button>
 </main>
 
@@ -50,5 +58,6 @@
     }
 
     private void OpenAdminConsole() => Nav.NavigateTo("/admin");
+    private void OpenMailbox() => Nav.NavigateTo("/mailbox");
     private void OpenCollection() => Nav.NavigateTo("/collection");
 }

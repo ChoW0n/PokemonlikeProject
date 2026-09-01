@@ -1,0 +1,82 @@
+@page "/mailbox"
+@using PokemonBattle.Data
+@using PokemonBattle.Models
+@using PokemonBattle.Services
+@inject GameState State
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Nav
+
+<PageTitle>메시지 보관함</PageTitle>
+
+<main class="preview-page">
+    <h1>메시지 보관함</h1>
+    <p>라이벌전 소식과 보상을 확인할 수 있습니다. 보관함을 열어도 런 진행은 바뀌지 않습니다.</p>
+
+    <section class="info-panel" aria-labelledby="machine-heading">
+        <h2 id="machine-heading">기술머신</h2>
+        @if (State.TechnicalMachines.Count == 0)
+        {
+            <p>보유한 기술머신이 없습니다.</p>
+        }
+        else
+        {
+            <div class="move-chip-row" aria-label="보유 기술머신 목록">
+                @foreach (var machine in State.TechnicalMachines.Where(item => item.Quantity > 0))
+                {
+                    <span class="move-chip">
+                        TM · @(MoveDatabase.All.TryGetValue(machine.MoveKey, out var move) ? move.Name : machine.MoveKey)
+                        ×@machine.Quantity
+                    </span>
+                }
+            </div>
+            <p class="config-label">기술머신을 배울 수 있는 포켓몬은 팀 편성 화면에서 기술 목록에 표시됩니다.</p>
+        }
+    </section>
+
+    <section aria-labelledby="message-heading">
+        <h2 id="message-heading">메시지</h2>
+        @if (State.MailboxMessages.Count == 0)
+        {
+            <p>아직 도착한 메시지가 없습니다.</p>
+        }
+        else
+        {
+            <div class="preset-list" role="list" aria-label="보관함 메시지 목록">
+                @foreach (var message in State.MailboxMessages)
+                {
+                    <article class="preset-entry @(message.IsRead ? "" : "is-selected")" role="listitem">
+                        <div>
+                            <strong>@message.Title</strong>
+                            <p>@message.Body</p>
+                            <small>@message.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</small>
+                        </div>
+                        @if (!message.IsRead)
+                        {
+                            <button type="button" @onclick="() => MarkRead(message.Id)">읽음</button>
+                        }
+                    </article>
+                }
+            </div>
+        }
+    </section>
+
+    <button type="button" @onclick="GoHome">시작 화면으로</button>
+</main>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CurrentUser.IsLoggedIn)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        await State.LoadRunForCurrentUser();
+    }
+
+    private async Task MarkRead(int messageId) =>
+        await State.MarkMailboxMessageReadAsync(messageId);
+
+    private void GoHome() => Nav.NavigateTo("/");
+}

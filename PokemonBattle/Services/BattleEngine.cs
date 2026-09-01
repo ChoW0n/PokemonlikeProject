@@ -31,7 +31,9 @@ public sealed class BattleEngine
 
     public bool CanSwitch(Pokemon active, Pokemon opponent)
     {
-        if (active.Ingrained || active.BindingTurnsRemaining > 0) return false;
+        if (active.Ingrained
+            || active.BindingTurnsRemaining > 0
+            || active.RampageMoveKey != null) return false;
         bool isGhostType = active.HasType(PokemonType.Ghost);
         if (opponent.SelectedAbility == "그림자밟기"
             && !isGhostType
@@ -407,6 +409,7 @@ public sealed class BattleEngine
                 return result;
             }
             await ExecuteMoveAsync(attacker, defender, move, executingMoveKey, attackerIsHero, emit, result, isContinuation);
+            await AdvanceRampageAfterAttemptAsync(attacker, executingMoveKey, emit);
         }
 
         if (attacker.IsFainted && defender.IsFainted)
@@ -433,6 +436,41 @@ public sealed class BattleEngine
                 ReferenceEquals(result.OtherFaintedPokemon, attacker) ? attackerIsHero : !attackerIsHero));
         }
         return result;
+    }
+
+    private async Task AdvanceRampageAfterAttemptAsync(
+        Pokemon attacker,
+        string moveKey,
+        Func<BattleEvent, Task> emit)
+    {
+        if (!MoveRuleMetadata.IsRampageMove(moveKey) || attacker.IsFainted)
+        {
+            return;
+        }
+
+        bool ended;
+        if (attacker.RampageMoveKey == null)
+        {
+            attacker.StartRampage(moveKey, rng.Next(2, 4));
+            ended = false;
+        }
+        else
+        {
+            ended = attacker.AdvanceRampageTurn();
+        }
+
+        if (!ended)
+        {
+            return;
+        }
+
+        attacker.ClearRampage();
+        if (!attacker.IsConfused && !attacker.IsImmuneToConfusion())
+        {
+            attacker.ApplyConfusion(rng);
+            await emit(BattleEvent.MessageLine(
+                $"{attacker.Data.Name}은(는) 난동이 끝나 혼란에 빠졌다!"));
+        }
     }
 
     private async Task ExecuteMoveAsync(

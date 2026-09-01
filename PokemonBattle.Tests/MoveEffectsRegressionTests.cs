@@ -93,6 +93,37 @@ public sealed class MoveEffectsRegressionTests
     }
 
     [Fact]
+    public async Task Rampage_turns_advance_when_the_attempt_is_blocked_by_protection()
+    {
+        var attacker = CreatePokemon(1, "outrage");
+        var defender = CreatePokemon(25, "protect");
+        var engine = CreateEngine(new FixedRandom(99));
+
+        await engine.TakeTurnAsync(defender, attacker, "protect", false, _ => Task.CompletedTask);
+        await engine.TakeTurnAsync(attacker, defender, "outrage", true, _ => Task.CompletedTask);
+
+        Assert.Equal("outrage", attacker.RampageMoveKey);
+        int remainingAfterBlockedAttempt = attacker.RampageTurnsRemaining;
+
+        await engine.TakeTurnAsync(attacker, defender, "tackle", true, _ => Task.CompletedTask);
+
+        Assert.True(remainingAfterBlockedAttempt > attacker.RampageTurnsRemaining
+            || attacker.RampageMoveKey == null);
+    }
+
+    private sealed class FixedRandom : Random
+    {
+        private readonly int value;
+
+        public FixedRandom(int value)
+        {
+            this.value = value;
+        }
+
+        public override int Next(int maxValue) => Math.Min(value, maxValue - 1);
+    }
+
+    [Fact]
     public async Task Self_targeted_stat_effects_do_not_lower_the_opponent()
     {
         var attacker = CreatePokemon(4, "fiery-dance");
@@ -136,8 +167,8 @@ public sealed class MoveEffectsRegressionTests
         return new Pokemon(PokemonDatabase.All[id], moves.ToList(), "", "없음", level);
     }
 
-    private static BattleEngine CreateEngine() =>
-        new(new Random(1234), new IBattleEffectHandler[] { new MoveEffectHandler() });
+    private static BattleEngine CreateEngine(Random? random = null) =>
+        new(random ?? new Random(1234), new IBattleEffectHandler[] { new MoveEffectHandler() });
 
     private static Func<BattleEvent, Task> Capture(List<BattleEvent> events) =>
         battleEvent =>

@@ -1,4 +1,5 @@
 using PokemonBattle.Models;
+using PokemonBattle.Data;
 
 namespace PokemonBattle.Services;
 
@@ -10,6 +11,7 @@ public class GameState
     private readonly RunStore _runStore;
     private readonly CurrentUserService _currentUser;
     private readonly SkillRatingService _skillRatings;
+    private readonly PlayerProgressionStore? _progression;
 
     public GameScreen CurrentScreen { get; private set; } = GameScreen.Start;
     public int CurrentScore { get; private set; }
@@ -26,6 +28,11 @@ public class GameState
     public int LastLegendaryProgressReward { get; private set; }
     public bool LegendaryUnlocked => LegendaryProgression.IsUnlocked(LegendaryProgressPercent);
     public bool LegendaryEncounterConsumed { get; private set; }
+    public int CompletedBattles { get; private set; }
+    public bool RivalPending { get; private set; }
+    public bool IsRivalBattle { get; private set; }
+    public List<MailboxMessage> MailboxMessages { get; private set; } = new();
+    public List<TechnicalMachineInventory> TechnicalMachines { get; private set; } = new();
 
     public int SelectedPokemonId { get; private set; } = 1;
     public int EnemyPokemonId { get; private set; } = 4;
@@ -38,6 +45,7 @@ public class GameState
     public List<PokemonLoadout> EnemyLoadouts { get; private set; } = new(); //상대 팀의 확정된 기술/특성/도구 (미리보기와 전투가 항상 일치하도록)
 
     private bool _runLoaded;
+    private bool _battleOutcomeProcessed;
     private readonly List<RunRoundPerformance> _roundPerformances = new();
 
     public event Action? OnChange;
@@ -48,7 +56,8 @@ public class GameState
         UnlockService unlocks,
         RunStore runStore,
         CurrentUserService currentUser,
-        SkillRatingService skillRatings)
+        SkillRatingService skillRatings,
+        PlayerProgressionStore? progression = null)
     {
         _scoreStore = scoreStore;
         _presetStore = presetStore;
@@ -56,6 +65,7 @@ public class GameState
         _runStore = runStore;
         _currentUser = currentUser;
         _skillRatings = skillRatings;
+        _progression = progression;
     }
 
     public IReadOnlyList<LegendaryEncounterHistoryEntry> LegendaryEncounterHistory =>
@@ -88,6 +98,15 @@ public class GameState
             difficultyAdjustment,
             SkillRatingCalculator.MinimumDifficultyAdjustment,
             SkillRatingCalculator.MaximumDifficultyAdjustment);
+
+        if (_progression != null)
+        {
+            var accountProgress = await _progression.LoadAsync(_currentUser.Username!);
+            CompletedBattles = accountProgress.completedBattles;
+            RivalPending = accountProgress.rivalPending;
+            MailboxMessages = accountProgress.messages;
+            TechnicalMachines = accountProgress.machines;
+        }
 
         //방어 코드: 도감에 없는 포켓몬(예: 크래시로 깨진 PokemonId=0)이 하나라도 섞여있으면
         //전체 데이터를 신뢰할 수 없다고 보고 진행 상황을 완전히 초기화함
@@ -226,11 +245,91 @@ public class GameState
         PlayerLoadouts = TeamLoadoutRules.NormalizeUniqueItems(loadouts);
         PlayerTeamIds = PlayerLoadouts.Select(l => l.PokemonId).ToList();
         await PersistRun();
+        if (_progression != null && _currentUser.IsLoggedIn)
+        {
+            await _progression.SaveLatestLoadoutsAsync(_currentUser.Username!, PlayerLoadouts);
+            await _progression.RecordTeamSelectionsAsync(_currentUser.Username!, PlayerLoadouts);
+        }
         NotifyChange();
+    }
+
+    public async Task<List<PokemonLoadout>?> GetPendingRivalLoadoutsAsync()
+    {
+        if (_progression == null || !_currentUser.IsLoggedIn) return null;
+        var rival = await _progression.GetPendingRivalAsync(_currentUser.Username!);
+        if (rival == null) return null;
+        IsRivalBattle = true;
+        RivalPending = true;
+        return rival;
+    }
+
+    public void MarkNormalBattle() => IsRivalBattle = false;
+
+    public void BeginBattle(bool? rival = null)
+    {
+        if (rival.HasValue) IsRivalBattle = rival.Value;
+        _battleOutcomeProcessed = false;
+    }
+
+    public async Task RecordMoveSelectionAsync(string moveKey)
+    {
+        if (_progression == null || !_currentUser.IsLoggedIn) return;
+        await _progression.RecordMoveSelectionAsync(_currentUser.Username!, moveKey);
+    }
+
+    public IReadOnlyList<string> TechnicalMachineMovesFor(int pokemonId)
+    {
+        if (!PokemonDatabase.All.TryGetValue(pokemonId, out var data)) return Array.Empty<string>();
+        var compatible = data.MoveNames.ToHashSet(StringComparer.Ordinal);
+        return TechnicalMachines
+            .Where(machine => machine.Quantity > 0 && MoveDatabase.All.ContainsKey(machine.MoveKey))
+            .Where(machine => compatible.Contains(machine.MoveKey))
+            .Select(machine => machine.MoveKey)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
+
+    public async Task<bool> TryLearnTechnicalMachineAsync(string moveKey)
+    {
+        if (_progression == null || !_currentUser.IsLoggedIn) return false;
+        bool consumed = await _progression.TryConsumeTechnicalMachineAsync(
+            _currentUser.Username!, moveKey);
+        if (consumed)
+        {
+            var machine = TechnicalMachines.FirstOrDefault(item => item.MoveKey == moveKey);
+            if (machine != null) machine.Quantity--;
+            NotifyChange();
+        }
+        return consumed;
+    }
+
+    public async Task MarkMailboxMessageReadAsync(int messageId)
+    {
+        if (_progression == null || !_currentUser.IsLoggedIn) return;
+        if (await _progression.MarkMessageReadAsync(_currentUser.Username!, messageId))
+        {
+            var message = MailboxMessages.FirstOrDefault(item => item.Id == messageId);
+            if (message != null) message.IsRead = true;
+            NotifyChange();
+        }
+    }
+
+    public int UnreadMailboxCount => MailboxMessages.Count(message => !message.IsRead);
+
+    private async Task RefreshAccountProgress()
+    {
+        if (_progression == null || !_currentUser.IsLoggedIn) return;
+        var accountProgress = await _progression.LoadAsync(_currentUser.Username!);
+        CompletedBattles = accountProgress.completedBattles;
+        RivalPending = accountProgress.rivalPending;
+        MailboxMessages = accountProgress.messages;
+        TechnicalMachines = accountProgress.machines;
     }
 
     public async Task WinRound(int turns = 0, IEnumerable<Pokemon>? playerTeam = null)
     {
+        if (_battleOutcomeProcessed) return;
+        _battleOutcomeProcessed = true;
         RecordRoundPerformance(turns, playerTeam, cleared: true);
         ResultSkillRating = SkillRatingCalculator.PreviewRating(
             SkillRating,
@@ -260,12 +359,21 @@ public class GameState
         }
 
         await PersistRun();
+        if (_progression != null && _currentUser.IsLoggedIn)
+        {
+            await _progression.CompleteBattleAsync(
+                _currentUser.Username!, PlayerLoadouts, IsRivalBattle, won: true);
+            await RefreshAccountProgress();
+        }
         CurrentScreen = GameScreen.Result;
         NotifyChange();
     }
 
     public async Task LoseBattle(int turns = 0, IEnumerable<Pokemon>? playerTeam = null)
     {
+        if (_battleOutcomeProcessed) return;
+        _battleOutcomeProcessed = true;
+        var latestLoadouts = PlayerLoadouts.Select(loadout => loadout.Clone()).ToList();
         RecordRoundPerformance(turns, playerTeam, cleared: false);
         await UpdateSkillRatingForCurrentRun();
         _scoreStore.SaveIfHigher(CurrentScore);
@@ -275,6 +383,12 @@ public class GameState
         CurrentScore = 0;
         PlayerLoadouts = new List<PokemonLoadout>();
         PlayerTeamIds = new List<int>();
+        if (_progression != null && _currentUser.IsLoggedIn)
+        {
+            await _progression.CompleteBattleAsync(
+                _currentUser.Username!, latestLoadouts, IsRivalBattle, won: false);
+            await RefreshAccountProgress();
+        }
         _roundPerformances.Clear();
         await PersistRun();
         CurrentScreen = GameScreen.Result;
@@ -295,6 +409,8 @@ public class GameState
         PlayerTeamIds = new List<int>();
         EnemyLoadouts = new List<PokemonLoadout>();
         EnemyTeamIds = new List<int>();
+        IsRivalBattle = false;
+        _battleOutcomeProcessed = false;
         LegendaryEncounterConsumed = false;
         CurrentRunDifficultyAdjustment =
             SkillRatingCalculator.CalculateDifficultyAdjustment(SkillRating);

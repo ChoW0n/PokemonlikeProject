@@ -39,6 +39,7 @@
 
     private void GoKeep()
     {
+        State.BeginBattle();
         State.GoTo(GameScreen.Battle);
         Nav.NavigateTo("/battle");
     }

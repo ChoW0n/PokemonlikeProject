@@ -27,6 +27,10 @@
     @if (State.LastBattleWon)
     {
         <h1 class="result-win">승리!</h1>
+        @if (State.IsRivalBattle)
+        {
+            <p class="config-label">라이벌전 승리! 보관함에 기술머신 1개를 지급했습니다.</p>
+        }
         <p>현재 연승 점수: @State.CurrentScore</p>
         <p>최고 기록: @State.HighScore</p>
         <p class="config-label">전설 출현 진행도: @State.LegendaryProgressPercent%</p>
@@ -82,6 +86,10 @@
     else
     {
         <h1 class="result-lose">패배...</h1>
+        @if (State.IsRivalBattle)
+        {
+            <p class="config-label">라이벌전에서 패배했습니다. 결과 메시지를 보관함에 보관했습니다.</p>
+        }
         <p>이번 판 점수: 0으로 초기화됨</p>
         <p>최고 기록: @State.HighScore</p>
         <p class="config-label">전설 출현 진행도: @State.LegendaryProgressPercent%</p>
