@@ -14,3 +14,17 @@ mtime_ms = 1788273906760
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:7f38b434-fb48-49e8-bfe1-a6131a03e62d/dd1c1627-8269-47dc-9308-1a096ecd4996/f6cd4a21-489e-4a3b-a3ae-198e7effb80e"
 storage_version_token = "1788273908123100"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "T7ai_gDRt4bvUw5WVQ5vd"
+uri = "file://claude-context-bundle.md"
+type = "text"
+title = "Pokemon Battle Claude context bundle"
+description = "Verified after Task #61 merge: current source context, 142-test result, app health, and handoff guidance."
+logical_id = "e19d396f-d7e7-4c53-a808-eb843195c4d1"
+content_hash = "sha256:0c6012ffea1409d54faaaf2ba50d5dfbba4d840984f12a66ca6a6d8011fdddd7"
+size = 9787
+mtime_ms = 1788302973975
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:7f38b434-fb48-49e8-bfe1-a6131a03e62d/e19d396f-d7e7-4c53-a808-eb843195c4d1/16061e16-ce1c-4035-bfcc-0d3b0b4e7dc1"
+storage_version_token = "1788302982679898"
+content_type = "text/markdown"

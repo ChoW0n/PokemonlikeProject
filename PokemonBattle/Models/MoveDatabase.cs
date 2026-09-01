@@ -31,7 +31,7 @@ public static class MoveDatabase
         All["flamethrower"] = new Move("화염방사", 90, PokemonType.Fire, 15, 100, false, 0, false, true, "burn", 10, 0, new List<StatChangeEntry>(), 0, "세찬 불꽃을 상대에게 발사하여 공격한다. 화상 상태로 만들 때가 있다.", 0, 0, 1, 1);
         All["fire-spin"] = new Move("회오리불꽃", 35, PokemonType.Fire, 15, 85, false, 0, false, true, "trap", 100, 0, new List<StatChangeEntry>(), 0, "세차게 소용돌이치는 불꽃 속에 4-5턴 동안 상대를 가두어 공격한다.", 0, 0, 1, 1);
         All["rage"] = new Move("분노", 20, PokemonType.Normal, 20, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "기술을 썼을 때 공격을 받으면 분노의 힘으로 공격이 올라간다.", 0, 0, 1, 1);
-        All["smokescreen"] = new Move("연막", 0, PokemonType.Normal, 20, 100, false, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "연기나 먹물을 내뿜어 상대의 명중률을 떨어뜨린다.", 0, 0, 1, 1);
+        All["smokescreen"] = new Move("연막", 0, PokemonType.Normal, 20, 100, false, 0, true, false, "none", 0, 0, new List<StatChangeEntry> { new() { Stat = "accuracy", Change = -1, TargetsSelf = false } }, 100, "연기나 먹물을 내뿜어 상대의 명중률을 떨어뜨린다.", 0, 0, 1, 1);
         All["fury-swipes"] = new Move("마구할퀴기", 18, PokemonType.Normal, 15, 80, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "손톱이나 낫 등으로 상대를 할퀴어서 공격한다. 2-5회 동안 연속으로 쓴다.", 0, 0, 2, 5);
         All["slash"] = new Move("베어가르기", 70, PokemonType.Normal, 20, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "발톱이나 낫 등으로 상대를 베어 갈라서 공격한다. 급소에 맞기 쉽다.", 0, 0, 1, 1);
         All["scary-face"] = new Move("겁나는얼굴", 0, PokemonType.Normal, 10, 100, false, 0, true, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "speed", Change = -2, TargetsSelf = false } }, 100, "무서운 얼굴로 노려보고 겁주어 상대의 스피드를 크게 떨어뜨린다.", 0, 0, 1, 1);
@@ -92,7 +92,7 @@ public static class MoveDatabase
         All["venoshock"] = new Move("베놈쇼크", 65, PokemonType.Poison, 10, 100, false, 0, false, true, "none", 0, 0, new List<StatChangeEntry>(), 0, "특수한 독액을 끼얹는다. 독 상태의 상대에게는 위력이 2배가 된다.", 0, 0, 1, 1);
         All["fell-stinger"] = new Move("마지막일침", 50, PokemonType.Bug, 25, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "이 기술을 사용하여 상대를 쓰러뜨리면 공격이 크게 오른다.", 0, 0, 1, 1);
         All["razor-wind"] = new Move("칼바람", 80, PokemonType.Normal, 10, 100, false, 0, false, true, "none", 0, 0, new List<StatChangeEntry>(), 0, "바람의 칼날을 만들어 2턴째에 상대를 공격한다. 급소에 맞기 쉽다.", 0, 0, 1, 1);
-        All["sand-attack"] = new Move("모래뿌리기", 0, PokemonType.Ground, 15, 100, false, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "상대의 얼굴에 모래를 뿌려서 명중률을 떨어뜨린다.", 0, 0, 1, 1);
+        All["sand-attack"] = new Move("모래뿌리기", 0, PokemonType.Ground, 15, 100, false, 0, true, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "accuracy", Change = -1, TargetsSelf = false } }, 100, "상대의 얼굴에 모래를 뿌려서 명중률을 떨어뜨린다.", 0, 0, 1, 1);
         All["quick-attack"] = new Move("전광석화", 40, PokemonType.Normal, 30, 100, false, 1, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "눈에 보이지 않는 굉장한 속도로 상대에게 돌진한다. 반드시 선제공격할 수 있다.", 0, 0, 1, 1);
         All["twister"] = new Move("회오리", 40, PokemonType.Dragon, 20, 100, false, 0, false, true, "none", 0, 20, new List<StatChangeEntry>(), 0, "회오리를 일으켜 상대를 끌어들여 공격한다. 상대를 풀죽게 만들 때가 있다.", 0, 0, 1, 1);
         All["feather-dance"] = new Move("깃털댄스", 0, PokemonType.Flying, 15, 100, false, 0, true, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "attack", Change = -2, TargetsSelf = false } }, 100, "깃털을 흩뿌려 상대의 몸에 휘감는다. 상대의 공격을 크게 떨어뜨린다.", 0, 0, 1, 1);
@@ -151,7 +151,7 @@ public static class MoveDatabase
         All["poison-fang"] = new Move("맹독엄니", 50, PokemonType.Poison, 15, 100, false, 0, false, false, "poison", 50, 0, new List<StatChangeEntry>(), 0, "독이 있는 이빨로 상대를 물어서 공격한다. 맹독을 주입할 때가 있다.", 0, 0, 1, 1);
         All["earth-power"] = new Move("대지의힘", 90, PokemonType.Ground, 10, 100, false, 0, false, true, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "special-defense", Change = -1, TargetsSelf = false } }, 10, "상대의 발밑에 대지의 힘을 방출한다. 상대의 특수방어를 떨어뜨릴 때가 있다.", 0, 0, 1, 1);
         All["body-slam"] = new Move("누르기", 85, PokemonType.Normal, 15, 100, false, 0, false, false, "paralysis", 30, 0, new List<StatChangeEntry>(), 0, "몸 전체로 상대를 덮쳐 눌러 공격한다. 마비 상태로 만들 때가 있다.", 0, 0, 1, 1);
-        All["superpower"] = new Move("엄청난힘", 120, PokemonType.Fighting, 5, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "attack", Change = -1, TargetsSelf = false }, new StatChangeEntry { Stat = "defense", Change = -1, TargetsSelf = false } }, 100, "엄청난 힘을 발휘하여 상대를 공격한다. 자신의 공격과 방어가 떨어진다.", 0, 0, 1, 1);
+        All["superpower"] = new Move("엄청난힘", 120, PokemonType.Fighting, 5, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "attack", Change = -1, TargetsSelf = true }, new StatChangeEntry { Stat = "defense", Change = -1, TargetsSelf = true } }, 100, "엄청난 힘을 발휘하여 상대를 공격한다. 자신의 공격과 방어가 떨어진다.", 0, 0, 1, 1);
         All["sludge-wave"] = new Move("오물웨이브", 95, PokemonType.Poison, 10, 100, false, 0, false, true, "poison", 10, 0, new List<StatChangeEntry>(), 0, "오물 파도로 자신의 주위에 있는 포켓몬을 공격한다. 독 상태로 만들 때가 있다.", 0, 0, 1, 1);
         All["chip-away"] = new Move("야금야금", 70, PokemonType.Normal, 20, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "틈을 보며 착실하게 공격한다. 상대의 능력 변화에 관계없이 데미지를 준다.", 0, 0, 1, 1);
         All["horn-attack"] = new Move("뿔찌르기", 65, PokemonType.Normal, 25, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "날카롭고 뾰족한 뿔로 상대를 공격한다.", 0, 0, 1, 1);
@@ -217,7 +217,7 @@ public static class MoveDatabase
         All["karate-chop"] = new Move("태권당수", 50, PokemonType.Fighting, 25, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "날카로운 당수로 상대를 때려서 공격한다. 급소에 맞기 쉽다.", 0, 0, 1, 1);
         All["cross-chop"] = new Move("크로스촙", 100, PokemonType.Fighting, 5, 80, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "양손으로 당수를 상대에게 힘껏 쳐서 공격한다. 급소에 맞기 쉽다.", 0, 0, 1, 1);
         All["u-turn"] = new Move("유턴", 70, PokemonType.Bug, 20, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "공격한 뒤 굉장한 스피드로 돌아와서 교대 포켓몬과 교체한다.", 0, 0, 1, 1);
-        All["close-combat"] = new Move("인파이트", 120, PokemonType.Fighting, 5, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "defense", Change = -1, TargetsSelf = false }, new StatChangeEntry { Stat = "special-defense", Change = -1, TargetsSelf = false } }, 100, "방어를 포기하고 상대 깊숙이 돌격한다. 자신의 방어와 특수방어가 떨어진다.", 0, 0, 1, 1);
+        All["close-combat"] = new Move("인파이트", 120, PokemonType.Fighting, 5, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "defense", Change = -1, TargetsSelf = true }, new StatChangeEntry { Stat = "special-defense", Change = -1, TargetsSelf = true } }, 100, "방어를 포기하고 상대 깊숙이 돌격한다. 자신의 방어와 특수방어가 떨어진다.", 0, 0, 1, 1);
         All["retaliate"] = new Move("원수갚기", 70, PokemonType.Normal, 5, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "쓰러진 같은 편의 원수를 갚는다. 앞 턴에서 같은 편이 쓰러졌다면 위력이 올라간다.", 0, 0, 1, 1);
         All["stomping-tantrum"] = new Move("분함의발구르기", 75, PokemonType.Ground, 10, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "분함을 발판삼아 공격한다. 앞 턴에서 기술이 빗나갔다면 위력이 배가 된다.", 0, 0, 1, 1);
         All["rage-fist"] = new Move("분노의주먹", 50, PokemonType.Ghost, 10, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "", 0, 0, 1, 1);
@@ -314,7 +314,7 @@ public static class MoveDatabase
         All["synchronoise"] = new Move("싱크로노이즈", 120, PokemonType.Psychic, 10, 100, false, 0, false, true, "none", 0, 0, new List<StatChangeEntry>(), 0, "이상한 전파로 주위에 있는 자신과 같은 타입의 포켓몬에게 데미지를 준다.", 0, 0, 1, 1);
         All["vice-grip"] = new Move("찝기", 55, PokemonType.Normal, 30, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "상대를 양쪽에서 집어서 데미지를 준다.", 0, 0, 1, 1);
         All["crabhammer"] = new Move("집게해머", 100, PokemonType.Water, 10, 90, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "큰 집게를 상대에게 내리쳐서 공격한다. 급소에 맞기 쉽다.", 0, 0, 1, 1);
-        All["hammer-arm"] = new Move("암해머", 100, PokemonType.Fighting, 10, 90, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "speed", Change = -1, TargetsSelf = false } }, 100, "강하고 무거운 주먹을 휘둘러 데미지를 준다. 자신의 스피드가 떨어진다.", 0, 0, 1, 1);
+        All["hammer-arm"] = new Move("암해머", 100, PokemonType.Fighting, 10, 90, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "speed", Change = -1, TargetsSelf = true } }, 100, "강하고 무거운 주먹을 휘둘러 데미지를 준다. 자신의 스피드가 떨어진다.", 0, 0, 1, 1);
         All["charge"] = new Move("충전", 0, PokemonType.Electric, 20, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "special-defense", Change = 1, TargetsSelf = true } }, 100, "다음 턴에 쓸 전기타입 기술의 위력을 올린다. 자신의 특수방어도 올라간다.", 0, 0, 1, 1);
         All["charge-beam"] = new Move("차지빔", 50, PokemonType.Electric, 10, 90, false, 0, false, true, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "special-attack", Change = 1, TargetsSelf = false } }, 70, "전격의 다발을 상대에게 발사한다. 전기를 모아서 자신의 특수공격을 올릴 때가 있다.", 0, 0, 1, 1);
         All["eerie-impulse"] = new Move("괴전파", 0, PokemonType.Electric, 15, 100, false, 0, true, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "special-attack", Change = -2, TargetsSelf = false } }, 100, "몸에서 괴전파를 내어 상대에게 쏨으로써 특수공격을 크게 떨어뜨린다.", 0, 0, 1, 1);
@@ -500,5 +500,124 @@ public static class MoveDatabase
         All["diamond-storm"] = new Move("다이아스톰", 100, PokemonType.Rock, 5, 95, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "defense", Change = 2, TargetsSelf = false } }, 50, "다이아 폭풍을 일으켜 데미지를 준다. 자신의 방어를 올릴 때가 있다.", 0, 0, 1, 1);
         All["hyperspace-hole"] = new Move("이차원홀", 80, PokemonType.Psychic, 5, 100, true, 0, false, true, "none", 0, 0, new List<StatChangeEntry>(), 0, "다른차원홀로 갑자기 상대 바로 옆에 나타나 공격한다. 방어나 판별도 무시할 수 있다.", 0, 0, 1, 1);
         All["steam-eruption"] = new Move("스팀버스트", 110, PokemonType.Water, 5, 95, false, 0, false, true, "burn", 30, 0, new List<StatChangeEntry>(), 0, "상대에게 굉장히 뜨거운 증기를 뿜는다. 상대는 화상을 입기도 한다.", 0, 0, 1, 1);
+        All["reflect"] = new Move("리플렉터", 0, PokemonType.Psychic, 20, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 물리 기술의 데미지를 줄인다.", 0, 0, 1, 1);
+        All["light-screen"] = new Move("빛의장막", 0, PokemonType.Psychic, 30, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 특수 기술의 데미지를 줄인다.", 0, 0, 1, 1);
+        All["aurora-veil"] = new Move("오로라베일", 0, PokemonType.Ice, 20, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 받는 데미지를 줄인다.", 0, 0, 1, 1);
+        All["endure"] = new Move("버티기", 0, PokemonType.Normal, 10, 100, true, 4, true, false, "protect", 100, 0, new List<StatChangeEntry>(), 0, "이번 턴에 쓰러질 공격을 받아도 HP를 1 남기고 버틴다.", 0, 0, 1, 1);
+        All["substitute"] = new Move("대타출동", 0, PokemonType.Normal, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "최대 HP의 4분의 1을 사용해 자신의 대타를 만든다.", 0, 0, 1, 1);
+        All["trick-room"] = new Move("트릭룸", 0, PokemonType.Psychic, 5, 100, true, -7, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "5턴 동안 느린 포켓몬부터 움직인다.", 0, 0, 1, 1);
+        All["gravity"] = new Move("중력", 0, PokemonType.Psychic, 5, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "5턴 동안 중력을 강하게 해 모든 포켓몬을 땅에 붙인다.", 0, 0, 1, 1);
+        All["counter"] = new Move("카운터", 0, PokemonType.Fighting, 20, 100, true, -5, false, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "그 턴에 받은 물리 공격의 2배를 되돌려준다.", 0, 0, 1, 1);
+        All["mirror-coat"] = new Move("미러코트", 0, PokemonType.Psychic, 20, 100, true, -5, false, true, "none", 0, 0, new List<StatChangeEntry>(), 100, "그 턴에 받은 특수 공격의 2배를 되돌려준다.", 0, 0, 1, 1);
+        All["trick"] = new Move("트릭", 0, PokemonType.Psychic, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "자신과 상대의 도구를 바꾼다.", 0, 0, 1, 1);
+        All["switcheroo"] = new Move("바꿔치기", 0, PokemonType.Dark, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "자신과 상대의 도구를 바꾼다.", 0, 0, 1, 1);
+        All["stealth-rock"] = new Move("스텔스록", 0, PokemonType.Rock, 20, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "상대 진영에 뾰족한 돌을 설치해 교체해 나온 포켓몬을 공격한다.", 0, 0, 1, 1);
+        All["spikes"] = new Move("압정뿌리기", 0, PokemonType.Ground, 20, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "상대 진영에 압정을 설치한다. 최대 3번까지 겹칠 수 있다.", 0, 0, 1, 1);
+        All["toxic-spikes"] = new Move("독압정", 0, PokemonType.Poison, 20, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "상대 진영에 독압정을 설치한다. 최대 2번까지 겹칠 수 있다.", 0, 0, 1, 1);
+        All["sticky-web"] = new Move("끈적끈적네트", 0, PokemonType.Bug, 20, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "상대 진영에 끈적한 거미줄을 설치해 교체해 나온 포켓몬의 스피드를 낮춘다.", 0, 0, 1, 1);
+        All["baneful-bunker"] = new Move("독가시방벽", 0, PokemonType.Poison, 10, 100, true, 4, true, false, "protect", 100, 0, new List<StatChangeEntry>(), 0, "상대의 공격을 막고 접촉한 상대를 독 상태로 만든다.", 0, 0, 1, 1);
+        All["spiky-shield"] = new Move("가시방벽", 0, PokemonType.Grass, 10, 100, true, 4, true, false, "protect", 100, 0, new List<StatChangeEntry>(), 0, "상대의 공격을 막고 접촉한 상대에게 상처를 입힌다.", 0, 0, 1, 1);
+        All["obstruct"] = new Move("완강한거부", 0, PokemonType.Dark, 10, 100, true, 4, true, false, "protect", 100, 0, new List<StatChangeEntry>(), 0, "상대의 공격을 막고 접촉한 상대의 방어를 크게 떨어뜨린다.", 0, 0, 1, 1);
+        All["silk-guard"] = new Move("실드", 0, PokemonType.Bug, 10, 100, true, 4, true, false, "protect", 100, 0, new List<StatChangeEntry>(), 0, "상대의 공격을 전혀 받지 않는다.", 0, 0, 1, 1);
+        All["taunt"] = new Move("도발", 0, PokemonType.Dark, 20, 100, false, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "3턴 동안 상대는 변화 기술을 사용할 수 없게 된다.", 0, 0, 1, 1);
+        All["kings-shield"] = new Move("킹실드", 0, PokemonType.Steel, 10, 100, true, 4, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "공격을 막고 접촉한 상대의 공격을 크게 떨어뜨린다.", 0, 0, 1, 1);
+        All["sunny-day"] = new Move("쾌청", 0, PokemonType.Fire, 5, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 햇살이 강해진다.", 0, 0, 1, 1);
+        All["rain-dance"] = new Move("비바라기", 0, PokemonType.Water, 5, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 비가 내린다.", 0, 0, 1, 1);
+        All["sandstorm"] = new Move("모래바람", 0, PokemonType.Rock, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 모래바람이 분다.", 0, 0, 1, 1);
+        All["hail"] = new Move("싸라기눈", 0, PokemonType.Ice, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 싸라기눈이 내린다.", 0, 0, 1, 1);
+        All["grassy-terrain"] = new Move("그래스필드", 0, PokemonType.Grass, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 땅이 초록빛으로 물든다.", 0, 0, 1, 1);
+        All["electric-terrain"] = new Move("일렉트릭필드", 0, PokemonType.Electric, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 땅에 전기가 흐른다.", 0, 0, 1, 1);
+        All["psychic-terrain"] = new Move("사이코필드", 0, PokemonType.Psychic, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 신비한 힘이 땅을 감싼다.", 0, 0, 1, 1);
+        All["misty-terrain"] = new Move("미스트필드", 0, PokemonType.Fairy, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "5턴 동안 안개가 땅을 감싼다.", 0, 0, 1, 1);
+
+        var statChangeCorrections = new Dictionary<string, List<StatChangeEntry>>
+        {
+            ["ancient-power"] = new()
+            {
+                new() { Stat = "attack", Change = 1, TargetsSelf = true },
+                new() { Stat = "defense", Change = 1, TargetsSelf = true },
+                new() { Stat = "special-attack", Change = 1, TargetsSelf = true },
+                new() { Stat = "special-defense", Change = 1, TargetsSelf = true },
+                new() { Stat = "speed", Change = 1, TargetsSelf = true }
+            },
+            ["charge-beam"] = new() { new() { Stat = "special-attack", Change = 1, TargetsSelf = true } },
+            ["coil"] = new()
+            {
+                new() { Stat = "attack", Change = 1, TargetsSelf = true },
+                new() { Stat = "defense", Change = 1, TargetsSelf = true },
+                new() { Stat = "accuracy", Change = 1, TargetsSelf = true }
+            },
+            ["defog"] = new() { new() { Stat = "evasion", Change = -1, TargetsSelf = false } },
+            ["double-team"] = new() { new() { Stat = "evasion", Change = 1, TargetsSelf = true } },
+            ["dragon-ascent"] = new()
+            {
+                new() { Stat = "defense", Change = -1, TargetsSelf = true },
+                new() { Stat = "special-defense", Change = -1, TargetsSelf = true }
+            },
+            ["fiery-dance"] = new() { new() { Stat = "special-attack", Change = 1, TargetsSelf = true } },
+            ["flash"] = new() { new() { Stat = "accuracy", Change = -1, TargetsSelf = false } },
+            ["hone-claws"] = new()
+            {
+                new() { Stat = "attack", Change = 1, TargetsSelf = true },
+                new() { Stat = "accuracy", Change = 1, TargetsSelf = true }
+            },
+            ["howl"] = new() { new() { Stat = "attack", Change = 1, TargetsSelf = true } },
+            ["kinesis"] = new() { new() { Stat = "accuracy", Change = -1, TargetsSelf = false } },
+            ["leaf-storm"] = new() { new() { Stat = "special-attack", Change = -2, TargetsSelf = true } },
+            ["metal-claw"] = new() { new() { Stat = "attack", Change = 1, TargetsSelf = true } },
+            ["minimize"] = new() { new() { Stat = "evasion", Change = 2, TargetsSelf = true } },
+            ["mud-slap"] = new() { new() { Stat = "accuracy", Change = -1, TargetsSelf = false } },
+            ["overheat"] = new() { new() { Stat = "special-attack", Change = -2, TargetsSelf = true } },
+            ["psycho-boost"] = new() { new() { Stat = "special-attack", Change = -2, TargetsSelf = true } },
+            ["rapid-spin"] = new() { new() { Stat = "speed", Change = 1, TargetsSelf = true } },
+            ["sand-attack"] = new() { new() { Stat = "accuracy", Change = -1, TargetsSelf = false } },
+            ["silver-wind"] = new()
+            {
+                new() { Stat = "attack", Change = 1, TargetsSelf = true },
+                new() { Stat = "defense", Change = 1, TargetsSelf = true },
+                new() { Stat = "special-attack", Change = 1, TargetsSelf = true },
+                new() { Stat = "special-defense", Change = 1, TargetsSelf = true },
+                new() { Stat = "speed", Change = 1, TargetsSelf = true }
+            },
+            ["steel-wing"] = new() { new() { Stat = "defense", Change = 1, TargetsSelf = true } },
+            ["sweet-scent"] = new() { new() { Stat = "evasion", Change = -2, TargetsSelf = false } },
+            ["v-create"] = new()
+            {
+                new() { Stat = "defense", Change = -1, TargetsSelf = true },
+                new() { Stat = "special-defense", Change = -1, TargetsSelf = true },
+                new() { Stat = "speed", Change = -1, TargetsSelf = true }
+            }
+        };
+        foreach (var correction in statChangeCorrections)
+            All[correction.Key].StatChanges = correction.Value;
+
+        var statChangeChanceCorrections = new Dictionary<string, int>
+        {
+            ["ancient-power"] = 10,
+            ["charge-beam"] = 70,
+            ["coil"] = 100,
+            ["defog"] = 100,
+            ["double-team"] = 100,
+            ["dragon-ascent"] = 100,
+            ["fiery-dance"] = 50,
+            ["flash"] = 100,
+            ["hone-claws"] = 100,
+            ["howl"] = 100,
+            ["kinesis"] = 100,
+            ["leaf-storm"] = 100,
+            ["metal-claw"] = 10,
+            ["minimize"] = 100,
+            ["mud-slap"] = 100,
+            ["overheat"] = 100,
+            ["psycho-boost"] = 100,
+            ["rapid-spin"] = 100,
+            ["sand-attack"] = 100,
+            ["silver-wind"] = 10,
+            ["steel-wing"] = 10,
+            ["sweet-scent"] = 100,
+            ["v-create"] = 100
+        };
+        foreach (var correction in statChangeChanceCorrections)
+            All[correction.Key].StatChangeChance = correction.Value;
     }
 }
