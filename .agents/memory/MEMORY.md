@@ -11,4 +11,4 @@
 - [Protection move catalog](protection-move-catalog.md) — adding a protection rule requires matching move data and presentation registration, not metadata alone.
 - [Ally ability boundaries](ally-ability-boundaries.md) — 1v1 must not infer the opponent as an ally; only owner-protecting effects run without a partner.
 - [Skill rating persistence](skill-rating-persistence.md) — account rating is separate from the run; active-run difficulty is persisted and fixed until reset.
-- [EF raw SQL JSON defaults](ef-raw-sql-json-defaults.md) — ExecuteSqlRaw format strings require doubled braces for literal JSON object defaults.
+- [Trace ability lifecycle](trace-ability-lifecycle.md) — copied abilities are temporary and restore on switch-out.

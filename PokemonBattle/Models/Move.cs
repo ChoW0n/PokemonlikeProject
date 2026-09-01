@@ -418,20 +418,29 @@ public static class MoveRuleMetadata
             if (attacker.SelectedAbility == "의욕" && !move.IsStatus && !move.IsSpecial) accuracy *= 0.8;
             if (attacker.SelectedAbility == "복안") accuracy *= 1.3;
             if (attacker.SelectedAbility == "승리의별") accuracy *= 1.1;
-            accuracy *= AccuracyStageMultiplier(attacker.StatStages["accuracy"]);
+            bool attackerUnaware = attacker.SelectedAbility == "천진";
+            if (!attackerUnaware)
+                accuracy *= AccuracyStageMultiplier(attacker.StatStages["accuracy"]);
         }
 
         if (defender != null)
         {
             if (!weatherSuppressed
+                && !defender.IsAbilitySuppressedBy(attacker)
                 && defender.SelectedAbility == "모래숨기"
                 && BattleWeather.Current == BattleWeather.Sand) accuracy *= 0.8;
             if (!weatherSuppressed
+                && !defender.IsAbilitySuppressedBy(attacker)
                 && defender.SelectedAbility == "눈숨기"
                 && BattleWeather.Current == BattleWeather.Hail) accuracy *= 0.8;
-            if (defender.SelectedAbility == "갈지자걸음" && defender.IsConfused) accuracy *= 0.5;
-            accuracy /= AccuracyStageMultiplier(defender.StatStages["evasion"]);
-            if (defender.SelectedAbility == "미라클스킨"
+            if (!defender.IsAbilitySuppressedBy(attacker)
+                && defender.SelectedAbility == "갈지자걸음" && defender.IsConfused) accuracy *= 0.5;
+            bool defenderUnaware = defender.SelectedAbility == "천진"
+                && !defender.IsAbilitySuppressedBy(attacker);
+            if (!defenderUnaware)
+                accuracy /= AccuracyStageMultiplier(defender.StatStages["evasion"]);
+            if (!defender.IsAbilitySuppressedBy(attacker)
+                && defender.SelectedAbility == "미라클스킨"
                 && move.IsStatus
                 && TargetsOpponent(move)
                 && !move.AlwaysHits)

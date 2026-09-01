@@ -169,6 +169,16 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
 
     public async Task AfterHitAsync(BattleEffectContext context)
     {
+        if (!context.Defender.IsFainted
+            && context.AttackType is PokemonType.Dark or PokemonType.Ghost or PokemonType.Bug
+            && context.Defender.SelectedAbility == "주눅"
+            && !context.Defender.IsAbilitySuppressedBy(context.Attacker))
+        {
+            context.Defender.ChangeStage("speed", 1);
+            await context.ShowMessage(
+                $"{context.Defender.Data.Name}의 주눅으로 속도가 올라갔다!");
+        }
+
         if (context.LastHitDamage <= 0) return;
 
         if (!context.Defender.IsFainted
@@ -381,7 +391,8 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
     {
         if (!context.MakesContact || context.LastHitDamage <= 0 || context.Attacker.IsFainted) return;
 
-        int? reflectedDamage = context.Defender.TryReflectDamage(context.MakesContact);
+        int? reflectedDamage = context.Defender.TryReflectDamage(
+            context.MakesContact, context.Attacker);
         if (reflectedDamage != null)
         {
             context.Attacker.CurrentHp = Math.Max(0, context.Attacker.CurrentHp - reflectedDamage.Value);
@@ -389,7 +400,8 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
             await context.ShowMessage($"{context.Attacker.Data.Name}은(는) {context.Defender.SelectedAbility}에 상처를 입었다!");
         }
 
-        if (context.Defender.SelectedAbility == "미라" && context.Attacker.SelectedAbility != "미라")
+        if (!context.Defender.IsAbilitySuppressedBy(context.Attacker)
+            && context.Defender.SelectedAbility == "미라" && context.Attacker.SelectedAbility != "미라")
         {
             context.Attacker.SelectedAbility = "미라";
             await context.ShowMessage($"{context.Attacker.Data.Name}의 특성이 미라로 변했다!");
@@ -406,7 +418,8 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
 
         if (context.Defender.IsFainted || context.Attacker.IsFainted) return;
 
-        if (context.Defender.SelectedAbility == "헤롱헤롱바디"
+        if (!context.Defender.IsAbilitySuppressedBy(context.Attacker)
+            && context.Defender.SelectedAbility == "헤롱헤롱바디"
             && !context.Attacker.IsInfatuated
             && context.Defender.HasOppositeKnownGenderTo(context.Attacker)
             && !context.Attacker.IsImmuneToMentalEffect("infatuation")
@@ -419,30 +432,35 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
 
         if (context.Attacker.Status != StatusCondition.None) return;
         string? reaction = null;
-        if (context.Defender.SelectedAbility == "정전기" && context.Random.Next(100) < 30)
+        if (!context.Defender.IsAbilitySuppressedBy(context.Attacker)
+            && context.Defender.SelectedAbility == "정전기" && context.Random.Next(100) < 30)
         {
-            context.Attacker.ApplyAilment("paralysis");
+            context.Attacker.ApplyAilment("paralysis", opponent: context.Defender);
             if (context.Attacker.Status == StatusCondition.Paralysis) reaction = "정전기에 마비됐다";
         }
-        else if (context.Defender.SelectedAbility == "독가시" && context.Random.Next(100) < 30)
+        else if (!context.Defender.IsAbilitySuppressedBy(context.Attacker)
+            && context.Defender.SelectedAbility == "독가시" && context.Random.Next(100) < 30)
         {
-            context.Attacker.ApplyAilment("poison");
+            context.Attacker.ApplyAilment("poison", opponent: context.Defender);
             if (context.Attacker.Status == StatusCondition.Poison) reaction = "독가시에 찔려 독 상태가 되었다";
         }
-        else if (context.Defender.SelectedAbility == "불꽃몸" && context.Random.Next(100) < 30)
+        else if (!context.Defender.IsAbilitySuppressedBy(context.Attacker)
+            && context.Defender.SelectedAbility == "불꽃몸" && context.Random.Next(100) < 30)
         {
-            context.Attacker.ApplyAilment("burn");
+            context.Attacker.ApplyAilment("burn", opponent: context.Defender);
             if (context.Attacker.Status == StatusCondition.Burn) reaction = "불꽃몸에 닿아 화상을 입었다";
         }
-        else if (context.Defender.SelectedAbility == "포자" && context.Random.Next(100) < 30)
+        else if (!context.Defender.IsAbilitySuppressedBy(context.Attacker)
+            && context.Defender.SelectedAbility == "포자" && context.Random.Next(100) < 30)
         {
             string ailment = context.Random.Next(3) switch { 0 => "poison", 1 => "paralysis", _ => "sleep" };
-            context.Attacker.ApplyAilment(ailment);
+            context.Attacker.ApplyAilment(ailment, opponent: context.Defender);
             if (context.Attacker.Status != StatusCondition.None) reaction = $"포자 때문에 {AilmentKor(ailment)} 상태가 되었다";
         }
-        else if (context.Defender.SelectedAbility == "독수" && context.Random.Next(100) < 30)
+        else if (!context.Defender.IsAbilitySuppressedBy(context.Attacker)
+            && context.Defender.SelectedAbility == "독수" && context.Random.Next(100) < 30)
         {
-            context.Attacker.ApplyAilment("poison");
+            context.Attacker.ApplyAilment("poison", opponent: context.Defender);
             if (context.Attacker.Status == StatusCondition.Poison) reaction = "독수에 중독되었다";
         }
         if (reaction != null) await context.ShowMessage($"{context.Attacker.Data.Name}은(는) {reaction}!");

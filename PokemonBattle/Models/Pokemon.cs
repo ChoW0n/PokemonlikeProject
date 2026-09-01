@@ -5,6 +5,7 @@ public class Pokemon
     private static int nextActorNumber;
     private readonly PokemonData originalData;
     private readonly string[] originalMoveKeys;
+    private readonly string originalAbility;
     private Dictionary<string, int>? preTransformPP;
     private PokemonType? typeOverride1;
     private PokemonType? typeOverride2;
@@ -25,6 +26,9 @@ public class Pokemon
     public int DisabledTurnsRemaining { get; private set; }
     public bool FlashFireActive { get; private set; }
     public int TurnsOnField { get; private set; }
+    public int ReflectTurnsRemaining { get; private set; }
+    public int LightScreenTurnsRemaining { get; private set; }
+    public int AuroraVeilTurnsRemaining { get; private set; }
     public bool IsAlternateForm { get; private set; }
     public bool HasConsumedBerry { get; private set; }
     public bool HasPickedUpItem { get; private set; }
@@ -171,12 +175,16 @@ public class Pokemon
 
     public int EffectiveAtkAgainst(Pokemon? opponent = null)
     {
-        double value = Atk * StageMult("attack");
+        bool opponentIgnoresStages = opponent?.SelectedAbility == "천진"
+            && !opponent.IsAbilitySuppressedBy(this);
+        double value = Atk * (opponentIgnoresStages ? 1.0 : StageMult("attack"));
         if (Status == StatusCondition.Burn && SelectedAbility != "근성") value *= 0.5;
         if (SelectedAbility == "근성" && Status != StatusCondition.None) value *= 1.5;
         if (SelectedAbility is "의욕") value *= 1.5;
         if (SelectedAbility is "천하장사" or "순수한힘") value *= 2.0;
-        if (!BattleWeather.AreEffectsSuppressed(this, opponent)
+        if (SelectedAbility == "무기력" && CurrentHp <= MaxHp / 2) value *= 0.5;
+        if (!IsAbilitySuppressedBy(opponent)
+            && !BattleWeather.AreEffectsSuppressed(this, opponent)
             && SelectedAbility == "플라워기프트" && BattleWeather.Current == "쾌청")
         {
             value *= 1.5;
@@ -185,25 +193,29 @@ public class Pokemon
         return (int)value;
     }
 
-    public int EffectiveDef
+    public int EffectiveDef => EffectiveDefAgainst();
+
+    public int EffectiveDefAgainst(Pokemon? opponent = null)
     {
-        get
-        {
-            double value = Def * StageMult("defense");
-            if (SelectedAbility == "풀모피" && BattleField.Current == BattleField.Grassy) value *= 2.0;
-            if (SelectedAbility == "이상한비늘" && Status != StatusCondition.None) value *= 1.5;
-            return (int)value;
-        }
+        bool opponentIgnoresStages = opponent?.SelectedAbility == "천진";
+        double value = Def * (opponentIgnoresStages ? 1.0 : StageMult("defense"));
+        if (!IsAbilitySuppressedBy(opponent)
+            && SelectedAbility == "풀모피" && BattleField.Current == BattleField.Grassy) value *= 2.0;
+        if (!IsAbilitySuppressedBy(opponent)
+            && SelectedAbility == "이상한비늘" && Status != StatusCondition.None) value *= 1.5;
+        return (int)value;
     }
 
     public int EffectiveSpAtk => EffectiveSpAtkAgainst();
 
     public int EffectiveSpAtkAgainst(Pokemon? opponent = null, Pokemon? ally = null)
     {
-        double value = SpAtk * StageMult("special-attack");
+        bool opponentIgnoresStages = opponent?.SelectedAbility == "천진";
+        double value = SpAtk * (opponentIgnoresStages ? 1.0 : StageMult("special-attack"));
         if (HasPlusMinusPartner(ally)) value *= 1.5;
         if (!BattleWeather.AreEffectsSuppressed(this, opponent)
             && SelectedAbility == "선파워" && BattleWeather.Current == "쾌청") value *= 1.5;
+        if (SelectedAbility == "무기력" && CurrentHp <= MaxHp / 2) value *= 0.5;
         return (int)value;
     }
 
@@ -211,8 +223,10 @@ public class Pokemon
 
     public int EffectiveSpDefAgainst(Pokemon? opponent = null)
     {
-        double value = SpDef * StageMult("special-defense");
-        if (!BattleWeather.AreEffectsSuppressed(this, opponent)
+        bool opponentIgnoresStages = opponent?.SelectedAbility == "천진";
+        double value = SpDef * (opponentIgnoresStages ? 1.0 : StageMult("special-defense"));
+        if (!IsAbilitySuppressedBy(opponent)
+            && !BattleWeather.AreEffectsSuppressed(this, opponent)
             && SelectedAbility == "플라워기프트" && BattleWeather.Current == "쾌청")
         {
             value *= 1.5;
@@ -257,6 +271,7 @@ public class Pokemon
         PokemonGender? gender = null)
     {
         originalData = data;
+        originalAbility = ability;
         Data = data;
         ActorId = $"{data.EnglishName}-{Interlocked.Increment(ref nextActorNumber)}";
         Level = level;
@@ -345,6 +360,7 @@ public class Pokemon
 
     public void ResetOnSwitchOut()
     {
+        SelectedAbility = originalAbility;
         if (IsTransformed)
         {
             Data = originalData;
@@ -373,6 +389,9 @@ public class Pokemon
         DisabledTurnsRemaining = 0;
         FlashFireActive = false;
         TurnsOnField = 0;
+        ReflectTurnsRemaining = 0;
+        LightScreenTurnsRemaining = 0;
+        AuroraVeilTurnsRemaining = 0;
         IsAlternateForm = false;
         IsProtected = false;
         ProtectionStreak = 0;
@@ -452,6 +471,9 @@ public class Pokemon
         if (UproarTurnsRemaining > 0 && --UproarTurnsRemaining == 0) UproarActive = false;
         if (PendingDelayedAttackKey != null && PendingDelayedAttackTurns > 0)
             PendingDelayedAttackTurns--;
+        if (ReflectTurnsRemaining > 0) ReflectTurnsRemaining--;
+        if (LightScreenTurnsRemaining > 0) LightScreenTurnsRemaining--;
+        if (AuroraVeilTurnsRemaining > 0) AuroraVeilTurnsRemaining--;
     }
 
     public void ResetFieldCounter() => TurnsOnField = 0;
@@ -484,24 +506,31 @@ public class Pokemon
                 return true;
             }
         }
-        if (ailmentName == "sleep" && (SelectedAbility is "불면" or "의기양양")) return true;
-        if (ailmentName == "sleep" && SelectedAbility == "스위트베일") return true;
-        if (ailmentName == "poison" && SelectedAbility == "면역") return true;
-        if (ailmentName == "paralysis" && SelectedAbility == "유연") return true;
-        if (ailmentName == "burn" && SelectedAbility == "수의베일") return true;
-        if (ailmentName == "freeze" && SelectedAbility == "마그마의무장") return true;
+        if (!IsAbilitySuppressedBy(opponent))
+        {
+            if (ailmentName == "sleep" && (SelectedAbility is "불면" or "의기양양")) return true;
+            if (ailmentName == "sleep" && SelectedAbility == "스위트베일") return true;
+            if (ailmentName == "poison" && SelectedAbility == "면역") return true;
+            if (ailmentName == "paralysis" && SelectedAbility == "유연") return true;
+            if (ailmentName == "burn" && SelectedAbility == "수의베일") return true;
+            if (ailmentName == "freeze" && SelectedAbility == "마그마의무장") return true;
+        }
         if (!BattleWeather.AreEffectsSuppressed(this, opponent)
             && BattleWeather.Current == "쾌청" && SelectedAbility == "리프가드") return true;
         return false;
     }
-    public bool IsImmuneToConfusion() =>
-        SelectedAbility == "마이페이스" || BattleField.Current == BattleField.Misty;
+    public bool IsImmuneToConfusion(Pokemon? opponent = null) =>
+        (!IsAbilitySuppressedBy(opponent) && SelectedAbility == "마이페이스")
+        || BattleField.Current == BattleField.Misty;
 
-    public bool IsImmuneToMentalEffect(string effectName) =>
-        (SelectedAbility == "둔감"
+    public bool IsImmuneToMentalEffect(string effectName, Pokemon? opponent = null) =>
+        (!IsAbilitySuppressedBy(opponent) && SelectedAbility == "둔감"
             && (effectName is "infatuation" or "attract" or "taunt"))
-        || (SelectedAbility == "아로마베일"
+        || (!IsAbilitySuppressedBy(opponent) && SelectedAbility == "아로마베일"
             && (effectName is "disable" or "encore" or "heal-block" or "taunt" or "torment"));
+
+    public bool IsAbilitySuppressedBy(Pokemon? attacker) =>
+        attacker?.SelectedAbility is "틀깨기" or "터보블레이즈" or "테라볼티지";
 
     public bool HasSameKnownGenderAs(Pokemon? other) =>
         other != null
@@ -537,9 +566,9 @@ public class Pokemon
         if (Status == StatusCondition.Sleep) SleepTurnsRemaining = (random ?? rng).Next(1, 4);
     }
 
-    public void ApplyConfusion(Random? random = null)
+    public void ApplyConfusion(Random? random = null, Pokemon? opponent = null)
     {
-        if (IsConfused || IsImmuneToConfusion()) return;
+        if (IsConfused || IsImmuneToConfusion(opponent)) return;
         IsConfused = true;
         ConfusionTurnsRemaining = (random ?? rng).Next(1, 5);
     }
@@ -684,30 +713,31 @@ public class Pokemon
         bool isCritical = false,
         PokemonType? secondaryAttackType = null,
         double moveEffectivenessMultiplier = 1.0,
-        bool ignoresGroundImmunity = false)
+        bool ignoresGroundImmunity = false,
+        Pokemon? attacker = null)
     {
-        double multiplier = TypeChart.GetMultiplier(attackType, CurrentType1);
+        double multiplier = TypeMultiplier(attackType, CurrentType1, attacker);
         if (CurrentType2 != null)
         {
-            multiplier *= TypeChart.GetMultiplier(attackType, CurrentType2.Value);
+            multiplier *= TypeMultiplier(attackType, CurrentType2.Value, attacker);
         }
         if (secondaryAttackType != null)
         {
-            multiplier *= TypeChart.GetMultiplier(secondaryAttackType.Value, CurrentType1);
+            multiplier *= TypeMultiplier(secondaryAttackType.Value, CurrentType1, attacker);
             if (CurrentType2 != null)
-                multiplier *= TypeChart.GetMultiplier(secondaryAttackType.Value, CurrentType2.Value);
+                multiplier *= TypeMultiplier(secondaryAttackType.Value, CurrentType2.Value, attacker);
         }
         multiplier *= moveEffectivenessMultiplier;
 
-        if (IsImmuneToMoveType(attackType)) multiplier = 0;
+        if (IsImmuneToMoveType(attackType, attacker)) multiplier = 0;
         if (ignoresGroundImmunity && attackType == PokemonType.Ground
             && HasType(PokemonType.Flying))
         {
             multiplier = CurrentType1 == PokemonType.Flying
                 ? 1
-                : TypeChart.GetMultiplier(attackType, CurrentType1);
+                : TypeMultiplier(attackType, CurrentType1, attacker);
             if (CurrentType2 != null && CurrentType2 != PokemonType.Flying)
-                multiplier *= TypeChart.GetMultiplier(attackType, CurrentType2.Value);
+                multiplier *= TypeMultiplier(attackType, CurrentType2.Value, attacker);
         }
         if (TypeImmunityRevealed && multiplier == 0
             && attackType is PokemonType.Normal or PokemonType.Fighting or PokemonType.Psychic)
@@ -718,7 +748,7 @@ public class Pokemon
             if (multiplier == 0) multiplier = 1;
             if (CurrentType2 != null)
             {
-                double second = TypeChart.GetMultiplier(attackType, CurrentType2.Value);
+                double second = TypeMultiplier(attackType, CurrentType2.Value, attacker);
                 multiplier *= second == 0 ? 1 : second;
             }
         }
@@ -728,14 +758,18 @@ public class Pokemon
         LastHitWasCritical = isCritical;
 
         double dmgMultiplier = 1.0;
-        if ((SelectedAbility is "하드록" or "필터") && multiplier >= 2.0) dmgMultiplier *= 0.75;
-        if (SelectedAbility == "멀티스케일" && wasFullHp) dmgMultiplier *= 0.5;
-        if (SelectedAbility == "두꺼운지방" && attackType is PokemonType.Fire or PokemonType.Ice) dmgMultiplier *= 0.5;
-        if (SelectedAbility == "내열" && attackType == PokemonType.Fire) dmgMultiplier *= 0.5;
-        if (SelectedAbility == "퍼코트" && !isSpecial) dmgMultiplier *= 0.5;
-        if (SelectedAbility == "건조피부" && attackType == PokemonType.Fire) dmgMultiplier *= 1.25;
+        bool abilitySuppressed = IsAbilitySuppressedBy(attacker);
+        if (!abilitySuppressed && (SelectedAbility is "하드록" or "필터") && multiplier >= 2.0) dmgMultiplier *= 0.75;
+        if (!abilitySuppressed && SelectedAbility == "멀티스케일" && wasFullHp) dmgMultiplier *= 0.5;
+        if (!abilitySuppressed && SelectedAbility == "두꺼운지방" && attackType is PokemonType.Fire or PokemonType.Ice) dmgMultiplier *= 0.5;
+        if (!abilitySuppressed && SelectedAbility == "내열" && attackType == PokemonType.Fire) dmgMultiplier *= 0.5;
+        if (!abilitySuppressed && SelectedAbility == "퍼코트" && !isSpecial) dmgMultiplier *= 0.5;
+        if (!abilitySuppressed && SelectedAbility == "건조피부" && attackType == PokemonType.Fire) dmgMultiplier *= 1.25;
+        if (!isCritical && attacker?.SelectedAbility != "틈새포착" && HasActiveScreen(isSpecial))
+            dmgMultiplier *= 0.5;
         if (isCritical) dmgMultiplier *= 1.5;
-        if (SelectedAbility == "불가사의부적" && multiplier > 0 && multiplier < 2.0) multiplier = 0;
+        if (!abilitySuppressed
+            && SelectedAbility == "불가사의부적" && multiplier > 0 && multiplier < 2.0) multiplier = 0;
         LastMultiplier = multiplier;
 
         int finalDamage = (int)(rawDamage * multiplier * dmgMultiplier);
@@ -745,7 +779,8 @@ public class Pokemon
         if (finalDamage > 0 && RageActive) ChangeStage("attack", 1);
         if (CurrentHp <= 0)
         {
-            bool sturdySave = (SelectedAbility == "옹골참" || HeldItem == "기합의띠") && wasFullHp;
+            bool sturdySave = ((!abilitySuppressed && SelectedAbility == "옹골참")
+                || HeldItem == "기합의띠") && wasFullHp;
             bool focusBandSave = HeldItem == "기합의머리띠" && rng.Next(100) < 10;
             bool endureSave = ActiveProtectionMoveKey == "endure";
 
@@ -770,7 +805,9 @@ public class Pokemon
         return $"{Data.Name}의 분노의경혈로 공격이 최고까지 올랐다!";
     }
 
-    public bool IsCriticalImmune() => SelectedAbility is "조가비갑옷" or "전투무장";
+    public bool IsCriticalImmune(Pokemon? attacker = null) =>
+        !IsAbilitySuppressedBy(attacker)
+        && SelectedAbility is "조가비갑옷" or "전투무장";
 
     public bool UpdateFormForMove(string moveKey, bool isStatus)
     {
@@ -915,6 +952,19 @@ public class Pokemon
     public void SetChargeBoost() => ChargeBoostActive = true;
     public void ClearChargeBoost() => ChargeBoostActive = false;
     public void RevealTypeImmunity() => TypeImmunityRevealed = true;
+    public void SetReflect(int turns) => ReflectTurnsRemaining = Math.Max(0, turns);
+    public void SetLightScreen(int turns) => LightScreenTurnsRemaining = Math.Max(0, turns);
+    public void SetAuroraVeil(int turns) => AuroraVeilTurnsRemaining = Math.Max(0, turns);
+    public void ClearScreens()
+    {
+        ReflectTurnsRemaining = 0;
+        LightScreenTurnsRemaining = 0;
+        AuroraVeilTurnsRemaining = 0;
+    }
+    public bool HasActiveScreen(bool isSpecial) =>
+        ReflectTurnsRemaining > 0 && !isSpecial
+        || LightScreenTurnsRemaining > 0 && isSpecial
+        || AuroraVeilTurnsRemaining > 0;
     public bool TryStockpile()
     {
         if (StockpileCount >= 3) return false;
@@ -1132,23 +1182,41 @@ public class Pokemon
     }
 
     //철가시: 물리 접촉기로 나를 때린 공격자가 자기 최대HP의 1/8만큼 반사 데미지를 입음
-    public int? TryReflectDamage(bool moveMakesContact)
+    public int? TryReflectDamage(bool moveMakesContact, Pokemon? attacker = null)
     {
-        if (moveMakesContact && !IsFainted && (SelectedAbility is "철가시" or "까칠한피부"))
+        if (moveMakesContact && !IsFainted
+            && !IsAbilitySuppressedBy(attacker)
+            && (SelectedAbility is "철가시" or "까칠한피부"))
         {
             return Math.Max(1, MaxHp / 8);
         }
         return null;
     }
 
-    public bool IsImmuneToMoveType(PokemonType attackType)
+    public bool IsImmuneToMoveType(PokemonType attackType, Pokemon? attacker = null)
     {
+        if (IsAbilitySuppressedBy(attacker)) return false;
         return (SelectedAbility == "부유" && attackType == PokemonType.Ground)
             || (SelectedAbility is "피뢰침" or "축전" or "전기엔진" && attackType == PokemonType.Electric)
             || (SelectedAbility is "저수" or "건조피부" && attackType == PokemonType.Water)
             || (SelectedAbility == "마중물" && attackType == PokemonType.Water)
             || (SelectedAbility == "타오르는불꽃" && attackType == PokemonType.Fire)
             || (SelectedAbility == "초식" && attackType == PokemonType.Grass);
+    }
+
+    private static double TypeMultiplier(
+        PokemonType attackType,
+        PokemonType defendType,
+        Pokemon? attacker)
+    {
+        if (attacker?.SelectedAbility == "배짱"
+            && attackType is PokemonType.Normal or PokemonType.Fighting
+            && defendType == PokemonType.Ghost)
+        {
+            return 1.0;
+        }
+
+        return TypeChart.GetMultiplier(attackType, defendType);
     }
 
     public PokemonType ResolveMoveType(Move move, Pokemon? opponent = null)
