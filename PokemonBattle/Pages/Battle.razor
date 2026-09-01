@@ -31,11 +31,18 @@
 
     <section class="arena-stage" aria-label="배틀 상태" aria-describedby="battle-state-summary">
         <p id="battle-state-summary" class="visually-hidden">상대와 내 포켓몬의 이름, 레벨, 타입, 현재 HP와 상태 이상을 표시합니다.</p>
+        <div class="arena-meta" aria-label="현재 전장 정보">
+            <span class="arena-meta-label">LIVE ARENA</span>
+            <span>날씨 · @BattleWeather.Current</span>
+            <span>필드 · @BattleField.Current</span>
+        </div>
         <div id="battle-fx-layer" class="battle-fx-layer" aria-hidden="true"></div>
         <div class="stage-slot slot-top">
             <div class="hud-plate hud-enemy" aria-label="@($"{Enemy.Data.Name} 상태: HP {Enemy.CurrentHp}/{Enemy.MaxHp}{(StatusText(Enemy) == "" ? "" : $", {StatusText(Enemy)}")}")">
-                <span class="hud-name">@Enemy.Data.Name</span>
-                <span class="hud-level">Lv.@Enemy.Level</span>
+                <div class="hud-heading">
+                    <span class="hud-name">@Enemy.Data.Name</span>
+                    <span class="hud-level">Lv.@Enemy.Level</span>
+                </div>
                 <div class="hud-types">
                     <img src="@TypeIcons.GetUrl(Enemy.CurrentType1)" class="type-icon-img" alt="@Enemy.CurrentType1" />
                     @if (Enemy.CurrentType2 != null)
@@ -47,11 +54,13 @@
                     <span class="hp-label">HP</span>
                     <div class="health-track" role="progressbar" aria-label="@($"{Enemy.Data.Name} HP")" aria-valuemin="0" aria-valuemax="@Enemy.MaxHp" aria-valuenow="@Enemy.CurrentHp" aria-valuetext="@($"{Enemy.CurrentHp} / {Enemy.MaxHp}")"><span class="health-fill @HpClass(EnemyHpPercent)" style="width:@EnemyHpPercent%"></span></div>
                 </div>
-                <span class="hud-hp-num @(EnemyHpPercent <= 20 ? "hp-critical" : "")">@Enemy.CurrentHp/@Enemy.MaxHp</span>
-                @if (StatusText(Enemy) != "")
-                {
-                    <span class="hud-status">@StatusText(Enemy)</span>
-                }
+                <div class="hud-foot">
+                    <span class="hud-hp-num @(EnemyHpPercent <= 20 ? "hp-critical" : "")">@Enemy.CurrentHp/@Enemy.MaxHp</span>
+                    @if (StatusText(Enemy) != "")
+                    {
+                        <span class="hud-status">@StatusText(Enemy)</span>
+                    }
+                </div>
             </div>
             <div class="platform-shadow"
                  style="@SpriteStyle(Enemy.Data)"
@@ -77,8 +86,10 @@
                  style="@SpriteStyle(Hero.Data)"
                  aria-hidden="true"></div>
             <div class="hud-plate hud-hero" aria-label="@($"{Hero.Data.Name} 상태: HP {Hero.CurrentHp}/{Hero.MaxHp}{(StatusText(Hero) == "" ? "" : $", {StatusText(Hero)}")}")">
-                <span class="hud-name">@Hero.Data.Name</span>
-                <span class="hud-level">Lv.@Hero.Level</span>
+                <div class="hud-heading">
+                    <span class="hud-name">@Hero.Data.Name</span>
+                    <span class="hud-level">Lv.@Hero.Level</span>
+                </div>
                 <div class="hud-types">
                     <img src="@TypeIcons.GetUrl(Hero.CurrentType1)" class="type-icon-img" alt="@Hero.CurrentType1" />
                     @if (Hero.CurrentType2 != null)
@@ -90,14 +101,16 @@
                     <span class="hp-label">HP</span>
                     <div class="health-track" role="progressbar" aria-label="@($"{Hero.Data.Name} HP")" aria-valuemin="0" aria-valuemax="@Hero.MaxHp" aria-valuenow="@Hero.CurrentHp" aria-valuetext="@($"{Hero.CurrentHp} / {Hero.MaxHp}")"><span class="health-fill @HpClass(HeroHpPercent)" style="width:@HeroHpPercent%"></span></div>
                 </div>
-                <span class="hud-hp-num @(HeroHpPercent <= 20 ? "hp-critical" : "")">@Hero.CurrentHp/@Hero.MaxHp</span>
-                @if (StatusText(Hero) != "")
-                {
-                    <span class="hud-status">@StatusText(Hero)</span>
-                }
+                <div class="hud-foot">
+                    <span class="hud-hp-num @(HeroHpPercent <= 20 ? "hp-critical" : "")">@Hero.CurrentHp/@Hero.MaxHp</span>
+                    @if (StatusText(Hero) != "")
+                    {
+                        <span class="hud-status">@StatusText(Hero)</span>
+                    }
+                </div>
             </div>
         </div>
-        <div class="turn-tag" aria-label="@($"현재 {Turn}턴")">TURN @Turn</div>
+        <div class="turn-tag" aria-label="@($"현재 {Turn}턴")"><span>TURN</span><strong>@Turn</strong></div>
     </section>
 
     <div class="team-order" aria-label="내 팀 순서" role="list">
@@ -115,6 +128,18 @@
         <div class="panel-heading">
             <p class="eyebrow command-eyebrow">TURN @Turn</p>
             <h2 id="command-heading">@MenuTitle</h2>
+            <p class="command-state @(IsBusy ? "is-busy" : "")" role="status">
+                @(IsBusy
+                    ? "전투 처리 중 · 잠시 기다려 주세요."
+                    : Menu switch
+                    {
+                        BattleMenu.Attack when PendingMoveKey != null => "기술을 한 번 더 누르거나 아래에서 시전을 확정하세요.",
+                        BattleMenu.Attack => "기술을 선택하면 위력과 효과를 확인할 수 있습니다.",
+                        BattleMenu.Switch => "현재 포켓몬을 제외한 출전 가능한 포켓몬을 선택하세요.",
+                        BattleMenu.ForcedSwitch => "쓰러진 포켓몬을 대신할 포켓몬을 선택하세요.",
+                        _ => "공격 또는 교체를 선택하세요."
+                    })
+            </p>
         </div>
 
         @if (Menu == BattleMenu.Main)
@@ -122,30 +147,37 @@
             <div class="action-grid">
                 <button type="button" class="action-tile action-attack" disabled="@IsBusy" @onclick="OpenAttackMenu">
                     <span class="action-icon">COMMAND 01</span>
-                    <span>공격</span>
+                    <strong>공격</strong>
+                    <small>기술과 효과 확인</small>
                 </button>
                 <button type="button" class="action-tile action-switch" disabled="@IsBusy" @onclick="() => Menu = BattleMenu.Switch">
                     <span class="action-icon">COMMAND 02</span>
-                    <span>교체</span>
+                    <strong>교체</strong>
+                    <small>팀에서 출전 선택</small>
                 </button>
             </div>
         }
         else if (Menu == BattleMenu.Attack)
         {
+            <div class="selection-helper">
+                <span class="selection-helper-label">AVAILABLE MOVES</span>
+                <span>사용할 기술을 고르세요. 선택 후 시전 확정</span>
+            </div>
             <div class="move-name-grid">
                 @foreach (var moveKey in HeroMoveKeys)
                 {
                     var move = MoveDatabase.All[moveKey];
                     int ppLoop = Hero.CurrentPP[moveKey];
                     <button type="button"
-                            class="move-name-button @(PendingMoveKey == moveKey ? "is-pending" : "")"
+                            class="move-name-button @(PendingMoveKey == moveKey ? "is-pending" : "") @(!Hero.CanUseMove(moveKey) ? "is-unavailable" : "")"
                             disabled="@(IsBusy || !Hero.CanUseMove(moveKey))"
                              aria-pressed="@(PendingMoveKey == moveKey ? "true" : "false")"
                              aria-label="@($"{move.Name}, PP {ppLoop}/{move.MaxPP}{(Hero.CanUseMove(moveKey) ? "" : ", 사용할 수 없음")}")"
                              @onclick="() => TapMove(moveKey)">
                         <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
+                        <span class="move-type-label">@TypeKor(move.Type)</span>
                         <span class="move-name-text">@move.Name @(move.Priority > 0 ? "우선" : "") @(Hero.ChoiceLockedMove != null && Hero.ChoiceLockedMove != moveKey ? "고정" : "")</span>
-                        <span class="move-pp-num">@ppLoop/@move.MaxPP</span>
+                        <span class="move-pp-num">PP @ppLoop/@move.MaxPP</span>
                     </button>
                 }
                 @if (!HeroHasUsableMove)
@@ -156,6 +188,7 @@
                             aria-label="몸부림, 사용 가능한 기술 없음"
                             @onclick="() => UseMove(null)">
                         <span class="type-dot" style="background:@TypeColors.GetHex(PokemonType.Normal)"></span>
+                        <span class="move-type-label">노말</span>
                         <span class="move-name-text">몸부림</span>
                         <span class="move-pp-num">PP 없음</span>
                     </button>
@@ -168,6 +201,13 @@
                     double pmult = pmove.IsStatus ? 1.0 : Rules.PreviewMultiplier(pmove, Enemy, Hero);
                 int pp = Hero.CurrentPP[PendingMoveKey];
                 <div id="selected-move-details" class="move-detail-panel" role="region" aria-label="@($"{pmove.Name} 상세 정보")">
+                    <div class="move-detail-heading">
+                        <div>
+                            <span class="move-detail-kicker">SELECTED MOVE</span>
+                            <h3>@pmove.Name</h3>
+                        </div>
+                        <span class="move-type-badge" style="border-color:@TypeColors.GetHex(pmove.Type); color:@TypeColors.GetHex(pmove.Type)">@TypeKor(pmove.Type)</span>
+                    </div>
                     @if (!pmove.IsStatus)
                     {
                         <GaugeBar Label="위력" Percent="@StatBarHelper.PowerPercent(pmove.Power)" ColorClass="@StatBarHelper.PowerColor(pmove.Power)" DisplayText="@pmove.Power.ToString()" />
@@ -199,9 +239,13 @@
         }
         else if (Menu == BattleMenu.Switch)
         {
+            <div class="selection-helper">
+                <span class="selection-helper-label">SWITCH ORDER</span>
+                <span>교체는 한 턴을 사용하며 상대의 행동이 이어집니다.</span>
+            </div>
             @if (!Rules.CanSwitch(Hero, Enemy))
             {
-                <p class="move-detail-effect">@($"{Enemy.Data.Name}의 {Enemy.SelectedAbility} 때문에 교체할 수 없습니다.")</p>
+                <p class="move-detail-effect command-warning" role="alert">@($"{Enemy.Data.Name}의 {Enemy.SelectedAbility} 때문에 교체할 수 없습니다.")</p>
             }
             <div class="move-grid">
                 @for (int i = 0; i < PlayerTeam.Count; i++)
@@ -211,7 +255,7 @@
                     bool canSwitch = !member.IsFainted && idx != PlayerTeamIndex
                         && Rules.CanSwitch(Hero, Enemy);
                     <button type="button"
-                            class="move-button"
+                             class="move-button team-choice-button @(!canSwitch ? "is-unavailable" : "")"
                             disabled="@(IsBusy || !canSwitch)"
                             aria-label="@($"{member.Data.Name}, 레벨 {member.Level}, HP {member.CurrentHp}/{member.MaxHp}{(member.IsFainted ? ", 기절" : "")}{(!canSwitch ? ", 교체할 수 없음" : "")}")"
                             @onclick="() => SwitchTo(idx)">
@@ -219,6 +263,7 @@
                             <span class="move-name">@member.Data.Name</span>
                             <span class="move-meta">Lv.@member.Level · HP @member.CurrentHp/@member.MaxHp @(member.IsFainted ? "· 기절" : "")</span>
                         </div>
+                        <span class="choice-state">@(member.IsFainted ? "기절" : idx == PlayerTeamIndex ? "출전 중" : canSwitch ? "교체" : "불가")</span>
                     </button>
                 }
                 <button type="button" class="back-button" aria-label="행동 선택으로 돌아가기" disabled="@IsBusy" @onclick="() => Menu = BattleMenu.Main">← 뒤로</button>
@@ -226,6 +271,10 @@
         }
         else if (Menu == BattleMenu.ForcedSwitch)
         {
+            <div class="forced-switch-notice" role="alert">
+                <strong>강제 교체</strong>
+                <span>전투를 계속하려면 쓰러지지 않은 포켓몬을 선택하세요.</span>
+            </div>
             <div class="move-grid">
                 @for (int i = 0; i < PlayerTeam.Count; i++)
                 {
@@ -233,7 +282,7 @@
                     var member = PlayerTeam[idx];
                     bool canPick = !member.IsFainted;
                     <button type="button"
-                            class="move-button"
+                             class="move-button team-choice-button @(!canPick ? "is-unavailable" : "")"
                             disabled="@(!canPick)"
                             aria-label="@($"{member.Data.Name}, 레벨 {member.Level}, HP {member.CurrentHp}/{member.MaxHp}{(member.IsFainted ? ", 기절" : "")}")"
                             @onclick="() => ForcedSwitchTo(idx)">
@@ -241,6 +290,7 @@
                             <span class="move-name">@member.Data.Name</span>
                             <span class="move-meta">Lv.@member.Level · HP @member.CurrentHp/@member.MaxHp @(member.IsFainted ? "· 기절" : "")</span>
                         </div>
+                        <span class="choice-state">@(member.IsFainted ? "기절" : "출전")</span>
                     </button>
                 }
             </div>
