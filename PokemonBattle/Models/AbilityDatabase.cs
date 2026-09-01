@@ -223,7 +223,6 @@ public static class AbilityDatabase
         All["전기엔진"] = new AbilityInfo("전기엔진", "전기를 받으면 스피드가 올라간다.");
         All["예리함"] = new AbilityInfo("예리함", "");
         All["슬로스타트"] = new AbilityInfo("슬로스타트", "공격과 스피드가 잠시 동안 절반이 된다.");
-        All["나이트메어"] = new AbilityInfo("나이트메어", "잠들어 있는 상대의 HP를 줄인다.");
         All["멀티타입"] = new AbilityInfo("멀티타입", "지니고 있는 플레이트에 따라 타입이 바뀐다.");
         All["승리의별"] = new AbilityInfo("승리의별", "자신과 같은 편의 명중률이 올라간다.");
         All["심술꾸러기"] = new AbilityInfo("심술꾸러기", "능력의 변화가 역전된다.");

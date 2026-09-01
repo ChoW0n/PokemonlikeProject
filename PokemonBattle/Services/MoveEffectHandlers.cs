@@ -61,12 +61,6 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
             await context.ShowMessage($"{context.Attacker.Data.Name}은(는) 자신을 희생했다!");
         }
 
-        if (context.MoveKey == "memento" && !context.Attacker.IsFainted)
-        {
-            context.Attacker.MarkFainted();
-            await context.ShowMessage($"{context.Attacker.Data.Name}은(는) 추억의선물로 쓰러졌다!");
-        }
-
         if (context.MoveKey is "giga-impact" or "hyper-beam" or "rock-wrecker"
             or "roar-of-time" or "blast-burn" or "frenzy-plant" or "hydro-cannon"
             or "meteor-assault")
@@ -114,6 +108,12 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         int chanceMultiplier = attacker.HasActiveAbility("하늘의은총", defender) ? 2 : 1;
 
         await ApplyMoveSpecificEffectAsync(context);
+
+        if (context.MoveKey == "memento" && !attacker.IsFainted)
+        {
+            attacker.MarkFainted();
+            await context.ShowMessage($"{attacker.Data.Name}은(는) 추억의선물로 쓰러졌다!");
+        }
 
         string? weather = MoveRuleMetadata.WeatherForMove(context.MoveKey);
         if (weather != null)
@@ -191,7 +191,11 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 if (targetsSelf && statChange.Change < 0) selfStatDropApplied = true;
 
                 int before = target.StatStages[statChange.Stat];
-                target.ChangeStage(statChange.Stat, statChange.Change, causedByOpponent: !targetsSelf);
+                target.ChangeStage(
+                    statChange.Stat,
+                    statChange.Change,
+                    causedByOpponent: !targetsSelf,
+                    opponent: targetsSelf ? null : attacker);
                 int after = target.StatStages[statChange.Stat];
                 if (before == after) continue;
 
@@ -199,7 +203,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 await context.ShowMessage($"{target.Data.Name}의 {StatKor(statChange.Stat)}이(가) {direction}!");
                 if (!targetsSelf && after < before)
                 {
-                    string? reaction = target.TriggerStatDropAbility();
+                    string? reaction = target.TriggerStatDropAbility(attacker);
                     if (reaction != null) await context.ShowMessage(reaction);
                 }
             }

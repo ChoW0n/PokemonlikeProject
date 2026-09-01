@@ -39,24 +39,17 @@ public class Pokemon
     public int LightScreenTurnsRemaining { get; private set; }
     public int AuroraVeilTurnsRemaining { get; private set; }
     public bool IsAlternateForm { get; private set; }
-    public BattleGimmickKind ActiveGimmick { get; private set; }
-    public PokemonType? TerastalType { get; private set; }
-    public int GimmickTurnsRemaining { get; private set; }
     public bool HasConsumedBerry { get; private set; }
     public bool HasPickedUpItem { get; private set; }
     public bool HasLostHeldItem { get; private set; }
     public bool HasHoneyGathered { get; private set; }
     public bool IsIllusionActive { get; private set; }
     public bool WasIllusionBroken { get; private set; }
-    public PokemonType CurrentType1 => ActiveGimmick == BattleGimmickKind.Terastal && TerastalType != null
-        ? TerastalType.Value
-        : typeOverride1
+    public PokemonType CurrentType1 => typeOverride1
         ?? (SelectedAbility == "멀티타입"
             ? GetPlateType(HeldItem) ?? Data.Type1
             : Data.Type1);
-    public PokemonType? CurrentType2 => ActiveGimmick == BattleGimmickKind.Terastal
-        ? null
-        : typeOverride1 != null
+    public PokemonType? CurrentType2 => typeOverride1 != null
         ? typeOverride2
         : (SelectedAbility == "멀티타입" && GetPlateType(HeldItem) != null ? null : Data.Type2);
     public string TypeDisplay => CurrentType2 == null
@@ -149,16 +142,7 @@ public class Pokemon
     private int StatHp(int baseStat) => (2 * baseStat + 31) * Level / 100 + Level + 10;
     private int StatOther(int baseStat) => (2 * baseStat + 31) * Level / 100 + 5;
 
-    public int MaxHp
-    {
-        get
-        {
-            int baseHp = StatHp(IsTransformed || IsIllusionActive ? originalData.BaseHp : Data.BaseHp);
-            return ActiveGimmick is BattleGimmickKind.Dynamax or BattleGimmickKind.Gigantamax
-                ? baseHp * 2
-                : baseHp;
-        }
-    }
+    public int MaxHp => StatHp(IsTransformed || IsIllusionActive ? originalData.BaseHp : Data.BaseHp);
 
     public double EffectiveWeight => GetEffectiveWeight();
 
@@ -440,7 +424,6 @@ public class Pokemon
 
     public void ResetOnSwitchOut()
     {
-        DeactivateGimmick();
         SelectedAbility = originalAbility;
         if (IsTransformed)
         {
@@ -525,26 +508,40 @@ public class Pokemon
         WasIllusionBroken = false;
     }
 
-    public bool CanChangeStage(string stat, int delta, bool causedByOpponent = false)
+    public bool CanChangeStage(
+        string stat,
+        int delta,
+        bool causedByOpponent = false,
+        Pokemon? opponent = null)
     {
         if (!StatStages.ContainsKey(stat) || delta == 0) return false;
+        bool abilitySuppressed = IsAbilitySuppressedBy(opponent);
         if (causedByOpponent && delta < 0 && HasActiveHeldItem() && HeldItem == "클리어아뮬렛")
             return false;
-        if (causedByOpponent && delta < 0 && stat == "accuracy" && SelectedAbility == "날카로운눈")
+        if (causedByOpponent && delta < 0 && !abilitySuppressed
+            && stat == "accuracy" && SelectedAbility == "날카로운눈")
             return false;
-        if (causedByOpponent && delta < 0 && (SelectedAbility is "클리어바디" or "하얀연기")) return false;
-        if (causedByOpponent && delta < 0 && SelectedAbility == "괴력집게" && stat == "attack") return false;
-        if (causedByOpponent && delta < 0 && SelectedAbility == "부풀린가슴" && stat == "defense") return false;
-        if (causedByOpponent && delta < 0 && SelectedAbility == "플라워베일"
+        if (causedByOpponent && delta < 0 && !abilitySuppressed
+            && (SelectedAbility is "클리어바디" or "하얀연기")) return false;
+        if (causedByOpponent && delta < 0 && !abilitySuppressed
+            && SelectedAbility == "괴력집게" && stat == "attack") return false;
+        if (causedByOpponent && delta < 0 && !abilitySuppressed
+            && SelectedAbility == "부풀린가슴" && stat == "defense") return false;
+        if (causedByOpponent && delta < 0 && !abilitySuppressed
+            && SelectedAbility == "플라워베일"
             && HasType(PokemonType.Grass)) return false;
         return true;
     }
 
-    public void ChangeStage(string stat, int delta, bool causedByOpponent = false)
+    public void ChangeStage(
+        string stat,
+        int delta,
+        bool causedByOpponent = false,
+        Pokemon? opponent = null)
     {
-        if (!CanChangeStage(stat, delta, causedByOpponent)) return;
-        if (SelectedAbility == "심술꾸러기") delta = -delta;
-        if (SelectedAbility == "단순") delta *= 2;
+        if (!CanChangeStage(stat, delta, causedByOpponent, opponent)) return;
+        if (!IsAbilitySuppressedBy(opponent) && SelectedAbility == "심술꾸러기") delta = -delta;
+        if (!IsAbilitySuppressedBy(opponent) && SelectedAbility == "단순") delta *= 2;
         StatStages[stat] = Math.Clamp(StatStages[stat] + delta, -6, 6);
     }
 
@@ -595,43 +592,11 @@ public class Pokemon
 
     public void ResetFieldCounter() => TurnsOnField = 0;
 
-    public bool ActivateGimmick(BattleGimmickKind kind, PokemonType? teraType = null)
-    {
-        if (kind == BattleGimmickKind.None || ActiveGimmick != BattleGimmickKind.None || IsFainted)
-            return false;
-        if (kind == BattleGimmickKind.Terastal && teraType == null)
-            return false;
-
-        ActiveGimmick = kind;
-        GimmickTurnsRemaining = kind is BattleGimmickKind.Dynamax or BattleGimmickKind.Gigantamax ? 3 : 0;
-        if (kind == BattleGimmickKind.Terastal) TerastalType = teraType;
-        if (kind is BattleGimmickKind.Dynamax or BattleGimmickKind.Gigantamax)
-            CurrentHp = Math.Min(MaxHp, CurrentHp * 2);
-        return true;
-    }
-
-    public bool AdvanceGimmickTurn()
-    {
-        if (GimmickTurnsRemaining <= 0) return false;
-        GimmickTurnsRemaining--;
-        if (GimmickTurnsRemaining > 0) return false;
-        DeactivateGimmick();
-        return true;
-    }
-
-    public void DeactivateGimmick()
-    {
-        if (ActiveGimmick is BattleGimmickKind.Dynamax or BattleGimmickKind.Gigantamax)
-            CurrentHp = Math.Min(StatHp(originalData.BaseHp), (int)Math.Ceiling(CurrentHp / 2.0));
-        ActiveGimmick = BattleGimmickKind.None;
-        TerastalType = null;
-        GimmickTurnsRemaining = 0;
-    }
-
     public bool ShouldSkipTurn => SelectedAbility == "게으름" && TurnsOnField % 2 == 1;
 
-    public string? TriggerStatDropAbility()
+    public string? TriggerStatDropAbility(Pokemon? opponent = null)
     {
+        if (IsAbilitySuppressedBy(opponent)) return null;
         if (SelectedAbility == "오기")
         {
             ChangeStage("attack", 2);
@@ -974,9 +939,11 @@ public class Pokemon
         }
     }
 
-    public string? TriggerCriticalHitAbility()
+    public string? TriggerCriticalHitAbility(Pokemon? opponent = null)
     {
-        if (!LastHitWasCritical || IsFainted || SelectedAbility != "분노의경혈") return null;
+        if (!LastHitWasCritical || IsFainted
+            || IsAbilitySuppressedBy(opponent)
+            || SelectedAbility != "분노의경혈") return null;
 
         StatStages["attack"] = 6;
         return $"{Data.Name}의 분노의경혈로 공격이 최고까지 올랐다!";

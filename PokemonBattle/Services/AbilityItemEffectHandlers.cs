@@ -251,17 +251,17 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
         }
 
         if (!context.Defender.IsFainted && context.AttackType == PokemonType.Dark
-            && context.Defender.SelectedAbility == "정의의마음")
+            && context.Defender.HasActiveAbility("정의의마음", context.Attacker))
         {
-            context.Defender.ChangeStage("attack", 1);
+            context.Defender.ChangeStage("attack", 1, opponent: context.Attacker);
             await context.ShowMessage($"{context.Defender.Data.Name}의 정의의마음으로 공격이 올랐다!");
         }
 
         if (!context.Defender.IsFainted && !context.Move.IsSpecial
-            && context.Defender.SelectedAbility == "깨어진갑옷")
+            && context.Defender.HasActiveAbility("깨어진갑옷", context.Attacker))
         {
-            context.Defender.ChangeStage("defense", -1);
-            context.Defender.ChangeStage("speed", 2);
+            context.Defender.ChangeStage("defense", -1, opponent: context.Attacker);
+            context.Defender.ChangeStage("speed", 2, opponent: context.Attacker);
             await context.ShowMessage($"{context.Defender.Data.Name}의 깨어진갑옷으로 방어가 떨어지고 속도가 크게 올랐다!");
         }
 
@@ -503,7 +503,8 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
 
         int? reflectedDamage = context.Defender.TryReflectDamage(
             context.MakesContact, context.Attacker);
-        if (reflectedDamage != null)
+        if (reflectedDamage != null
+            && !context.Attacker.HasActiveAbility("매직가드", context.Defender))
         {
             context.Attacker.CurrentHp = Math.Max(0, context.Attacker.CurrentHp - reflectedDamage.Value);
             if (context.Attacker.CurrentHp == 0) context.Attacker.MarkFainted();
@@ -517,7 +518,8 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
             await context.ShowMessage($"{context.Attacker.Data.Name}의 특성이 미라로 변했다!");
         }
 
-        if (context.Defender.IsFainted && context.Defender.SelectedAbility == "유폭"
+        if (context.Defender.IsFainted
+            && context.Defender.HasActiveAbility("유폭", context.Attacker)
             && !context.Attacker.IsFainted)
         {
             int damage = Math.Max(1, context.Attacker.MaxHp / 4);

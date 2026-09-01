@@ -359,7 +359,8 @@ public static class MoveRuleMetadata
         string moveKey,
         Move move,
         Pokemon attacker,
-        Pokemon defender)
+        Pokemon defender,
+        bool? attackerMovedFirst = null)
     {
         double power = EffectivePowerBase(
             moveKey,
@@ -368,13 +369,13 @@ public static class MoveRuleMetadata
         switch (moveKey)
         {
             case "facade" when attacker.Status != StatusCondition.None:
-            case "hex" when defender.Status != StatusCondition.None || defender.IsConfused:
+            case "hex" when defender.Status != StatusCondition.None:
             case "venoshock" when defender.Status is StatusCondition.Poison:
                 power *= 2;
                 break;
             case "brine" when defender.CurrentHp <= defender.MaxHp / 2:
             case "assurance" when defender.LastDamageTakenThisTurn:
-            case "payback" when defender.LastDamageTakenThisTurn:
+            case "payback" when attackerMovedFirst == false:
             case "revenge" when attacker.WasDamagedThisTurn:
             case "avalanche" when attacker.WasDamagedThisTurn:
                 power *= 2;
