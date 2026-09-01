@@ -20,7 +20,7 @@
                 <h1>포켓몬 배틀</h1>
                 @if (State.IsRivalBattle)
                 {
-                    <span class="rival-badge" aria-label="라이벌전">⚔ 라이벌전</span>
+                    <span class="rival-badge" aria-label="라이벌전">라이벌전</span>
                 }
             </div>
             <p class="intro">현재 날씨: @BattleWeather.Current · 필드: @BattleField.Current</p>
@@ -114,11 +114,11 @@
         {
             <div class="action-grid">
                 <button type="button" class="action-tile action-attack" disabled="@IsBusy" @onclick="OpenAttackMenu">
-                    <span class="action-icon">⚔</span>
+                    <span class="action-icon">COMMAND 01</span>
                     <span>공격</span>
                 </button>
                 <button type="button" class="action-tile action-switch" disabled="@IsBusy" @onclick="() => Menu = BattleMenu.Switch">
-                    <span class="action-icon">🔄</span>
+                    <span class="action-icon">COMMAND 02</span>
                     <span>교체</span>
                 </button>
             </div>
@@ -137,7 +137,7 @@
                              aria-label="@($"{move.Name}, PP {ppLoop}/{move.MaxPP}{(Hero.CanUseMove(moveKey) ? "" : ", 사용할 수 없음")}")"
                              @onclick="() => TapMove(moveKey)">
                         <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
-                        <span class="move-name-text">@move.Name @(move.Priority > 0 ? "⚡" : "") @(Hero.ChoiceLockedMove != null && Hero.ChoiceLockedMove != moveKey ? "🔒" : "")</span>
+                        <span class="move-name-text">@move.Name @(move.Priority > 0 ? "우선" : "") @(Hero.ChoiceLockedMove != null && Hero.ChoiceLockedMove != moveKey ? "고정" : "")</span>
                         <span class="move-pp-num">@ppLoop/@move.MaxPP</span>
                     </button>
                 }
@@ -169,11 +169,11 @@
                     <GaugeBar Label="PP" Percent="@StatBarHelper.PpPercent(pp, pmove.MaxPP)" ColorClass="@StatBarHelper.PpColor(pp, pmove.MaxPP)" DisplayText="@($"{pp}/{pmove.MaxPP}")" />
                     @if (pmove.MaxHits > 1)
                     {
-                        <p class="move-star-line">🔁 @pmove.MinHits~@(pmove.MaxHits)회 연속 타격</p>
+                        <p class="move-star-line">연속 타격 · @pmove.MinHits~@(pmove.MaxHits)회</p>
                     }
                     @if (pmult >= 2.0)
                     {
-                        <p class="move-star-line">⭐ 효과가 굉장하다!</p>
+                        <p class="move-star-line">효과가 굉장하다</p>
                     }
                     @{ var summary = MoveEffectSummary(pmove); }
                     @if (summary != "")

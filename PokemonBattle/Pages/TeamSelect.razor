@@ -29,7 +29,7 @@
                        @oninput="OnSearchChanged" />
 
                 <button type="button" class="lock-toggle" aria-pressed="@(ShowLocked ? "true" : "false")" @onclick="() => ShowLocked = !ShowLocked">
-                    @(ShowLocked ? "🔓 잠긴 포켓몬 숨기기" : "🔒 잠긴 포켓몬 보기")
+                    @(ShowLocked ? "잠긴 포켓몬 숨기기" : "잠긴 포켓몬 보기")
                 </button>
 
                 <div class="dex-grid">
@@ -57,7 +57,7 @@
                             }
                             else
                             {
-                                <span class="dex-type">🔒 잠김</span>
+                                <span class="dex-type">잠김</span>
                             }
                         </button>
                     }
@@ -108,7 +108,7 @@
                         @foreach (var name in PresetNames)
                         {
                             <div class="preset-entry" role="listitem">
-                                <span class="preset-name" title="@name">📁 @name</span>
+                                <span class="preset-name" title="@name">PRESET · @name</span>
                                 <div class="preset-actions">
                                     <button type="button" class="preset-action" aria-label="@($"{name} 프리셋 불러오기")" @onclick="() => LoadPresetByName(name)">불러오기</button>
                                     <button type="button" class="preset-action preset-delete" aria-label="@($"{name} 프리셋 삭제")" @onclick="() => DeletePresetByName(name)">삭제</button>
@@ -158,7 +158,7 @@
                              aria-expanded="@(ViewingMoveKey == moveKey ? "true" : "false")"
                              @onclick="() => ViewOrToggleMove(moveKey)">
                             <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
-                             <span class="dex-name">@move.Name @(move.Priority > 0 ? "⚡" : "") @(IsTechnicalMachineMove(picked, moveKey) ? "· TM" : "")</span>
+                             <span class="dex-name">@move.Name @(move.Priority > 0 ? "우선" : "") @(IsTechnicalMachineMove(picked, moveKey) ? "· TM" : "")</span>
                             <span class="dex-type">@(move.IsStatus ? "변화기" : "공격기")</span>
                         </button>
                     }
