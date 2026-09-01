@@ -43,10 +43,31 @@ public class GameState
     public List<int> EnemyTeamIds { get; private set; } = new();
     public List<PokemonLoadout> PlayerLoadouts { get; private set; } = new();
     public List<PokemonLoadout> EnemyLoadouts { get; private set; } = new(); //상대 팀의 확정된 기술/특성/도구 (미리보기와 전투가 항상 일치하도록)
+    public RunMetaState RunMeta { get; private set; } = new();
+    public BattlefieldImprintDefinition? CurrentBattlefieldImprint =>
+        RunMetaCatalog.Battlefield(RunMeta.BattlefieldImprintId);
+    public IReadOnlyList<RunLegacyDefinition> ActiveLegacies =>
+        RunMeta.LegacyIds
+            .Select(RunMetaCatalog.Legacy)
+            .Where(legacy => legacy != null)
+            .Cast<RunLegacyDefinition>()
+            .ToList();
+    public IReadOnlyList<string> PendingLegacyChoices => RunMeta.PendingLegacyChoices;
+    public int LegacyClaimsRemaining => RunMeta.LegacyClaimsRemaining;
+    public IReadOnlyList<StolenMoveOption> PendingStolenMoveChoices =>
+        RunMeta.PendingStolenMoveChoices;
+    public bool CanChooseRiskCovenant =>
+        RunMeta.RiskCovenantStage == CurrentRunLevel
+        && !RunMeta.RiskCovenantDecisionMade;
+    public RiskCovenantDefinition? CurrentRiskCovenant =>
+        RunMetaCatalog.Covenant(RunMeta.RiskCovenantId)
+        ?? RunMetaCatalog.RiskCovenants.FirstOrDefault();
 
     private bool _runLoaded;
     private bool _battleOutcomeProcessed;
     private readonly List<RunRoundPerformance> _roundPerformances = new();
+    private readonly List<StolenMoveOption> _battleUsedEnemyMoves = new();
+    private readonly Random _metaRandom = new();
 
     public event Action? OnChange;
 
@@ -84,8 +105,10 @@ public class GameState
             legendaryProgressPercent,
             legendaryEncounterHistory,
             difficultyAdjustment,
-            roundPerformances) =
+            roundPerformances,
+            metaState) =
             await _runStore.Load(_currentUser.Username!);
+        RunMeta = RunMetaCatalog.Normalize(metaState);
         _legendaryEncounterHistory.Clear();
         _legendaryEncounterHistory.AddRange(legendaryEncounterHistory);
         _roundPerformances.Clear();
@@ -119,6 +142,7 @@ public class GameState
             PlayerLoadouts = new List<PokemonLoadout>();
             PlayerTeamIds = new List<int>();
             _roundPerformances.Clear();
+            RunMeta = new RunMetaState();
         }
         else
         {
@@ -171,7 +195,8 @@ public class GameState
             LegendaryProgressPercent,
             _legendaryEncounterHistory,
             CurrentRunDifficultyAdjustment,
-            _roundPerformances);
+            _roundPerformances,
+            RunMeta);
     }
 
     public void GoTo(GameScreen screen)
@@ -269,6 +294,148 @@ public class GameState
     {
         if (rival.HasValue) IsRivalBattle = rival.Value;
         _battleOutcomeProcessed = false;
+        _battleUsedEnemyMoves.Clear();
+    }
+
+    public async Task EnsureStageMetaAsync()
+    {
+        int stage = CurrentRunLevel;
+        bool changed = false;
+
+        if (RunMeta.BattlefieldImprintStage != stage
+            || RunMetaCatalog.Battlefield(RunMeta.BattlefieldImprintId) == null)
+        {
+            var selected = RunMetaCatalog.BattlefieldImprints
+                .OrderBy(_ => _metaRandom.Next())
+                .First();
+            RunMeta.BattlefieldImprintId = selected.Id;
+            RunMeta.BattlefieldImprintStage = stage;
+            changed = true;
+        }
+
+        if (RunMeta.RiskCovenantStage != stage)
+        {
+            RunMeta.RiskCovenantStage = stage;
+            RunMeta.RiskCovenantId = null;
+            RunMeta.RiskCovenantDecisionMade = false;
+            RunMeta.RiskCovenantAccepted = false;
+            RunMeta.BonusLegacyClaims = 0;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            await PersistRun();
+            NotifyChange();
+        }
+    }
+
+    public async Task<bool> ChooseRiskCovenantAsync(bool accept)
+    {
+        if (!CanChooseRiskCovenant) return false;
+
+        var covenant = RunMetaCatalog.RiskCovenants.First();
+        RunMeta.RiskCovenantDecisionMade = true;
+        RunMeta.RiskCovenantAccepted = accept;
+        RunMeta.RiskCovenantId = accept ? covenant.Id : null;
+        RunMeta.BonusLegacyClaims = accept ? covenant.BonusLegacyClaims : 0;
+
+        if (accept)
+        {
+            foreach (var loadout in EnemyLoadouts)
+            {
+                loadout.Level += covenant.EnemyLevelBonus;
+            }
+        }
+
+        await PersistRun();
+        NotifyChange();
+        return true;
+    }
+
+    public void RecordEnemyMoveUsed(int sourcePokemonId, string moveKey)
+    {
+        if (!RunMetaCatalog.IsStolenMoveEligible(moveKey, sourcePokemonId)
+            || _battleUsedEnemyMoves.Any(option =>
+                option.SourcePokemonId == sourcePokemonId && option.MoveKey == moveKey))
+        {
+            return;
+        }
+
+        _battleUsedEnemyMoves.Add(new StolenMoveOption
+        {
+            SourcePokemonId = sourcePokemonId,
+            MoveKey = moveKey
+        });
+    }
+
+    public IReadOnlyList<string> RunStolenMoveKeysFor(int pokemonId) =>
+        RunMeta.StolenMoves
+            .Where(move => move.PokemonId == pokemonId)
+            .Select(move => move.MoveKey)
+            .ToList();
+
+    public bool IsRunStolenMove(int pokemonId, string moveKey) =>
+        RunMeta.StolenMoves.Any(move =>
+            move.PokemonId == pokemonId && move.MoveKey == moveKey);
+
+    public async Task<bool> ClaimLegacyAsync(string legacyId)
+    {
+        if (RunMeta.LegacyClaimsRemaining <= 0
+            || !RunMeta.PendingLegacyChoices.Contains(legacyId)
+            || RunMeta.LegacyIds.Contains(legacyId))
+        {
+            return false;
+        }
+
+        RunMeta.LegacyIds.Add(legacyId);
+        RunMeta.PendingLegacyChoices.Remove(legacyId);
+        RunMeta.LegacyClaimsRemaining--;
+        await PersistRun();
+        NotifyChange();
+        return true;
+    }
+
+    public async Task<bool> ClaimStolenMoveAsync(int pokemonId, string moveKey)
+    {
+        var option = RunMeta.PendingStolenMoveChoices.FirstOrDefault(candidate =>
+            candidate.MoveKey == moveKey);
+        var loadout = PlayerLoadouts.FirstOrDefault(candidate =>
+            candidate.PokemonId == pokemonId);
+        if (option == null || loadout == null
+            || loadout.ChosenMoveNames.Count >= 4
+            || !RunMetaCatalog.IsStolenMoveEligible(moveKey, option.SourcePokemonId)
+            || loadout.ChosenMoveNames.Contains(moveKey))
+        {
+            return false;
+        }
+
+        loadout.ChosenMoveNames.Add(moveKey);
+        RunMeta.StolenMoves.Add(new StolenMoveRecord
+        {
+            PokemonId = pokemonId,
+            MoveKey = moveKey
+        });
+        RunMeta.PendingStolenMoveChoices.Remove(option);
+        await PersistRun();
+        NotifyChange();
+        return true;
+    }
+
+    public async Task ClearPendingRunRewardsAsync()
+    {
+        if (RunMeta.PendingLegacyChoices.Count == 0
+            && RunMeta.PendingStolenMoveChoices.Count == 0
+            && RunMeta.LegacyClaimsRemaining == 0)
+        {
+            return;
+        }
+
+        RunMeta.PendingLegacyChoices.Clear();
+        RunMeta.PendingStolenMoveChoices.Clear();
+        RunMeta.LegacyClaimsRemaining = 0;
+        await PersistRun();
+        NotifyChange();
     }
 
     public async Task RecordMoveSelectionAsync(string moveKey)
@@ -345,6 +512,7 @@ public class GameState
         CurrentScore++;
         LastBattleWon = true;
         EvolutionMessages = new List<string>();
+        PrepareVictoryRewards();
 
         foreach (var loadout in PlayerLoadouts)
         {
@@ -383,6 +551,8 @@ public class GameState
         CurrentScore = 0;
         PlayerLoadouts = new List<PokemonLoadout>();
         PlayerTeamIds = new List<int>();
+        RunMeta = new RunMetaState();
+        _battleUsedEnemyMoves.Clear();
         if (_progression != null && _currentUser.IsLoggedIn)
         {
             await _progression.CompleteBattleAsync(
@@ -410,6 +580,8 @@ public class GameState
         EnemyLoadouts = new List<PokemonLoadout>();
         EnemyTeamIds = new List<int>();
         IsRivalBattle = false;
+        RunMeta = new RunMetaState();
+        _battleUsedEnemyMoves.Clear();
         _battleOutcomeProcessed = false;
         LegendaryEncounterConsumed = false;
         CurrentRunDifficultyAdjustment =
@@ -490,6 +662,29 @@ public class GameState
         ResultSkillRating = SkillRating;
         LastSkillRatingChange = SkillRating - previousRating;
         _roundPerformances.Clear();
+    }
+
+    private void PrepareVictoryRewards()
+    {
+        var availableLegacies = RunMetaCatalog.Legacies
+            .Where(legacy => !RunMeta.LegacyIds.Contains(legacy.Id))
+            .OrderBy(_ => _metaRandom.Next())
+            .Take(3)
+            .Select(legacy => legacy.Id)
+            .ToList();
+        RunMeta.PendingLegacyChoices = availableLegacies;
+        RunMeta.LegacyClaimsRemaining = Math.Min(
+            1 + RunMeta.BonusLegacyClaims,
+            availableLegacies.Count);
+        RunMeta.BonusLegacyClaims = 0;
+
+        RunMeta.PendingStolenMoveChoices = _battleUsedEnemyMoves
+            .Where(option => !RunMeta.StolenMoves.Any(stolen =>
+                stolen.MoveKey == option.MoveKey))
+            .OrderBy(_ => _metaRandom.Next())
+            .Take(6)
+            .Select(option => option.Clone())
+            .ToList();
     }
 
     private static bool HaveSameLoadouts(

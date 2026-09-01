@@ -10,6 +10,7 @@ public sealed class BattleEngine
 {
     private readonly Random rng;
     private readonly IReadOnlyList<IBattleEffectHandler> effectHandlers;
+    public RunMetaState? ActiveRunMeta { get; private set; }
 
     public BattleEngine(IEnumerable<IBattleEffectHandler> handlers)
         : this(new Random(), handlers)
@@ -28,6 +29,9 @@ public sealed class BattleEngine
         if (pokemon.HeldItem == "구애스카프" && pokemon.HasActiveHeldItem(opponent)) speed *= 1.5;
         return (int)speed;
     }
+
+    public void ConfigureRunMeta(RunMetaState? runMeta) =>
+        ActiveRunMeta = runMeta;
 
     public bool CanSwitch(Pokemon active, Pokemon opponent)
     {
@@ -90,11 +94,23 @@ public sealed class BattleEngine
         Pokemon hero,
         Pokemon enemy,
         Pokemon? heroIllusionTarget = null,
-        Pokemon? enemyIllusionTarget = null)
+        Pokemon? enemyIllusionTarget = null,
+        string? initialWeather = null,
+        string? initialField = null)
     {
         BattleWeather.Reset();
         BattleField.Reset();
         var messages = new List<string>();
+        if (initialWeather != null && initialWeather != BattleWeather.Clear)
+        {
+            BattleWeather.Set(initialWeather);
+            messages.Add($"전장 각인으로 날씨가 {initialWeather}(으)로 고정되었다!");
+        }
+        if (initialField != null && initialField != BattleField.None)
+        {
+            BattleField.Set(initialField);
+            messages.Add($"전장 각인으로 {initialField}이(가) 펼쳐졌다!");
+        }
         var entrants = new[] { (Pokemon: hero, Opponent: enemy), (Pokemon: enemy, Opponent: hero) }
             .OrderByDescending(entry => EffectiveSpeed(entry.Pokemon, entry.Opponent));
         foreach (var entry in entrants)
@@ -103,6 +119,16 @@ public sealed class BattleEngine
                 ? heroIllusionTarget
                 : enemyIllusionTarget;
             messages.AddRange(ActivateSwitchIn(entry.Pokemon, entry.Opponent, illusionTarget));
+        }
+        if (initialWeather != null && BattleWeather.Current != initialWeather)
+        {
+            BattleWeather.Set(initialWeather);
+            messages.Add($"전장 각인이 날씨를 {initialWeather}(으)로 되돌렸다!");
+        }
+        if (initialField != null && BattleField.Current != initialField)
+        {
+            BattleField.Set(initialField);
+            messages.Add($"전장 각인이 {initialField}을(를) 유지했다!");
         }
         return messages;
     }
@@ -304,7 +330,8 @@ public sealed class BattleEngine
 
             var opponent = active.FirstOrDefault(candidate =>
                 !ReferenceEquals(candidate, pokemon) && !candidate.IsFainted);
-            var context = new BattleEndOfTurnContext(pokemon, emit, opponent, rng);
+            var context = new BattleEndOfTurnContext(
+                pokemon, emit, opponent, rng, ActiveRunMeta);
             foreach (var handler in effectHandlers) await handler.EndOfTurnAsync(context);
             pokemon.AdvanceTurn();
         }
@@ -337,7 +364,8 @@ public sealed class BattleEngine
         Pokemon defender,
         string? moveKey,
         bool attackerIsHero,
-        Func<BattleEvent, Task> emit)
+        Func<BattleEvent, Task> emit,
+        bool? attackerMovedFirst = null)
     {
         var result = new BattleTurnResult();
 
@@ -381,7 +409,7 @@ public sealed class BattleEngine
             await emit(BattleEvent.MessageLine(
                 $"{attacker.Data.Name}의 {delayedMove.Name}의 시한 공격이 떨어졌다!"));
             await ExecuteMoveAsync(attacker, delayedTarget, delayedMove, pendingDelayedKey,
-                attackerIsHero, emit, result, isContinuation: true);
+                attackerIsHero, emit, result, isContinuation: true, attackerMovedFirst);
         }
 
         string? executingMoveKey = attacker.RampageMoveKey ?? attacker.ConsumePendingMove();
@@ -491,7 +519,9 @@ public sealed class BattleEngine
                     presentationKey: MovePresentationCatalog.Resolve(executingMoveKey, move)));
                 return result;
             }
-            await ExecuteMoveAsync(attacker, defender, move, executingMoveKey, attackerIsHero, emit, result, isContinuation);
+            await ExecuteMoveAsync(
+                attacker, defender, move, executingMoveKey, attackerIsHero, emit, result,
+                isContinuation, attackerMovedFirst);
             await AdvanceRampageAfterAttemptAsync(attacker, executingMoveKey, emit);
         }
 
@@ -564,7 +594,8 @@ public sealed class BattleEngine
         bool attackerIsHero,
         Func<BattleEvent, Task> emit,
         BattleTurnResult result,
-        bool isContinuation = false)
+        bool isContinuation = false,
+        bool? attackerMovedFirst = null)
     {
         if (attacker.UpdateFormForMove(moveKey, move.IsStatus))
         {
@@ -778,7 +809,16 @@ public sealed class BattleEngine
             }
 
             var powerContext = new BattlePowerContext(
-                attacker, defender, move, attackType, makesContact, power, moveKey);
+                attacker,
+                defender,
+                move,
+                attackType,
+                makesContact,
+                power,
+                moveKey,
+                attackerMovedFirst ?? EffectiveSpeed(attacker, defender) >= EffectiveSpeed(defender, attacker),
+                ActiveRunMeta,
+                attackerIsHero);
             foreach (var handler in effectHandlers) handler.ModifyPower(powerContext);
             power = powerContext.Power;
 

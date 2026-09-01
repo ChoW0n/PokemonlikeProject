@@ -36,6 +36,35 @@
             <span>· 스테이지 클리어로 다음 주기 진행</span>
         }
     </p>
+    @if (State.CurrentBattlefieldImprint != null)
+    {
+        <section class="info-panel" aria-label="이번 스테이지 전장 각인">
+            <strong>전장 각인 · @State.CurrentBattlefieldImprint.Name</strong>
+            <p class="info-desc">@State.CurrentBattlefieldImprint.Description</p>
+            <p class="config-label">
+                날씨: @State.CurrentBattlefieldImprint.Weather · 필드: @State.CurrentBattlefieldImprint.Field
+            </p>
+        </section>
+    }
+
+    @if (State.CanChooseRiskCovenant && State.CurrentRiskCovenant != null)
+    {
+        <section class="info-panel" aria-label="위험 서약">
+            <strong>위험 서약 · @State.CurrentRiskCovenant.Name</strong>
+            <p class="info-desc">@State.CurrentRiskCovenant.Description</p>
+            <p class="config-label">대가: @State.CurrentRiskCovenant.RewardDescription</p>
+            <button type="button" @onclick="() => ChooseRisk(true)">서약 수락</button>
+            <button type="button" @onclick="() => ChooseRisk(false)">이번에는 거절</button>
+        </section>
+    }
+    else if (State.RunMeta.RiskCovenantDecisionMade)
+    {
+        <p class="config-label">
+            @(State.RunMeta.RiskCovenantAccepted
+                ? $"위험 서약 수락 · {State.CurrentRiskCovenant?.RewardDescription}"
+                : "위험 서약을 거절했습니다.")
+        </p>
+    }
 
     @if (EnemyLoadouts.Count == 0)
     {
@@ -98,12 +127,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await State.LoadRunForCurrentUser();
+        await State.EnsureStageMetaAsync();
         var unlocked = await Unlocks.GetUnlockedIds();
 
         var rival = await State.GetPendingRivalLoadoutsAsync();
         if (rival != null)
         {
-            EnemyLoadouts = rival;
+            EnemyLoadouts = ApplyRiskBonus(rival);
             await State.SetEnemyLoadouts(EnemyLoadouts);
             return;
         }
@@ -116,7 +147,10 @@
         int teamSize = EnemyTeamProvider.GetTeamSizeForRound(State.CurrentRunLevel);
         int enemyLevel = Math.Max(
             1,
-            State.CurrentRunLevel + State.CurrentRunDifficultyAdjustment);
+            State.CurrentRunLevel + State.CurrentRunDifficultyAdjustment
+            + (State.RunMeta.RiskCovenantAccepted
+                ? State.CurrentRiskCovenant?.EnemyLevelBonus ?? 0
+                : 0));
 
         var team = EnemyTeamProvider.GetRandomTeam(teamSize, poolSize, firstStageOnly, unlocked, State.LegendaryUnlocked);
 
@@ -166,5 +200,23 @@
         {
             Nav.NavigateTo("/continue");
         }
+    }
+
+    private async Task ChooseRisk(bool accept)
+    {
+        await State.ChooseRiskCovenantAsync(accept);
+        EnemyLoadouts = State.EnemyLoadouts;
+    }
+
+    private List<PokemonLoadout> ApplyRiskBonus(List<PokemonLoadout> loadouts)
+    {
+        if (!State.RunMeta.RiskCovenantAccepted || State.CurrentRiskCovenant == null)
+            return loadouts;
+
+        foreach (var loadout in loadouts)
+        {
+            loadout.Level += State.CurrentRiskCovenant.EnemyLevelBonus;
+        }
+        return loadouts;
     }
 }

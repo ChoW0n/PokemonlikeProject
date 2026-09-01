@@ -417,6 +417,7 @@
 
     protected override void OnInitialized()
     {
+        Rules.ConfigureRunMeta(State.RunMeta);
         if (State.PlayerLoadouts.Count > 0)
         {
             PlayerTeam = State.PlayerLoadouts.Select(l =>
@@ -456,7 +457,9 @@
             Hero,
             Enemy,
             GetIllusionTarget(Hero, PlayerTeam),
-            GetIllusionTarget(Enemy, EnemyTeam));
+            GetIllusionTarget(Enemy, EnemyTeam),
+            State.CurrentBattlefieldImprint?.Weather,
+            State.CurrentBattlefieldImprint?.Field);
         if (initialAbilityMessages.Count > 0)
         {
             LogHistory = initialAbilityMessages
@@ -589,9 +592,25 @@
         _ => type.ToString()
     };
 
-    private async Task<bool> RunTurn(Pokemon attacker, Pokemon defender, string? moveKey, bool attackerIsHero)
+    private async Task<bool> RunTurn(
+        Pokemon attacker,
+        Pokemon defender,
+        string? moveKey,
+        bool attackerIsHero,
+        bool attackerMovedFirst)
     {
-        var result = await Rules.TakeTurnAsync(attacker, defender, moveKey, attackerIsHero, PlayBattleEvent);
+        if (!attackerIsHero && moveKey != null)
+        {
+            State.RecordEnemyMoveUsed(PokemonDatabase.All
+                .First(entry => ReferenceEquals(entry.Value, attacker.Data)).Key, moveKey);
+        }
+        var result = await Rules.TakeTurnAsync(
+            attacker,
+            defender,
+            moveKey,
+            attackerIsHero,
+            PlayBattleEvent,
+            attackerMovedFirst);
 
         if (result.FaintedPokemon == null && result.ForcedSwitchPokemon != null)
         {
@@ -738,18 +757,18 @@
 
             if (turnPlan.HeroFirst)
             {
-                if (await RunTurn(Hero, Enemy, heroMoveKey, true)) return;
+                if (await RunTurn(Hero, Enemy, heroMoveKey, true, attackerMovedFirst: true)) return;
                 if (!Enemy.IsFainted && !Hero.IsFainted)
                 {
-                    if (await RunTurn(Enemy, Hero, turnPlan.EnemyMoveKey, false)) return;
+                    if (await RunTurn(Enemy, Hero, turnPlan.EnemyMoveKey, false, attackerMovedFirst: false)) return;
                 }
             }
             else
             {
-                if (await RunTurn(Enemy, Hero, turnPlan.EnemyMoveKey, false)) return;
+                if (await RunTurn(Enemy, Hero, turnPlan.EnemyMoveKey, false, attackerMovedFirst: true)) return;
                 if (!Hero.IsFainted && !Enemy.IsFainted)
                 {
-                    if (await RunTurn(Hero, Enemy, heroMoveKey, true)) return;
+                    if (await RunTurn(Hero, Enemy, heroMoveKey, true, attackerMovedFirst: false)) return;
                 }
             }
 
@@ -800,7 +819,7 @@
             }
 
             string? enemyMoveKey = Rules.PickEnemyMove(Enemy, EnemyMoveKeys, Hero);
-            if (await RunTurn(Enemy, Hero, enemyMoveKey, false)) return;
+            if (await RunTurn(Enemy, Hero, enemyMoveKey, false, attackerMovedFirst: true)) return;
 
             await Rules.ApplyEndOfTurnEffectsAsync(new[] { Hero, Enemy }, PlayBattleEvent);
             if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }

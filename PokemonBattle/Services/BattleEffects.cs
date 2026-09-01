@@ -193,6 +193,9 @@ public sealed class BattlePowerContext
     public PokemonType AttackType { get; }
     public bool MakesContact { get; }
     public double Power { get; set; }
+    public bool AttackerMovedFirst { get; }
+    public bool AttackerIsHero { get; }
+    public RunMetaState? RunMeta { get; }
 
     public BattlePowerContext(
         Pokemon attacker,
@@ -201,7 +204,10 @@ public sealed class BattlePowerContext
         PokemonType attackType,
         bool makesContact,
         double power,
-        string moveKey = "")
+        string moveKey = "",
+        bool attackerMovedFirst = false,
+        RunMetaState? runMeta = null,
+        bool attackerIsHero = false)
     {
         Attacker = attacker;
         Defender = defender;
@@ -210,6 +216,9 @@ public sealed class BattlePowerContext
         AttackType = attackType;
         MakesContact = makesContact;
         Power = power;
+        AttackerMovedFirst = attackerMovedFirst;
+        RunMeta = runMeta;
+        AttackerIsHero = attackerIsHero;
     }
 }
 
@@ -219,17 +228,20 @@ public sealed class BattleEndOfTurnContext
     public Pokemon? Opponent { get; }
     public Random Random { get; }
     public Func<BattleEvent, Task> Emit { get; }
+    public RunMetaState? RunMeta { get; }
 
     public BattleEndOfTurnContext(
         Pokemon pokemon,
         Func<BattleEvent, Task> emit,
         Pokemon? opponent = null,
-        Random? random = null)
+        Random? random = null,
+        RunMetaState? runMeta = null)
     {
         Pokemon = pokemon;
         Opponent = opponent;
         Random = random ?? System.Random.Shared;
         Emit = emit;
+        RunMeta = runMeta;
     }
 
     public Task ShowMessage(string message, int baseDelayMs = 1400) =>

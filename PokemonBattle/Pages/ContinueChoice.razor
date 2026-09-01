@@ -10,6 +10,25 @@
     <h1>다음 라운드 준비</h1>
     <p>현재 팀을 그대로 쓰거나, 기술/특성/도구를 다시 구성할 수 있습니다.</p>
 
+    @if (State.CanChooseRiskCovenant && State.CurrentRiskCovenant != null)
+    {
+        <section class="info-panel" aria-label="위험 서약">
+            <strong>위험 서약 · @State.CurrentRiskCovenant.Name</strong>
+            <p class="info-desc">@State.CurrentRiskCovenant.Description</p>
+            <p class="config-label">보상: @State.CurrentRiskCovenant.RewardDescription</p>
+            <button type="button" @onclick="() => ChooseRisk(true)">서약 수락</button>
+            <button type="button" @onclick="() => ChooseRisk(false)">이번에는 거절</button>
+        </section>
+    }
+    else if (State.RunMeta.RiskCovenantDecisionMade)
+    {
+        <p class="config-label">
+            @(State.RunMeta.RiskCovenantAccepted
+                ? $"위험 서약 수락 · {State.CurrentRiskCovenant?.RewardDescription}"
+                : "위험 서약을 거절했습니다.")
+        </p>
+    }
+
     <div class="enemy-grid" role="list" aria-label="현재 팀">
         @foreach (var loadout in ValidLoadouts)
         {
@@ -42,5 +61,10 @@
         State.BeginBattle();
         State.GoTo(GameScreen.Battle);
         Nav.NavigateTo("/battle");
+    }
+
+    private async Task ChooseRisk(bool accept)
+    {
+        await State.ChooseRiskCovenantAsync(accept);
     }
 }

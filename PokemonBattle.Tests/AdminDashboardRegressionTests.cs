@@ -226,7 +226,8 @@ public class AdminDashboardRegressionTests
                 "LegendaryProgressPercent" INTEGER NOT NULL DEFAULT 0,
                 "LegendaryEncounterHistoryJson" TEXT NOT NULL DEFAULT '[]',
                 "DifficultyAdjustment" INTEGER NOT NULL DEFAULT 0,
-                "RoundPerformancesJson" TEXT NOT NULL DEFAULT '[]'
+                "RoundPerformancesJson" TEXT NOT NULL DEFAULT '[]',
+                "RunMetaStateJson" TEXT NOT NULL DEFAULT '{{}}'
             );
             CREATE TABLE "PlayerSkillRatings" (
                 "Id" SERIAL PRIMARY KEY,

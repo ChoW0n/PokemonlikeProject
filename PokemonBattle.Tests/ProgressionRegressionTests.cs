@@ -208,6 +208,54 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public async Task RunStorePersistsRunMetaAcrossFreshDbContext()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreatePlayerRunsTable(schema);
+            const string username = "run-meta-persistence";
+            var meta = new RunMetaState
+            {
+                LegacyIds = new List<string> { "first-strike" },
+                BattlefieldImprintId = "storm-garden",
+                BattlefieldImprintStage = 4,
+                RiskCovenantId = "blood-debt",
+                RiskCovenantStage = 4,
+                RiskCovenantDecisionMade = true,
+                RiskCovenantAccepted = true,
+                StolenMoves = new List<StolenMoveRecord>
+                {
+                    new() { PokemonId = 1, MoveKey = "tackle" }
+                }
+            };
+
+            await using (var db = CreateDbContext(schema))
+            {
+                await new RunStore(db).Save(
+                    username,
+                    4,
+                    4,
+                    new List<PokemonLoadout>
+                    {
+                        new() { PokemonId = 1, ChosenMoveNames = new List<string> { "tackle" } }
+                    },
+                    0,
+                    metaState: meta);
+            }
+
+            await using (var freshDb = CreateDbContext(schema))
+            {
+                var restored = await new RunStore(freshDb).Load(username);
+                Assert.Equal(new[] { "first-strike" }, restored.metaState.LegacyIds);
+                Assert.Equal("storm-garden", restored.metaState.BattlefieldImprintId);
+                Assert.True(restored.metaState.RiskCovenantAccepted);
+                Assert.Equal(4, restored.metaState.BattlefieldImprintStage);
+                Assert.Equal("tackle", Assert.Single(restored.metaState.StolenMoves).MoveKey);
+            }
+        });
+    }
+
+    [Fact]
     public async Task GameStateKeepsDifficultyFixedUntilTheRunIsReset()
     {
         await WithTemporarySchema(async schema =>
@@ -809,6 +857,10 @@ public class ProgressionRegressionTests
                     ALTER TABLE "PlayerRuns"
                         ADD COLUMN IF NOT EXISTS "RoundPerformancesJson" TEXT NOT NULL DEFAULT '[]';
                     """);
+                await db.Database.ExecuteSqlRawAsync("""
+                    ALTER TABLE "PlayerRuns"
+                        ADD COLUMN IF NOT EXISTS "RunMetaStateJson" TEXT NOT NULL DEFAULT '{{}}';
+                    """);
             }
 
             await using (var freshDb = CreateDbContext(schema))
@@ -869,7 +921,8 @@ public class ProgressionRegressionTests
                         "LegendaryProgressPercent" INTEGER NOT NULL DEFAULT 0,
                         "LegendaryEncounterHistoryJson" TEXT NOT NULL DEFAULT '[]',
                         "DifficultyAdjustment" INTEGER NOT NULL DEFAULT 0,
-                        "RoundPerformancesJson" TEXT NOT NULL DEFAULT '[]'
+                        "RoundPerformancesJson" TEXT NOT NULL DEFAULT '[]',
+                        "RunMetaStateJson" TEXT NOT NULL DEFAULT '{{}}'
             );
             """);
         await db.Database.ExecuteSqlRawAsync("""
