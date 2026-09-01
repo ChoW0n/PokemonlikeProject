@@ -1,12 +1,18 @@
 using PokemonBattle.Components;
 using PokemonBattle.Data;
 using PokemonBattle.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
 string connectionString = BuildConnectionString();
+builder.Services.AddDataProtection()
+    .SetApplicationName("PokemonBattle");
+builder.Services.Configure<Microsoft.AspNetCore.DataProtection.KeyManagement.KeyManagementOptions>(
+    options => options.XmlRepository = new PostgresXmlRepository(connectionString));
+
 builder.Services.AddDbContextFactory<AppDbContext>(options => options.UseNpgsql(
     connectionString,
     npgsqlOptions => npgsqlOptions.EnableRetryOnFailure(
