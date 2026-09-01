@@ -22,7 +22,11 @@ public sealed class MoveEffectsRegressionTests
                     or MoveRuleKind.Rampage
                     or MoveRuleKind.VariablePower or MoveRuleKind.VariableType
                     or MoveRuleKind.SpecialDefenseCalculation
-                    or MoveRuleKind.DualTypeDamage or MoveRuleKind.HazardRemoval));
+                    or MoveRuleKind.DualTypeDamage or MoveRuleKind.HazardRemoval
+                    or MoveRuleKind.Substitute or MoveRuleKind.TrickRoom
+                    or MoveRuleKind.Gravity or MoveRuleKind.Counter
+                    or MoveRuleKind.MirrorCoat or MoveRuleKind.ItemSwap
+                    or MoveRuleKind.HazardPlacement));
     }
 
     [Fact]
@@ -186,6 +190,127 @@ public sealed class MoveEffectsRegressionTests
         var defenderResult = await engine.TakeTurnAsync(
             defender, attacker, "dragon-tail", false, _ => Task.CompletedTask);
         Assert.Same(attacker, defenderResult.ForcedSwitchPokemon);
+    }
+
+    [Fact]
+    public async Task Substitute_absorbs_damage_and_pays_a_quarter_hp()
+    {
+        var user = CreatePokemon(25, "substitute", level: 50);
+        var attacker = CreatePokemon(1, "tackle", level: 50);
+        var engine = CreateEngine();
+
+        int hpBefore = user.CurrentHp;
+        await engine.TakeTurnAsync(user, attacker, "substitute", true, _ => Task.CompletedTask);
+        await engine.TakeTurnAsync(attacker, user, "tackle", false, _ => Task.CompletedTask);
+
+        Assert.True(user.HasSubstitute);
+        Assert.Equal(hpBefore - user.MaxHp / 4, user.CurrentHp);
+        Assert.Equal(attacker.MaxHp, attacker.CurrentHp);
+    }
+
+    [Fact]
+    public async Task Counter_and_mirror_coat_return_only_the_matching_damage_class()
+    {
+        var counterUser = CreatePokemon(25, "counter");
+        var physical = CreatePokemon(1, "tackle");
+        var engine = CreateEngine();
+
+        await engine.TakeTurnAsync(physical, counterUser, "tackle", false, _ => Task.CompletedTask);
+        int beforeCounter = physical.CurrentHp;
+        await engine.TakeTurnAsync(counterUser, physical, "counter", true, _ => Task.CompletedTask);
+        Assert.True(physical.CurrentHp < beforeCounter);
+
+        var mirrorUser = CreatePokemon(25, "mirror-coat");
+        var special = CreatePokemon(1, "water-gun");
+        await engine.TakeTurnAsync(special, mirrorUser, "water-gun", false, _ => Task.CompletedTask);
+        int beforeMirror = special.CurrentHp;
+        await engine.TakeTurnAsync(mirrorUser, special, "mirror-coat", true, _ => Task.CompletedTask);
+        Assert.True(special.CurrentHp < beforeMirror);
+    }
+
+    [Fact]
+    public async Task Magic_mirror_reflects_a_targeted_status_move_once()
+    {
+        var attacker = CreatePokemon(25, "growl");
+        var reflector = new Pokemon(
+            PokemonDatabase.All[1], new List<string> { "tackle" }, "매직미러", level: 50);
+        var engine = CreateEngine();
+
+        await engine.TakeTurnAsync(attacker, reflector, "growl", true, _ => Task.CompletedTask);
+
+        Assert.Equal(-1, attacker.StatStages["attack"]);
+        Assert.Equal(0, reflector.StatStages["attack"]);
+    }
+
+    [Fact]
+    public void Dynamax_is_one_use_per_side_and_resets_on_switch_out()
+    {
+        var pokemon = CreatePokemon(25, "tackle");
+        var engine = CreateEngine();
+        int baseHp = pokemon.MaxHp;
+
+        Assert.True(engine.CanActivateGimmick(pokemon, BattleGimmickKind.Dynamax, true));
+        Assert.NotEmpty(engine.ActivateGimmick(pokemon, BattleGimmickKind.Dynamax, true));
+        Assert.Equal(baseHp * 2, pokemon.MaxHp);
+        Assert.False(engine.CanActivateGimmick(pokemon, BattleGimmickKind.Dynamax, true));
+
+        pokemon.ResetOnSwitchOut();
+        Assert.Equal(baseHp, pokemon.MaxHp);
+        Assert.Equal(BattleGimmickKind.None, pokemon.ActiveGimmick);
+    }
+
+    [Fact]
+    public async Task Entry_hazards_damage_a_replacement_and_rapid_spin_boosts_its_user()
+    {
+        var setter = CreatePokemon(25, "stealth-rock");
+        var target = CreatePokemon(1, "rapid-spin");
+        var engine = CreateEngine();
+
+        await engine.TakeTurnAsync(setter, target, "stealth-rock", true, _ => Task.CompletedTask);
+        var replacement = CreatePokemon(1, "tackle");
+        int replacementHp = replacement.CurrentHp;
+        engine.ActivateSwitchIn(replacement, setter, isHeroSide: false);
+        Assert.True(replacement.CurrentHp < replacementHp);
+
+        await engine.TakeTurnAsync(target, setter, "rapid-spin", false, _ => Task.CompletedTask);
+        Assert.Equal(1, target.StatStages["speed"]);
+        Assert.Equal(0, setter.StatStages["speed"]);
+    }
+
+    [Fact]
+    public async Task Trick_room_reverses_speed_order_without_changing_priority()
+    {
+        var fast = CreatePokemon(25, "trick-room");
+        var slow = CreatePokemon(1, "tackle");
+        var engine = CreateEngine();
+        BattleField.Reset();
+
+        await engine.TakeTurnAsync(fast, slow, "trick-room", true, _ => Task.CompletedTask);
+        var plan = engine.PlanTurn(fast, "tackle", slow, new[] { "tackle" });
+
+        Assert.True(BattleField.TrickRoomActive);
+        Assert.False(plan.HeroFirst);
+        BattleField.Reset();
+    }
+
+    [Fact]
+    public async Task Trick_and_switcheroo_exchange_items_but_sticky_protects_the_defender()
+    {
+        var trickUser = new Pokemon(PokemonDatabase.All[25],
+            new List<string> { "trick" }, item: "생명의구슬", level: 50);
+        var target = new Pokemon(PokemonDatabase.All[1],
+            new List<string> { "tackle" }, item: "먹다남은음식", level: 50);
+        var engine = CreateEngine();
+
+        await engine.TakeTurnAsync(trickUser, target, "trick", true, _ => Task.CompletedTask);
+        Assert.Equal("먹다남은음식", trickUser.HeldItem);
+        Assert.Equal("생명의구슬", target.HeldItem);
+
+        var sticky = new Pokemon(PokemonDatabase.All[1],
+            new List<string> { "tackle" }, ability: "점착", item: "먹다남은음식", level: 50);
+        await engine.TakeTurnAsync(trickUser, sticky, "switcheroo", true, _ => Task.CompletedTask);
+        Assert.Equal("먹다남은음식", trickUser.HeldItem);
+        Assert.Equal("먹다남은음식", sticky.HeldItem);
     }
 
     private static Pokemon CreatePokemon(

@@ -15,3 +15,4 @@
 - [Trace ability lifecycle](trace-ability-lifecycle.md) — copied abilities are temporary and restore on switch-out.
 - [Enemy team scaling](enemy-team-scaling.md) — opponent team size follows the current run round; unlock count only expands the selection pool.
 - [Deployment UBB suspension](deployment-ubb-suspension.md) — successful builds can still be suspended by a usage-based billing hold.
+- [GitHub change control](github-change-control.md) — never commit or push unless the user explicitly asks for it.

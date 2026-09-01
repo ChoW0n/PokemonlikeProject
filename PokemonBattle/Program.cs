@@ -2,20 +2,11 @@ using PokemonBattle.Components;
 using PokemonBattle.Data;
 using PokemonBattle.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
-string connectionString = BuildConnectionString(builder.Configuration);
+string connectionString = BuildConnectionString();
 builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
-        | ForwardedHeaders.XForwardedProto
-        | ForwardedHeaders.XForwardedHost;
-    options.KnownNetworks.Clear();
-    options.KnownProxies.Clear();
-});
 
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<AuthService>();
@@ -141,18 +132,12 @@ using (var scope = app.Services.CreateScope())
             ON ""TechnicalMachines"" (""Username"", ""MoveKey"");
     ");
 
-    string? bootstrapAdminPassword =
-        Environment.GetEnvironmentVariable("ADMIN_BOOTSTRAP_PASSWORD");
-    string bootstrapAdminUsername =
-        Environment.GetEnvironmentVariable("ADMIN_BOOTSTRAP_USERNAME") ?? "admin";
-
-    if (!string.IsNullOrWhiteSpace(bootstrapAdminPassword)
-        && !db.Users.Any(u => u.Username == bootstrapAdminUsername))
+    if (!db.Users.Any(u => u.Username == "admin"))
     {
         db.Users.Add(new UserAccount
         {
-            Username = bootstrapAdminUsername,
-            PasswordHash = PasswordHasher.Hash(bootstrapAdminPassword),
+            Username = "admin",
+            PasswordHash = PasswordHasher.Hash("admin"),
             IsAdmin = true
         });
         db.SaveChanges();
@@ -176,7 +161,6 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
 }
 
-app.UseForwardedHeaders();
 app.UseStaticFiles();
 app.UseAntiforgery();
 
@@ -187,47 +171,32 @@ app.MapRazorComponents<App>()
 
 app.Run();
 
-string BuildConnectionString(IConfiguration configuration)
+string BuildConnectionString()
 {
-    string? raw = new[]
-    {
-        Environment.GetEnvironmentVariable("DATABASE_URL"),
-        Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection"),
-        configuration.GetConnectionString("DefaultConnection")
-    }.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+    string? raw = Environment.GetEnvironmentVariable("DATABASE_URL");
     if (string.IsNullOrEmpty(raw))
     {
-        throw new InvalidOperationException(
-            "데이터베이스 연결 설정이 없습니다. DATABASE_URL 또는 ConnectionStrings__DefaultConnection 환경변수를 설정하세요.");
-    }
-
-    if (!raw.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
-        && !raw.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
-    {
-        return raw;
+        throw new Exception("DATABASE_URL 환경변수가 없습니다. Replit에서 Database 도구를 먼저 활성화해주세요.");
     }
 
     var uri = new Uri(raw);
-    int userInfoSeparator = uri.UserInfo.IndexOf(':');
-    string user = Uri.UnescapeDataString(
-        userInfoSeparator >= 0 ? uri.UserInfo[..userInfoSeparator] : uri.UserInfo);
-    string password = userInfoSeparator >= 0
-        ? Uri.UnescapeDataString(uri.UserInfo[(userInfoSeparator + 1)..])
-        : "";
+    var userInfo = uri.UserInfo.Split(':');
+    string user = userInfo[0];
+    string password = userInfo.Length > 1 ? userInfo[1] : "";
     string host = uri.Host;
     int port = uri.Port > 0 ? uri.Port : 5432;
-    string database = Uri.UnescapeDataString(uri.AbsolutePath.TrimStart('/'));
+    string database = uri.AbsolutePath.TrimStart('/');
 
-    string sslMode = "Prefer";
+    string sslMode = "Disable";
     if (!string.IsNullOrEmpty(uri.Query))
     {
         var queryParams = uri.Query.TrimStart('?').Split('&');
         foreach (var p in queryParams)
         {
-            var kv = p.Split('=', 2);
+            var kv = p.Split('=');
             if (kv.Length == 2 && kv[0].Equals("sslmode", StringComparison.OrdinalIgnoreCase))
             {
-                sslMode = Uri.UnescapeDataString(kv[1]);
+                sslMode = kv[1];
             }
         }
     }

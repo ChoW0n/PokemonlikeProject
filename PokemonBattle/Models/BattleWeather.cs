@@ -9,41 +9,48 @@ public static class BattleWeather
     public const string Sand = "모래바람";
     public const string Hail = "싸라기눈";
 
-    private static string current = Clear;
+    private sealed class WeatherState
+    {
+        public string Current = Clear;
+        public int TurnsRemaining;
+    }
+
+    private static readonly AsyncLocal<WeatherState?> state = new();
+    private static WeatherState CurrentState => state.Value ??= new WeatherState();
+
     public static string Current
     {
-        get => current;
+        get => CurrentState.Current;
         set
         {
-            current = value;
-            TurnsRemaining = 0;
+            CurrentState.Current = value;
+            CurrentState.TurnsRemaining = 0;
         }
     }
 
-    public static int TurnsRemaining { get; private set; }
+    public static int TurnsRemaining => CurrentState.TurnsRemaining;
 
     public static bool AreEffectsSuppressed(Pokemon? first, Pokemon? second) =>
         HasWeatherNullifier(first, second) || HasWeatherNullifier(second, first);
 
     public static void Reset()
     {
-        current = Clear;
-        TurnsRemaining = 0;
+        state.Value = new WeatherState();
     }
 
     public static void Set(string weather, int turns = 0)
     {
-        current = weather;
-        TurnsRemaining = Math.Max(0, turns);
+        CurrentState.Current = weather;
+        CurrentState.TurnsRemaining = Math.Max(0, turns);
     }
 
     public static bool AdvanceTurn()
     {
-        if (TurnsRemaining <= 0) return false;
-        TurnsRemaining--;
-        if (TurnsRemaining > 0) return false;
+        if (CurrentState.TurnsRemaining <= 0) return false;
+        CurrentState.TurnsRemaining--;
+        if (CurrentState.TurnsRemaining > 0) return false;
 
-        current = Clear;
+        CurrentState.Current = Clear;
         return true;
     }
 

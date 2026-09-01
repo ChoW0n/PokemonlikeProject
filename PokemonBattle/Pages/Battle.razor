@@ -51,6 +51,10 @@
                 {
                     <span class="hud-status">@StatusText(Enemy)</span>
                 }
+                 @if (GimmickText(Enemy) != "")
+                 {
+                     <span class="hud-status gimmick-status">@GimmickText(Enemy)</span>
+                 }
             </div>
             <div class="platform-shadow"></div>
             <img id="sprite-enemy" src="@Enemy.Data.EffectiveImageUrl" alt="@Enemy.Data.Name"
@@ -88,6 +92,10 @@
                 {
                     <span class="hud-status">@StatusText(Hero)</span>
                 }
+                 @if (GimmickText(Hero) != "")
+                 {
+                     <span class="hud-status gimmick-status">@GimmickText(Hero)</span>
+                 }
             </div>
         </div>
         <div class="turn-tag" aria-label="@($"현재 {Turn}턴")">TURN @Turn</div>
@@ -122,6 +130,34 @@
                     <span>교체</span>
                 </button>
             </div>
+            @if (CanUseGimmick(BattleGimmickKind.MegaEvolution)
+                || CanUseGimmick(BattleGimmickKind.Dynamax)
+                || CanUseGimmick(BattleGimmickKind.Terastal))
+            {
+                <div class="gimmick-actions" aria-label="전투 기믹">
+                    @if (CanUseGimmick(BattleGimmickKind.MegaEvolution))
+                    {
+                        <button type="button" class="gimmick-button" disabled="@IsBusy"
+                                @onclick="() => UseGimmick(BattleGimmickKind.MegaEvolution)">
+                            메가진화
+                        </button>
+                    }
+                    @if (CanUseGimmick(BattleGimmickKind.Dynamax))
+                    {
+                        <button type="button" class="gimmick-button" disabled="@IsBusy"
+                                @onclick="() => UseGimmick(BattleGimmickKind.Dynamax)">
+                            다이맥스
+                        </button>
+                    }
+                    @if (CanUseGimmick(BattleGimmickKind.Terastal))
+                    {
+                        <button type="button" class="gimmick-button" disabled="@IsBusy"
+                                @onclick="() => UseGimmick(BattleGimmickKind.Terastal)">
+                            테라스탈 (@TypeKor(Hero.CurrentType1))
+                        </button>
+                    }
+                </div>
+            }
         }
         else if (Menu == BattleMenu.Attack)
         {
@@ -363,6 +399,17 @@
         _ => ""
     };
 
+    private static string GimmickText(Pokemon p) => p.ActiveGimmick switch
+    {
+        BattleGimmickKind.MegaEvolution => "메가진화",
+        BattleGimmickKind.Dynamax => $"다이맥스 {p.GimmickTurnsRemaining}턴",
+        BattleGimmickKind.Gigantamax => $"거다이맥스 {p.GimmickTurnsRemaining}턴",
+        BattleGimmickKind.Terastal => p.TerastalType == null
+            ? "테라스탈"
+            : $"{TypeKor(p.TerastalType.Value)} 테라스탈",
+        _ => ""
+    };
+
     private static string AilmentKor(string a) => a switch
     {
         "paralysis" => "마비", "poison" => "독", "burn" => "화상",
@@ -505,6 +552,37 @@
         Menu = BattleMenu.Attack;
     }
 
+    private bool CanUseGimmick(BattleGimmickKind kind) =>
+        Rules.CanActivateGimmick(
+            Hero,
+            kind,
+            isHeroSide: true,
+            kind == BattleGimmickKind.Terastal ? Hero.CurrentType1 : null);
+
+    private async Task UseGimmick(BattleGimmickKind kind)
+    {
+        if (IsBusy || !CanUseGimmick(kind)) return;
+
+        IsBusy = true;
+        try
+        {
+            foreach (var message in Rules.ActivateGimmick(
+                Hero,
+                kind,
+                isHeroSide: true,
+                kind == BattleGimmickKind.Terastal ? Hero.CurrentType1 : null))
+            {
+                await ShowMessage(message, 900);
+            }
+            PromptText = "기믹이 활성화되었습니다. 행동을 선택하세요.";
+            StateHasChanged();
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     private async Task TapMove(string key)
     {
         if (PendingMoveKey == key)
@@ -599,6 +677,17 @@
         bool attackerIsHero,
         bool attackerMovedFirst)
     {
+        if (!attackerIsHero && moveKey != null
+            && attacker.CurrentHp <= attacker.MaxHp / 2
+            && Rules.CanActivateGimmick(attacker, BattleGimmickKind.Dynamax, isHeroSide: false))
+        {
+            foreach (var message in Rules.ActivateGimmick(
+                attacker, BattleGimmickKind.Dynamax, isHeroSide: false))
+            {
+                await ShowMessage(message, 900);
+            }
+        }
+
         if (!attackerIsHero && moveKey != null)
         {
             State.RecordEnemyMoveUsed(PokemonDatabase.All
@@ -667,7 +756,7 @@
         EnemyTeamIndex++;
         EnemyMoveKeys = ResolveMoveKeys(Enemy);
         await ShowMessage($"{Enemy.Data.Name}이(가) 기술의 효과로 교체되어 나왔다!");
-        foreach (var message in Rules.ActivateSwitchIn(Enemy, Hero, GetIllusionTarget(Enemy, EnemyTeam)))
+                 foreach (var message in Rules.ActivateSwitchIn(Enemy, Hero, GetIllusionTarget(Enemy, EnemyTeam), false))
             await ShowMessage(message, 1000);
         return false;
     }
@@ -697,7 +786,7 @@
                 EnemyTeamIndex++;
                 EnemyMoveKeys = ResolveMoveKeys(Enemy);
                 await ShowMessage($"상대가 {Enemy.Data.Name}을(를) 내보냈다!");
-                foreach (var message in Rules.ActivateSwitchIn(Enemy, Hero, GetIllusionTarget(Enemy, EnemyTeam)))
+                 foreach (var message in Rules.ActivateSwitchIn(Enemy, Hero, GetIllusionTarget(Enemy, EnemyTeam), false))
                 {
                     await ShowMessage(message, 1000);
                 }
