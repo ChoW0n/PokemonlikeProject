@@ -16,11 +16,20 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         if (context.Move.DrainPercent > 0 && !context.Attacker.IsFainted)
         {
             int heal = Math.Max(1, context.TotalDamage * context.Move.DrainPercent / 100);
-            context.Attacker.CurrentHp = Math.Min(context.Attacker.MaxHp, context.Attacker.CurrentHp + heal);
-            await context.ShowMessage($"{context.Attacker.Data.Name}은(는) HP를 흡수했다!");
+            if (context.Attacker.HasActiveAbility("해감액", context.Defender))
+            {
+                context.Attacker.CurrentHp = Math.Max(0, context.Attacker.CurrentHp - heal);
+                if (context.Attacker.CurrentHp == 0) context.Attacker.MarkFainted();
+                await context.ShowMessage($"{context.Attacker.Data.Name}은(는) 해감액 때문에 HP를 흡수하지 못하고 데미지를 입었다!");
+            }
+            else
+            {
+                context.Attacker.CurrentHp = Math.Min(context.Attacker.MaxHp, context.Attacker.CurrentHp + heal);
+                await context.ShowMessage($"{context.Attacker.Data.Name}은(는) HP를 흡수했다!");
+            }
         }
         else if (context.Move.DrainPercent < 0 && !context.Attacker.IsFainted
-            && context.Attacker.SelectedAbility != "돌머리")
+            && !context.Attacker.HasActiveAbility("돌머리", context.Defender))
         {
             int recoilDamage = Math.Max(1, context.TotalDamage * Math.Abs(context.Move.DrainPercent) / 100);
             context.Attacker.CurrentHp = Math.Max(0, context.Attacker.CurrentHp - recoilDamage);
@@ -37,7 +46,8 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         }
 
         if (!context.Defender.IsFainted && context.MoveKey == "knock-off"
-            && context.Defender.HeldItem != "없음")
+            && context.Defender.HeldItem != "없음"
+            && !context.Defender.HasActiveAbility("점착", context.Attacker))
         {
             string item = context.Defender.HeldItem;
             context.Defender.HeldItem = "없음";
@@ -72,7 +82,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
             context.Attacker.ApplyBerryEffect(berryName!);
             await context.ShowMessage(
                 $"{context.Attacker.Data.Name}은(는) {context.Defender.Data.Name}의 {berryName}을(를) 빼앗아 먹었다!");
-            if (context.Attacker.SelectedAbility == "볼주머니")
+            if (context.Attacker.HasActiveAbility("볼주머니", context.Defender))
             {
                 int before = context.Attacker.CurrentHp;
                 int heal = Math.Max(1, context.Attacker.MaxHp / 8);
@@ -97,9 +107,9 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         var move = context.Move;
         var attacker = context.Attacker;
         var defender = context.Defender;
-        bool suppressSecondaryEffects = attacker.SelectedAbility == "우격다짐"
-            || (!move.IsStatus && defender.SelectedAbility == "인분");
-        int chanceMultiplier = attacker.SelectedAbility == "하늘의은총" ? 2 : 1;
+        bool suppressSecondaryEffects = attacker.HasActiveAbility("우격다짐", defender)
+            || (!move.IsStatus && defender.HasActiveAbility("인분", attacker));
+        int chanceMultiplier = attacker.HasActiveAbility("하늘의은총", defender) ? 2 : 1;
 
         await ApplyMoveSpecificEffectAsync(context);
 
@@ -143,7 +153,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 defender.ApplyAilment(ailment, context.Random, attacker);
                 await context.ShowMessage($"{defender.Data.Name}은(는) {AilmentKor(ailment)} 상태가 되었다!");
 
-                if (defender.SelectedAbility == "싱크로"
+                if (defender.HasActiveAbility("싱크로", attacker)
                     && move.AilmentName is "paralysis" or "poison" or "burn"
                     && attacker.Status == StatusCondition.None
                     && !attacker.IsImmuneToAilment(move.AilmentName, defender))
@@ -155,7 +165,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         }
 
         int flinchChance = move.FlinchChance;
-        if (!move.IsStatus && attacker.SelectedAbility == "악취") flinchChance = Math.Max(flinchChance, 10);
+        if (!move.IsStatus && attacker.HasActiveAbility("악취", defender)) flinchChance = Math.Max(flinchChance, 10);
         if (!suppressSecondaryEffects && flinchChance > 0 && !defender.IsFainted
             && defender.SelectedAbility != "정신력"
             && context.Random.Next(100) < Math.Min(100, flinchChance * chanceMultiplier))

@@ -169,6 +169,20 @@ public static class MoveRuleMetadata
         "self-destruct", "explosion", "misty-explosion"
     };
 
+    private static readonly HashSet<string> WindMoves = new()
+    {
+        "gust", "twister", "hurricane", "razor-wind", "silver-wind", "icy-wind",
+        "tailwind", "whirlwind", "fairy-wind", "sand-attack", "heat-wave"
+    };
+
+    private static readonly HashSet<string> SlicingMoves = new()
+    {
+        "razor-leaf", "razor-wind", "slash", "night-slash", "psycho-cut",
+        "leaf-blade", "air-cutter", "air-slash", "aqua-cutter", "x-scissor",
+        "sacred-sword", "secret-sword", "solar-blade", "kowtow-cleave",
+        "ceaseless-edge", "mighty-cleave"
+    };
+
     /// <summary>
     /// Every catalog entry has a concrete rule. StandardDamage is intentional for
     /// ordinary attacks; it is not an unknown/fallback state.
@@ -214,6 +228,8 @@ public static class MoveRuleMetadata
     };
     public static bool IsBindingMove(string moveKey) => BindingMoves.Contains(moveKey);
     public static bool IsForcedSwitchMove(string moveKey) => ForcedSwitchMoves.Contains(moveKey);
+    public static bool IsWindMove(string moveKey) => WindMoves.Contains(moveKey);
+    public static bool IsSlicingMove(string moveKey) => SlicingMoves.Contains(moveKey);
 
     public static bool MakesContact(string moveKey, Move move) =>
         !move.IsStatus && !move.IsSpecial && move.Power > 0 && !NonContactPhysicalMoves.Contains(moveKey);
@@ -273,10 +289,10 @@ public static class MoveRuleMetadata
             };
         }
         if (attacker == null) return resolvedType;
-        if (attacker.SelectedAbility == "노말스킨") return PokemonType.Normal;
-        if (resolvedType == PokemonType.Normal && attacker.SelectedAbility == "프리즈스킨")
+        if (attacker.HasActiveAbility("노말스킨", defender)) return PokemonType.Normal;
+        if (resolvedType == PokemonType.Normal && attacker.HasActiveAbility("프리즈스킨", defender))
             return PokemonType.Ice;
-        if (resolvedType == PokemonType.Normal && attacker.SelectedAbility == "페어리스킨")
+        if (resolvedType == PokemonType.Normal && attacker.HasActiveAbility("페어리스킨", defender))
             return PokemonType.Fairy;
         return resolvedType;
     }
@@ -379,13 +395,12 @@ public static class MoveRuleMetadata
                 break;
             case "grass-knot":
             case "low-kick":
-                // Weight is not part of the current 1v1 data model. Base HP is
-                // a stable proxy that still gives light/heavy species distinct
-                // deterministic tiers without inventing a second database.
-                power = defender.Data.BaseHp >= 120 ? 100
-                    : defender.Data.BaseHp >= 90 ? 80
-                    : defender.Data.BaseHp >= 60 ? 60
-                    : defender.Data.BaseHp >= 30 ? 40 : 20;
+                double weight = defender.GetEffectiveWeight(attacker);
+                power = weight >= 120 ? 120
+                    : weight >= 100 ? 100
+                    : weight >= 80 ? 80
+                    : weight >= 60 ? 60
+                    : weight >= 40 ? 40 : 20;
                 break;
         }
         return Math.Max(1, power);
@@ -415,10 +430,10 @@ public static class MoveRuleMetadata
 
         if (attacker != null)
         {
-            if (attacker.SelectedAbility == "의욕" && !move.IsStatus && !move.IsSpecial) accuracy *= 0.8;
-            if (attacker.SelectedAbility == "복안") accuracy *= 1.3;
-            if (attacker.SelectedAbility == "승리의별") accuracy *= 1.1;
-            bool attackerUnaware = attacker.SelectedAbility == "천진";
+            if (attacker.HasActiveAbility("의욕", defender) && !move.IsStatus && !move.IsSpecial) accuracy *= 0.8;
+            if (attacker.HasActiveAbility("복안", defender)) accuracy *= 1.3;
+            if (attacker.HasActiveAbility("승리의별", defender)) accuracy *= 1.1;
+            bool attackerUnaware = attacker.HasActiveAbility("천진", defender);
             if (!attackerUnaware)
                 accuracy *= AccuracyStageMultiplier(attacker.StatStages["accuracy"]);
         }
@@ -427,20 +442,19 @@ public static class MoveRuleMetadata
         {
             if (!weatherSuppressed
                 && !defender.IsAbilitySuppressedBy(attacker)
-                && defender.SelectedAbility == "모래숨기"
+                && defender.HasActiveAbility("모래숨기", attacker)
                 && BattleWeather.Current == BattleWeather.Sand) accuracy *= 0.8;
             if (!weatherSuppressed
                 && !defender.IsAbilitySuppressedBy(attacker)
-                && defender.SelectedAbility == "눈숨기"
+                && defender.HasActiveAbility("눈숨기", attacker)
                 && BattleWeather.Current == BattleWeather.Hail) accuracy *= 0.8;
             if (!defender.IsAbilitySuppressedBy(attacker)
-                && defender.SelectedAbility == "갈지자걸음" && defender.IsConfused) accuracy *= 0.5;
-            bool defenderUnaware = defender.SelectedAbility == "천진"
-                && !defender.IsAbilitySuppressedBy(attacker);
+                && defender.HasActiveAbility("갈지자걸음", attacker) && defender.IsConfused) accuracy *= 0.5;
+            bool defenderUnaware = defender.HasActiveAbility("천진", attacker);
             if (!defenderUnaware)
                 accuracy /= AccuracyStageMultiplier(defender.StatStages["evasion"]);
             if (!defender.IsAbilitySuppressedBy(attacker)
-                && defender.SelectedAbility == "미라클스킨"
+                && defender.HasActiveAbility("미라클스킨", attacker)
                 && move.IsStatus
                 && TargetsOpponent(move)
                 && !move.AlwaysHits)

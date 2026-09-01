@@ -25,7 +25,7 @@ public sealed class BattleEngine
     public int EffectiveSpeed(Pokemon pokemon, Pokemon? opponent = null)
     {
         double speed = pokemon.EffectiveSpdAgainst(opponent);
-        if (pokemon.HeldItem == "구애스카프") speed *= 1.5;
+        if (pokemon.HeldItem == "구애스카프" && pokemon.HasActiveHeldItem(opponent)) speed *= 1.5;
         return (int)speed;
     }
 
@@ -35,14 +35,14 @@ public sealed class BattleEngine
             || active.BindingTurnsRemaining > 0
             || active.RampageMoveKey != null) return false;
         bool isGhostType = active.HasType(PokemonType.Ghost);
-        if (opponent.SelectedAbility == "그림자밟기"
+        if (opponent.HasActiveAbility("그림자밟기", active)
             && !isGhostType
             && active.SelectedAbility != "그림자밟기") return false;
-        if (opponent.SelectedAbility == "개미지옥"
+        if (opponent.HasActiveAbility("개미지옥", active)
             && !active.HasType(PokemonType.Flying)
             && !isGhostType
             && active.SelectedAbility != "부유") return false;
-        if (opponent.SelectedAbility == "자력"
+        if (opponent.HasActiveAbility("자력", active)
             && active.IsSteelType
             && active.SelectedAbility != "자력") return false;
         return true;
@@ -57,7 +57,7 @@ public sealed class BattleEngine
     public bool CanEscape(Pokemon active, Pokemon opponent, bool isWildBattle = true)
     {
         if (!isWildBattle || active.IsFainted) return false;
-        if (active.SelectedAbility == "도주") return true;
+        if (active.HasActiveAbility("도주", opponent)) return true;
         return CanSwitch(active, opponent);
     }
 
@@ -66,7 +66,7 @@ public sealed class BattleEngine
         PokemonType attackType = attacker?.ResolveMoveType(move, target) ?? move.Type;
         double multiplier = TypeChart.GetMultiplier(attackType, target.CurrentType1);
         if (target.CurrentType2 != null) multiplier *= TypeChart.GetMultiplier(attackType, target.CurrentType2.Value);
-        if (attacker?.SelectedAbility == "배짱"
+        if (attacker?.HasActiveAbility("배짱", target) == true
             && attackType is PokemonType.Normal or PokemonType.Fighting
             && target.HasType(PokemonType.Ghost))
         {
@@ -82,11 +82,15 @@ public sealed class BattleEngine
         }
         if (target.IsImmuneToMoveType(attackType, attacker)) multiplier = 0;
         if (!target.IsAbilitySuppressedBy(attacker)
-            && target.SelectedAbility == "불가사의부적" && multiplier > 0 && multiplier < 2.0) multiplier = 0;
+            && target.HasActiveAbility("불가사의부적", attacker) && multiplier > 0 && multiplier < 2.0) multiplier = 0;
         return multiplier;
     }
 
-    public IReadOnlyList<string> InitializeWeather(Pokemon hero, Pokemon enemy)
+    public IReadOnlyList<string> InitializeWeather(
+        Pokemon hero,
+        Pokemon enemy,
+        Pokemon? heroIllusionTarget = null,
+        Pokemon? enemyIllusionTarget = null)
     {
         BattleWeather.Reset();
         BattleField.Reset();
@@ -95,12 +99,18 @@ public sealed class BattleEngine
             .OrderByDescending(entry => EffectiveSpeed(entry.Pokemon, entry.Opponent));
         foreach (var entry in entrants)
         {
-            messages.AddRange(ActivateSwitchIn(entry.Pokemon, entry.Opponent));
+            var illusionTarget = ReferenceEquals(entry.Pokemon, hero)
+                ? heroIllusionTarget
+                : enemyIllusionTarget;
+            messages.AddRange(ActivateSwitchIn(entry.Pokemon, entry.Opponent, illusionTarget));
         }
         return messages;
     }
 
-    public IReadOnlyList<string> ActivateSwitchIn(Pokemon entrant, Pokemon opponent)
+    public IReadOnlyList<string> ActivateSwitchIn(
+        Pokemon entrant,
+        Pokemon opponent,
+        Pokemon? illusionTarget = null)
     {
         var messages = new List<string>();
         entrant.ResetFieldCounter();
@@ -110,8 +120,12 @@ public sealed class BattleEngine
         {
             messages.Add($"{originalName}의 괴짜로 {entrant.Data.Name}으로 변신했다!");
         }
+        else if (illusionTarget != null && entrant.TryActivateIllusion(illusionTarget))
+        {
+            messages.Add($"{originalName}은(는) 일루전으로 {entrant.Data.Name}으로 둔갑했다!");
+        }
 
-        if (entrant.SelectedAbility == "트레이스"
+        if (entrant.HasActiveAbility("트레이스", opponent)
             && !opponent.IsFainted
             && !string.IsNullOrEmpty(opponent.SelectedAbility)
             && opponent.SelectedAbility != "트레이스")
@@ -120,28 +134,53 @@ public sealed class BattleEngine
             messages.Add($"{entrant.Data.Name}의 트레이스로 상대의 {entrant.SelectedAbility}을(를) 복사했다!");
         }
 
-        if (entrant.SelectedAbility == "통찰"
+        if (entrant.HasActiveAbility("통찰", opponent)
             && !opponent.IsFainted
             && opponent.HeldItem != "없음")
         {
             messages.Add($"{entrant.Data.Name}의 통찰로 상대가 {opponent.HeldItem}을(를) 지닌 것을 알아냈다!");
         }
 
-        string? weather = entrant.SelectedAbility switch
+        if (entrant.HasActiveAbility("예지몽", opponent))
         {
-            "가뭄" => "쾌청",
-            "잔비" => "비",
-            "모래날림" => "모래바람",
-            "눈퍼뜨리기" => "싸라기눈",
-            _ => null
-        };
+            var forewarnMove = opponent.CurrentPP.Keys
+                .Where(MoveDatabase.All.ContainsKey)
+                .Select(key => MoveDatabase.All[key])
+                .OrderByDescending(move => move.Power)
+                .FirstOrDefault();
+            if (forewarnMove != null)
+            {
+                messages.Add($"{entrant.Data.Name}의 예지몽이 상대의 {forewarnMove.Name}을(를) 감지했다!");
+            }
+        }
+        if (entrant.HasActiveAbility("위험예지", opponent))
+        {
+            bool danger = opponent.CurrentPP.Keys
+                .Where(MoveDatabase.All.ContainsKey)
+                .Select(key => MoveDatabase.All[key])
+                .Any(move => !move.IsStatus && PreviewMultiplier(move, entrant, opponent) >= 2.0);
+            if (danger)
+            {
+                messages.Add($"{entrant.Data.Name}의 위험예지로 위험한 기술을 감지했다!");
+            }
+        }
+
+        string? weather = entrant.HasActiveAbility("가뭄", opponent) ? "쾌청"
+            : entrant.HasActiveAbility("잔비", opponent) ? "비"
+            : entrant.HasActiveAbility("모래날림", opponent) ? "모래바람"
+            : entrant.HasActiveAbility("눈퍼뜨리기", opponent) ? "싸라기눈"
+            : null;
         if (weather != null)
         {
             BattleWeather.Set(weather);
             messages.Add($"{entrant.Data.Name}의 {entrant.SelectedAbility}! 날씨가 {weather}(으)로 바뀌었다!");
         }
+        if (entrant.UpdateWeatherForm(opponent))
+        {
+            messages.Add($"{entrant.Data.Name}의 기분파로 모습이 날씨에 맞게 변했다!");
+        }
 
-        if (entrant.SelectedAbility == "위협")
+        if (entrant.HasActiveAbility("위협", opponent))
         {
             int before = opponent.StatStages["attack"];
             opponent.ChangeStage("attack", -1, causedByOpponent: true);
@@ -155,22 +194,21 @@ public sealed class BattleEngine
             {
                 messages.Add($"{opponent.Data.Name}은(는) 위협의 영향을 받지 않았다!");
             }
-            if (opponent.SelectedAbility == "주눅"
-                && !opponent.IsAbilitySuppressedBy(entrant))
+            if (opponent.HasActiveAbility("주눅", entrant))
             {
                 opponent.ChangeStage("speed", 1);
                 messages.Add($"{opponent.Data.Name}의 주눅으로 속도가 올라갔다!");
             }
         }
 
-        if (entrant.SelectedAbility == "다운로드")
+        if (entrant.HasActiveAbility("다운로드", opponent))
         {
             string stat = opponent.EffectiveDef <= opponent.EffectiveSpDef ? "attack" : "special-attack";
             entrant.ChangeStage(stat, 1);
             messages.Add($"{entrant.Data.Name}의 다운로드로 {(stat == "attack" ? "공격" : "특공")}이 올랐다!");
         }
 
-        if (entrant.SelectedAbility == "슬로스타트")
+        if (entrant.HasActiveAbility("슬로스타트", opponent))
         {
             messages.Add($"{entrant.Data.Name}은(는) 슬로스타트로 힘을 내지 못하고 있다!");
         }
@@ -375,8 +413,7 @@ public sealed class BattleEngine
 
             if (!isContinuation
                 && TargetsOpponent(move)
-                && defender.SelectedAbility == "프레셔"
-                && !defender.IsAbilitySuppressedBy(attacker)
+                && defender.HasActiveAbility("프레셔", attacker)
                 && attacker.CurrentPP.TryGetValue(executingMoveKey, out int remainingPp))
             {
                 attacker.CurrentPP[executingMoveKey] = Math.Max(0, remainingPp - 1);
@@ -562,17 +599,15 @@ public sealed class BattleEngine
             return;
         }
         if (moveKey is "self-destruct" or "explosion" or "misty-explosion"
-            && (attacker.SelectedAbility == "습기"
-                || (defender.SelectedAbility == "습기"
-                    && !defender.IsAbilitySuppressedBy(attacker))))
+            && (attacker.HasActiveAbility("습기", defender)
+                || defender.HasActiveAbility("습기", attacker)))
         {
             await emit(BattleEvent.MessageLine(
                 $"{attacker.Data.Name}은(는) 습기 때문에 폭발할 수 없다!"));
             return;
         }
-        bool hit = move.AlwaysHits || attacker.SelectedAbility == "노가드"
-            || (defender.SelectedAbility == "노가드"
-                && !defender.IsAbilitySuppressedBy(attacker))
+        bool hit = move.AlwaysHits || attacker.HasActiveAbility("노가드", defender)
+            || defender.HasActiveAbility("노가드", attacker)
             || rng.Next(100) < Math.Min(100, (int)effectiveAccuracy);
         if (!hit)
         {
@@ -697,10 +732,21 @@ public sealed class BattleEngine
             && attackType is PokemonType.Normal or PokemonType.Fighting or PokemonType.Psychic;
         bool bypassesGroundImmunity = moveKey == "thousand-arrows"
             && attackType == PokemonType.Ground;
+        if (TargetsOpponent(move) && defender.IsImmuneToWindMove(moveKey, attacker))
+        {
+            var (absorbed, absorbMessage) = defender.TryAbsorb(attackType, moveKey);
+            context.WasAbsorbed = absorbed;
+            if (absorbMessage != null) await emit(BattleEvent.MessageLine(absorbMessage));
+            await emit(BattleEvent.MoveStep(
+                BattleEventPhase.Impact, attacker, defender, attackerIsHero, move, moveKey,
+                attackType, "immune", target: "opponent", presentationKey: presentationKey,
+                statusResult: "immune"));
+            return;
+        }
         if (TargetsOpponent(move) && defender.IsImmuneToMoveType(attackType, attacker)
             && !revealedImmunity && !bypassesGroundImmunity)
         {
-            var (absorbed, absorbMessage) = defender.TryAbsorb(attackType);
+            var (absorbed, absorbMessage) = defender.TryAbsorb(attackType, moveKey);
             context.WasAbsorbed = absorbed;
             if (absorbMessage != null)
             {
@@ -749,7 +795,7 @@ public sealed class BattleEngine
                 int scaledPower = (int)(((2.0 * attacker.Level / 5 + 2)
                     * power
                     * ((double)attackStat / Math.Max(defenseStat, 1))) / 50) + 2;
-                if (isCritical && attacker.SelectedAbility == "스나이퍼") scaledPower = (int)(scaledPower * 1.5);
+                if (isCritical && attacker.HasActiveAbility("스나이퍼", defender)) scaledPower = (int)(scaledPower * 1.5);
                 defender.TakeDamage(
                     scaledPower,
                     attackType,
@@ -911,11 +957,11 @@ public sealed class BattleEngine
 
     private static bool IsBlockedByAbility(Pokemon defender, Move move, Pokemon? attacker = null)
     {
-        if (!defender.IsAbilitySuppressedBy(attacker) && defender.SelectedAbility == "방음"
+        if (defender.HasActiveAbility("방음", attacker)
             && (move.Name.Contains("소리") || move.Name.Contains("노래") || move.Name is "울음소리" or "하이퍼보이스")) return true;
-        if (!defender.IsAbilitySuppressedBy(attacker) && defender.SelectedAbility == "방진"
+        if (defender.HasActiveAbility("방진", attacker)
             && (move.Name.Contains("가루") || move.Name is "버섯포자" or "목화포자")) return true;
-        if (!defender.IsAbilitySuppressedBy(attacker) && defender.SelectedAbility == "방탄"
+        if (defender.HasActiveAbility("방탄", attacker)
             && (move.Name.Contains("볼") || move.Name.Contains("탄") || move.Name.Contains("폭탄"))) return true;
         return false;
     }

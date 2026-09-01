@@ -30,6 +30,7 @@ public static class ItemDatabase
         new Item("자뭉열매", "HP가 절반 이하가 되면 최대 HP의 1/4을 회복한다.", Base + "sitrus-berry.png"),
         new Item("무화열매", "HP가 1/4 이하가 되면 최대 HP의 1/3을 회복한다. 먹보는 절반 이하에서 먹는다.", Base + "figy-berry.png"),
         new Item("리샘열매", "상태 이상이 되면 상태 이상을 회복한다.", Base + "lum-berry.png"),
+        new Item("달콤한꿀", "포켓몬을 유인하는 달콤한 꿀이다.", Base + "honey.png"),
         new Item("기합의띠", "풀피 상태에서 한 방에 쓰러질 위기에 처하면 HP 1을 남기고 버틴다.", Base + "focus-sash.png"),
         new Item("기합의머리띠", "HP와 무관하게 일정 확률로 한 방에 쓰러질 위기에서 버틴다.", Base + "focus-band.png"),
         new Item("검은안경", "악 타입 기술의 위력이 1.2배 상승한다.", Base + "black-glasses.png"),

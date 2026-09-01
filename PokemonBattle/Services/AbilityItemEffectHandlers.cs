@@ -11,40 +11,44 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
         var attacker = context.Attacker;
         var move = context.Move;
         var attackType = context.AttackType;
+        bool abilitySuppressed = attacker.IsAbilitySuppressedBy(context.Defender);
 
-        if (TypeBoostItem(attacker.HeldItem) == attackType) context.Power *= 1.2;
-        if (attacker.HeldItem == "구애머리띠" && !move.IsSpecial) context.Power *= 1.5;
-        if (attacker.HeldItem == "힘의머리띠" && !move.IsSpecial) context.Power *= 1.1;
-        if (attacker.HeldItem == "구애안경" && move.IsSpecial) context.Power *= 1.5;
-        if (attacker.HeldItem == "생명의구슬") context.Power *= 1.3;
-        if (attacker.SelectedAbility == "타오르는불꽃" && attacker.FlashFireActive && attackType == PokemonType.Fire)
+        if (attacker.HasActiveHeldItem(context.Defender) && TypeBoostItem(attacker.HeldItem) == attackType) context.Power *= 1.2;
+        if (attacker.HasActiveHeldItem(context.Defender) && attacker.HeldItem == "구애머리띠" && !move.IsSpecial) context.Power *= 1.5;
+        if (attacker.HasActiveHeldItem(context.Defender) && attacker.HeldItem == "힘의머리띠" && !move.IsSpecial) context.Power *= 1.1;
+        if (attacker.HasActiveHeldItem(context.Defender) && attacker.HeldItem == "구애안경" && move.IsSpecial) context.Power *= 1.5;
+        if (attacker.HasActiveHeldItem(context.Defender) && attacker.HeldItem == "생명의구슬") context.Power *= 1.3;
+        if (!abilitySuppressed && attacker.SelectedAbility == "타오르는불꽃" && attacker.FlashFireActive && attackType == PokemonType.Fire)
         {
             context.Power *= 1.5;
         }
-        if (attacker.SelectedAbility == "테크니션" && move.Power <= 60) context.Power *= 1.5;
-        if (attacker.SelectedAbility == "우격다짐"
+        if (!abilitySuppressed && attacker.SelectedAbility == "테크니션" && move.Power <= 60) context.Power *= 1.5;
+        if (!abilitySuppressed && attacker.SelectedAbility == "우격다짐"
             && (move.AilmentChance > 0 || move.FlinchChance > 0 || move.StatChanges.Count > 0)) context.Power *= 1.3;
-        if (attacker.SelectedAbility is "프리즈스킨" or "페어리스킨" && move.Type == PokemonType.Normal) context.Power *= 1.2;
-        if (attacker.SelectedAbility == "적응력"
+        if (!abilitySuppressed
+            && (attacker.SelectedAbility is "프리즈스킨" or "페어리스킨")
+            && move.Type == PokemonType.Normal) context.Power *= 1.2;
+        if (context.MoveKey == "acrobatics" && attacker.HeldItem == "없음") context.Power *= 2.0;
+        if (!abilitySuppressed && attacker.SelectedAbility == "적응력"
             && attacker.HasType(attackType))
         {
             // STAB is applied by BattleEngine before handlers; replace 1.5x with 2x.
             context.Power *= 2.0 / 1.5;
         }
         // Huge Power/Pure Power are already reflected in Pokemon.EffectiveAtk.
-        if (attacker.SelectedAbility == "색안경"
+        if (!abilitySuppressed && attacker.SelectedAbility == "색안경"
             && BattleTypeMultiplier(attackType, context.Defender) is > 0 and < 1)
         {
             context.Power *= 2.0;
         }
-        if (attacker.SelectedAbility == "투쟁심")
+        if (!abilitySuppressed && attacker.SelectedAbility == "투쟁심")
         {
             if (attacker.HasSameKnownGenderAs(context.Defender))
                 context.Power *= 1.25;
             else if (attacker.HasOppositeKnownGenderTo(context.Defender))
                 context.Power *= 0.75;
         }
-        if ((attacker.SelectedAbility is "심록" or "맹화" or "급류" or "벌레의알림")
+        if (!abilitySuppressed && (attacker.SelectedAbility is "심록" or "맹화" or "급류" or "벌레의알림")
             && attacker.CurrentHp <= attacker.MaxHp / 3
             && ((attacker.SelectedAbility == "심록" && attackType == PokemonType.Grass)
                 || (attacker.SelectedAbility == "맹화" && attackType == PokemonType.Fire)
@@ -53,13 +57,14 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
         {
             context.Power *= 1.5;
         }
-        if (attacker.SelectedAbility == "독폭주" && attacker.Status == StatusCondition.Poison && !move.IsSpecial) context.Power *= 1.5;
-        if (attacker.SelectedAbility == "이판사판" && move.DrainPercent < 0) context.Power *= 1.2;
-        if (attacker.SelectedAbility == "철주먹" && PunchMoves.Contains(move.Name)) context.Power *= 1.2;
-        if (attacker.SelectedAbility == "옹골찬턱" && BiteMoves.Contains(move.Name)) context.Power *= 1.5;
-        if (attacker.SelectedAbility == "단단한발톱" && context.MakesContact) context.Power *= 1.3;
-        if (attacker.SelectedAbility == "메가런처" && PulseMoves.Contains(move.Name)) context.Power *= 1.5;
-        if (attacker.SelectedAbility == "모래의힘" && BattleWeather.Current == "모래바람"
+        if (!abilitySuppressed && attacker.SelectedAbility == "독폭주" && attacker.Status == StatusCondition.Poison && !move.IsSpecial) context.Power *= 1.5;
+        if (!abilitySuppressed && attacker.SelectedAbility == "이판사판" && move.DrainPercent < 0) context.Power *= 1.2;
+        if (!abilitySuppressed && attacker.SelectedAbility == "철주먹" && PunchMoves.Contains(move.Name)) context.Power *= 1.2;
+        if (!abilitySuppressed && attacker.SelectedAbility == "옹골찬턱" && BiteMoves.Contains(move.Name)) context.Power *= 1.5;
+        if (!abilitySuppressed && attacker.SelectedAbility == "단단한발톱" && context.MakesContact) context.Power *= 1.3;
+        if (!abilitySuppressed && attacker.SelectedAbility == "메가런처" && PulseMoves.Contains(move.Name)) context.Power *= 1.5;
+        if (!abilitySuppressed && attacker.SelectedAbility == "예리함" && MoveRuleMetadata.IsSlicingMove(context.MoveKey)) context.Power *= 1.5;
+        if (!abilitySuppressed && attacker.SelectedAbility == "모래의힘" && BattleWeather.Current == "모래바람"
             && !BattleWeather.AreEffectsSuppressed(attacker, context.Defender)
             && (attackType is PokemonType.Rock or PokemonType.Ground or PokemonType.Steel)) context.Power *= 1.3;
 
@@ -101,7 +106,8 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
     public Task AfterDamageResultAsync(BattleEffectContext context)
     {
         var attacker = context.Attacker;
-        if (attacker.HeldItem != "생명의구슬" || attacker.SelectedAbility == "매직가드"
+        if (!attacker.HasActiveHeldItem(context.Defender) || attacker.HeldItem != "생명의구슬"
+            || attacker.HasActiveAbility("매직가드", context.Defender)
             || attacker.IsFainted || context.TotalDamage <= 0) return Task.CompletedTask;
 
         int recoil = Math.Max(1, attacker.MaxHp / 10);
@@ -113,7 +119,8 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
     public async Task EndOfTurnAsync(BattleEndOfTurnContext context)
     {
         var pokemon = context.Pokemon;
-        if (pokemon.HeldItem != "먹다남은음식" || pokemon.IsFainted) return;
+        if (pokemon.HeldItem != "먹다남은음식" || pokemon.IsFainted
+            || !pokemon.HasActiveHeldItem(context.Opponent)) return;
 
         int heal = Math.Max(1, pokemon.MaxHp / 16);
         int before = pokemon.CurrentHp;
@@ -217,18 +224,32 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
         if (context.TotalDamage <= 0) return;
 
         if (context.Defender.IsFainted && !context.Attacker.IsFainted
-            && context.Attacker.SelectedAbility == "자기과신")
+            && context.Attacker.HasActiveAbility("자기과신", context.Defender))
         {
             context.Attacker.ChangeStage("attack", 1);
             await context.ShowMessage($"{context.Attacker.Data.Name}의 자기과신으로 공격이 올랐다!");
         }
 
         if (!context.Defender.IsFainted && context.Attacker.HeldItem == "없음"
-            && context.Defender.HeldItem != "없음" && context.Attacker.SelectedAbility == "매지션")
+            && context.Defender.HeldItem != "없음"
+            && context.Attacker.HasActiveAbility("매지션", context.Defender)
+            && !context.Defender.HasActiveAbility("점착", context.Attacker))
         {
             context.Attacker.HeldItem = context.Defender.HeldItem;
             context.Defender.HeldItem = "없음";
             await context.ShowMessage($"{context.Attacker.Data.Name}은(는) 매지션으로 상대의 도구를 빼앗았다!");
+        }
+
+        if (!context.Defender.IsFainted
+            && (context.MoveKey is "thief" or "covet")
+            && context.Attacker.HeldItem == "없음"
+            && context.Defender.HeldItem != "없음"
+            && !context.Defender.HasActiveAbility("점착", context.Attacker))
+        {
+            string stolenItem = context.Defender.HeldItem;
+            context.Attacker.HeldItem = stolenItem;
+            context.Defender.HeldItem = "없음";
+            await context.ShowMessage($"{context.Attacker.Data.Name}은(는) {stolenItem}을(를) 훔쳤다!");
         }
     }
 
@@ -259,19 +280,24 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
             await context.ShowMessage(harvestMessage!, 900);
         }
 
+        if (pokemon.UpdateWeatherForm(context.Opponent))
+        {
+            await context.ShowMessage($"{pokemon.Data.Name}의 기분파로 모습이 날씨에 맞게 변했다!", 900);
+        }
+
         if (pokemon.UpdateFormAtEndOfTurn())
         {
             await context.ShowMessage($"{pokemon.Data.Name}의 달마모드로 모습이 변했다!", 900);
         }
 
-        if (pokemon.SelectedAbility == "가속" && pokemon.TurnsOnField > 0)
+        if (pokemon.HasActiveAbility("가속", context.Opponent) && pokemon.TurnsOnField > 0)
         {
             pokemon.ChangeStage("speed", 1);
             await context.ShowMessage($"{pokemon.Data.Name}의 가속으로 속도가 올랐다!", 900);
         }
 
         bool weatherSuppressed = BattleWeather.AreEffectsSuppressed(pokemon, context.Opponent);
-        if (pokemon.SelectedAbility == "촉촉바디"
+        if (pokemon.HasActiveAbility("촉촉바디", context.Opponent)
             && !weatherSuppressed
             && BattleWeather.Current == "비"
             && pokemon.Status != StatusCondition.None)
@@ -279,7 +305,7 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
             pokemon.ClearPrimaryStatus();
             await context.ShowMessage($"{pokemon.Data.Name}의 촉촉바디로 상태 이상이 회복되었다!", 900);
         }
-        else if (pokemon.SelectedAbility == "탈피" && pokemon.Status != StatusCondition.None
+        else if (pokemon.HasActiveAbility("탈피", context.Opponent) && pokemon.Status != StatusCondition.None
             && Random.Shared.Next(100) < 30)
         {
             pokemon.ClearPrimaryStatus();
@@ -287,11 +313,11 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
         }
 
         int heal = 0;
-        if (!weatherSuppressed && pokemon.SelectedAbility == "젖은접시" && BattleWeather.Current == "비")
+        if (!weatherSuppressed && pokemon.HasActiveAbility("젖은접시", context.Opponent) && BattleWeather.Current == "비")
             heal = pokemon.MaxHp / 16;
-        if (!weatherSuppressed && pokemon.SelectedAbility == "건조피부" && BattleWeather.Current == "비")
+        if (!weatherSuppressed && pokemon.HasActiveAbility("건조피부", context.Opponent) && BattleWeather.Current == "비")
             heal = pokemon.MaxHp / 8;
-        if (!weatherSuppressed && pokemon.SelectedAbility == "아이스바디"
+        if (!weatherSuppressed && pokemon.HasActiveAbility("아이스바디", context.Opponent)
             && BattleWeather.Current == "싸라기눈")
             heal = pokemon.MaxHp / 16;
         if (heal > 0)
@@ -315,15 +341,17 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
         }
 
         bool takesAbilityDamage = !weatherSuppressed
-            && ((pokemon.SelectedAbility == "선파워" && BattleWeather.Current == "쾌청")
-                || (pokemon.SelectedAbility == "건조피부" && BattleWeather.Current == "쾌청"));
-        if (takesAbilityDamage && pokemon.SelectedAbility != "매직가드")
+            && ((pokemon.HasActiveAbility("선파워", context.Opponent) && BattleWeather.Current == "쾌청")
+                || (pokemon.HasActiveAbility("건조피부", context.Opponent) && BattleWeather.Current == "쾌청"));
+        if (takesAbilityDamage && !pokemon.HasActiveAbility("매직가드", context.Opponent))
         {
             await DamageAsync(context, Math.Max(1, pokemon.MaxHp / 8),
                 $"{pokemon.Data.Name}은(는) {pokemon.SelectedAbility}으로 HP가 줄었다!");
         }
 
-        if (pokemon.IsFainted || pokemon.SelectedAbility is "매직가드" or "방진") return;
+        if (pokemon.IsFainted
+            || pokemon.HasActiveAbility("매직가드", context.Opponent)
+            || pokemon.HasActiveAbility("방진", context.Opponent)) return;
         bool sandDamage = !weatherSuppressed
             && BattleWeather.Current == "모래바람"
             && !pokemon.HasType(PokemonType.Rock)
@@ -344,6 +372,10 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
         if (context.Pokemon.TryPickUp(context.Random, out string? pickupMessage))
         {
             await context.ShowMessage(pickupMessage!, 900);
+        }
+        if (context.Pokemon.TryHoneyGather(context.Random, out string? honeyMessage))
+        {
+            await context.ShowMessage(honeyMessage!, 900);
         }
     }
 
@@ -418,8 +450,19 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
 
         if (context.Defender.IsFainted || context.Attacker.IsFainted) return;
 
-        if (!context.Defender.IsAbilitySuppressedBy(context.Attacker)
-            && context.Defender.SelectedAbility == "헤롱헤롱바디"
+        if (context.Defender.HasActiveAbility("나쁜손버릇", context.Attacker)
+            && context.Defender.HeldItem == "없음"
+            && context.Attacker.HeldItem != "없음"
+            && !context.Attacker.HasActiveAbility("점착", context.Defender))
+        {
+            string stolenItem = context.Attacker.HeldItem;
+            context.Attacker.HeldItem = "없음";
+            context.Defender.HeldItem = stolenItem;
+            await context.ShowMessage(
+                $"{context.Defender.Data.Name}의 나쁜손버릇으로 {stolenItem}을(를) 훔쳤다!");
+        }
+
+        if (context.Defender.HasActiveAbility("헤롱헤롱바디", context.Attacker)
             && !context.Attacker.IsInfatuated
             && context.Defender.HasOppositeKnownGenderTo(context.Attacker)
             && !context.Attacker.IsImmuneToMentalEffect("infatuation")
@@ -432,33 +475,33 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
 
         if (context.Attacker.Status != StatusCondition.None) return;
         string? reaction = null;
-        if (!context.Defender.IsAbilitySuppressedBy(context.Attacker)
-            && context.Defender.SelectedAbility == "정전기" && context.Random.Next(100) < 30)
+        if (context.Defender.HasActiveAbility("정전기", context.Attacker)
+            && context.Random.Next(100) < 30)
         {
             context.Attacker.ApplyAilment("paralysis", opponent: context.Defender);
             if (context.Attacker.Status == StatusCondition.Paralysis) reaction = "정전기에 마비됐다";
         }
-        else if (!context.Defender.IsAbilitySuppressedBy(context.Attacker)
-            && context.Defender.SelectedAbility == "독가시" && context.Random.Next(100) < 30)
+        else if (context.Defender.HasActiveAbility("독가시", context.Attacker)
+            && context.Random.Next(100) < 30)
         {
             context.Attacker.ApplyAilment("poison", opponent: context.Defender);
             if (context.Attacker.Status == StatusCondition.Poison) reaction = "독가시에 찔려 독 상태가 되었다";
         }
-        else if (!context.Defender.IsAbilitySuppressedBy(context.Attacker)
-            && context.Defender.SelectedAbility == "불꽃몸" && context.Random.Next(100) < 30)
+        else if (context.Defender.HasActiveAbility("불꽃몸", context.Attacker)
+            && context.Random.Next(100) < 30)
         {
             context.Attacker.ApplyAilment("burn", opponent: context.Defender);
             if (context.Attacker.Status == StatusCondition.Burn) reaction = "불꽃몸에 닿아 화상을 입었다";
         }
-        else if (!context.Defender.IsAbilitySuppressedBy(context.Attacker)
-            && context.Defender.SelectedAbility == "포자" && context.Random.Next(100) < 30)
+        else if (context.Defender.HasActiveAbility("포자", context.Attacker)
+            && context.Random.Next(100) < 30)
         {
             string ailment = context.Random.Next(3) switch { 0 => "poison", 1 => "paralysis", _ => "sleep" };
             context.Attacker.ApplyAilment(ailment, opponent: context.Defender);
             if (context.Attacker.Status != StatusCondition.None) reaction = $"포자 때문에 {AilmentKor(ailment)} 상태가 되었다";
         }
-        else if (!context.Defender.IsAbilitySuppressedBy(context.Attacker)
-            && context.Defender.SelectedAbility == "독수" && context.Random.Next(100) < 30)
+        else if (context.Defender.HasActiveAbility("독수", context.Attacker)
+            && context.Random.Next(100) < 30)
         {
             context.Attacker.ApplyAilment("poison", opponent: context.Defender);
             if (context.Attacker.Status == StatusCondition.Poison) reaction = "독수에 중독되었다";
@@ -470,7 +513,7 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
     {
         var defender = context.Defender;
         if (context.Move.IsStatus || context.TotalDamage <= 0 || defender.IsFainted) return;
-        if (defender.SelectedAbility == "저주받은바디" && context.Random.Next(100) < 30)
+        if (defender.HasActiveAbility("저주받은바디", context.Attacker) && context.Random.Next(100) < 30)
         {
             context.Attacker.DisableMove(context.MoveKey);
             await context.ShowMessage($"{context.Attacker.Data.Name}의 {context.Move.Name}이(가) 저주받은바디로 봉인되었다!");
