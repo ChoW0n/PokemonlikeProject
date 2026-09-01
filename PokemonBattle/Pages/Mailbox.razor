@@ -9,8 +9,11 @@
 <PageTitle>메시지 보관함</PageTitle>
 
 <main class="preview-page mailbox-page">
-    <h1>메시지 보관함</h1>
-    <p>라이벌전 소식과 보상을 확인할 수 있습니다. 보관함을 열어도 런 진행은 바뀌지 않습니다.</p>
+    <header class="page-header mailbox-header">
+        <p class="eyebrow">INBOX / REWARDS</p>
+        <h1>메시지 보관함</h1>
+        <p class="intro">라이벌전 소식과 보상을 확인할 수 있습니다. 보관함을 열어도 런 진행은 바뀌지 않습니다.</p>
+    </header>
 
     <section class="info-panel" aria-labelledby="machine-heading">
         <h2 id="machine-heading">기술머신</h2>
@@ -33,28 +36,50 @@
         }
     </section>
 
-    <section aria-labelledby="message-heading">
-        <h2 id="message-heading">메시지</h2>
+    <section class="mailbox-section" aria-labelledby="message-heading">
+        <div class="mailbox-section-heading">
+            <div>
+                <p class="eyebrow">MESSAGE ARCHIVE</p>
+                <h2 id="message-heading">메시지</h2>
+            </div>
+            <span class="mailbox-unread-summary" aria-live="polite">
+                <strong>@State.MailboxMessages.Count(message => !message.IsRead)</strong>개 읽지 않음
+            </span>
+        </div>
         @if (State.MailboxMessages.Count == 0)
         {
-            <p>아직 도착한 메시지가 없습니다.</p>
+            <div class="mailbox-empty-state">
+                <strong>보관함이 비어 있습니다</strong>
+                <p>새로운 소식과 보상은 이곳에 도착합니다.</p>
+            </div>
         }
         else
         {
-            <button type="button" disabled="@(!State.MailboxMessages.Any(message => !message.IsRead))"
-                    @onclick="MarkAllRead">전체 읽음</button>
+            <div class="mailbox-actions">
+                <span class="mailbox-action-note">읽지 않은 메시지를 한 번에 읽음 처리합니다.</span>
+                <button type="button" class="mailbox-mark-all"
+                        disabled="@(!State.MailboxMessages.Any(message => !message.IsRead))"
+                        @onclick="MarkAllRead">전체 읽음</button>
+            </div>
             <div class="preset-list" role="list" aria-label="보관함 메시지 목록">
                 @foreach (var message in State.MailboxMessages)
                 {
-                    <article class="preset-entry @(message.IsRead ? "" : "is-selected")" role="listitem">
-                        <div>
-                            <strong>@message.Title</strong>
+                    <article class="preset-entry mailbox-message @(message.IsRead ? "is-read" : "is-unread is-selected")" role="listitem">
+                        <div class="mailbox-message-copy">
+                            <div class="mailbox-message-heading">
+                                <strong>@message.Title</strong>
+                                <span class="mailbox-message-state @(message.IsRead ? "is-read" : "is-unread")">
+                                    @(message.IsRead ? "읽음" : "새 메시지")
+                                </span>
+                            </div>
                             <p>@message.Body</p>
-                            <small>@message.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</small>
+                            <small class="mailbox-message-date">@message.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</small>
                         </div>
                         @if (!message.IsRead)
                         {
-                            <button type="button" @onclick="() => MarkRead(message.Id)">읽음</button>
+                            <button type="button" class="mailbox-read-button"
+                                    aria-label="@($"{message.Title} 읽음 처리")"
+                                    @onclick="() => MarkRead(message.Id)">읽음</button>
                         }
                     </article>
                 }

@@ -43,11 +43,20 @@
             <button type="button" class="admin-refresh" @onclick="Refresh">새로고침</button>
         </header>
 
-        <section class="admin-metric-grid" aria-label="서비스 요약">
-            <article class="admin-metric"><span>전체 계정</span><strong>@Snapshot.UserCount</strong><small>관리자 @(Snapshot.AdminCount)명</small></article>
-            <article class="admin-metric"><span>저장된 런</span><strong>@Snapshot.RunCount</strong><small>진행 상태 레코드</small></article>
-            <article class="admin-metric"><span>프리셋</span><strong>@Snapshot.PresetCount</strong><small>사용자 팀 구성</small></article>
-            <article class="admin-metric"><span>공통 데이터</span><strong>@Snapshot.KnownPokemonCount</strong><small>포켓몬 · 기술 @(Snapshot.KnownMoveCount)개</small></article>
+        <section class="admin-overview" aria-labelledby="overview-title">
+            <div class="admin-section-heading">
+                <div>
+                    <p class="eyebrow">SERVICE OVERVIEW</p>
+                    <h2 id="overview-title">서비스 요약</h2>
+                </div>
+                <span class="admin-generated">현재 저장 상태</span>
+            </div>
+            <div class="admin-metric-grid">
+                <article class="admin-metric"><span>전체 계정</span><strong>@Snapshot.UserCount</strong><small>관리자 @(Snapshot.AdminCount)명</small></article>
+                <article class="admin-metric"><span>저장된 런</span><strong>@Snapshot.RunCount</strong><small>진행 상태 레코드</small></article>
+                <article class="admin-metric"><span>프리셋</span><strong>@Snapshot.PresetCount</strong><small>사용자 팀 구성</small></article>
+                <article class="admin-metric"><span>공통 데이터</span><strong>@Snapshot.KnownPokemonCount</strong><small>포켓몬 · 기술 @(Snapshot.KnownMoveCount)개</small></article>
+            </div>
         </section>
 
         <section class="admin-panel admin-analytics-panel" aria-labelledby="analytics-title">

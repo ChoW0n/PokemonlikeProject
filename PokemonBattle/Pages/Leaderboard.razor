@@ -23,11 +23,11 @@
     }
     else
     {
-        <header class="leaderboard-header">
+        <header class="leaderboard-header page-header">
             <div>
                 <p class="eyebrow">SKILL RATING / RANKING</p>
                 <h1>유저 랭킹</h1>
-                <p>완료한 런을 바탕으로 누적된 실력 평점 순위입니다.</p>
+                <p class="intro">완료한 런을 바탕으로 누적된 실력 평점 순위입니다.</p>
             </div>
             <button type="button" class="leaderboard-back" @onclick="GoHome">게임으로</button>
         </header>
@@ -72,12 +72,19 @@
             {
                 <div class="leaderboard-table-wrap">
                     <table class="leaderboard-table">
+                        <caption class="visually-hidden">레이팅 기준 전체 유저 순위</caption>
+                        <colgroup>
+                            <col class="leaderboard-column-rank" />
+                            <col class="leaderboard-column-user" />
+                            <col class="leaderboard-column-rating" />
+                            <col class="leaderboard-column-runs" />
+                        </colgroup>
                         <thead>
                             <tr>
-                                <th>순위</th>
-                                <th>유저</th>
-                                <th>레이팅</th>
-                                <th>완료 런</th>
+                                <th scope="col">순위</th>
+                                <th scope="col">유저</th>
+                                <th scope="col">레이팅</th>
+                                <th scope="col">완료 런</th>
                             </tr>
                         </thead>
                         <tbody>
