@@ -26,7 +26,7 @@
         <p id="battle-state-summary" class="visually-hidden">상대와 내 포켓몬의 이름, 레벨, 타입, 현재 HP와 상태 이상을 표시합니다.</p>
         <div id="battle-fx-layer" class="battle-fx-layer" aria-hidden="true"></div>
         <div class="stage-slot slot-top">
-            <div class="hud-plate" aria-label="@($"{Enemy.Data.Name} 상태: HP {Enemy.CurrentHp}/{Enemy.MaxHp}{(StatusText(Enemy) == "" ? "" : $", {StatusText(Enemy)}")}")">
+            <div class="hud-plate hud-enemy" aria-label="@($"{Enemy.Data.Name} 상태: HP {Enemy.CurrentHp}/{Enemy.MaxHp}{(StatusText(Enemy) == "" ? "" : $", {StatusText(Enemy)}")}")">
                 <span class="hud-name">@Enemy.Data.Name</span>
                 <span class="hud-level">Lv.@Enemy.Level</span>
                 <div class="hud-types">
@@ -49,7 +49,7 @@
             <div class="platform-shadow"></div>
             <img id="sprite-enemy" src="@Enemy.Data.EffectiveImageUrl" alt="@Enemy.Data.Name"
                  @key="Enemy.ActorId"
-                 class="fighter-sprite @(Enemy.IsFainted ? "is-fainted" : "")"
+                  class="fighter-sprite enemy-sprite @(Enemy.IsFainted ? "is-fainted" : "")"
                  data-slot="enemy" data-actor-id="@Enemy.ActorId" data-species="@Enemy.Data.EnglishName"
                  data-form="@Enemy.FormKey" data-state="@(Enemy.IsFainted ? "fainted" : "idle")" />
         </div>
@@ -61,7 +61,7 @@
                  data-slot="hero" data-actor-id="@Hero.ActorId" data-species="@Hero.Data.EnglishName"
                  data-form="@Hero.FormKey" data-state="@(Hero.IsFainted ? "fainted" : "idle")" />
             <div class="platform-shadow"></div>
-            <div class="hud-plate" aria-label="@($"{Hero.Data.Name} 상태: HP {Hero.CurrentHp}/{Hero.MaxHp}{(StatusText(Hero) == "" ? "" : $", {StatusText(Hero)}")}")">
+            <div class="hud-plate hud-hero" aria-label="@($"{Hero.Data.Name} 상태: HP {Hero.CurrentHp}/{Hero.MaxHp}{(StatusText(Hero) == "" ? "" : $", {StatusText(Hero)}")}")">
                 <span class="hud-name">@Hero.Data.Name</span>
                 <span class="hud-level">Lv.@Hero.Level</span>
                 <div class="hud-types">
@@ -82,6 +82,7 @@
                 }
             </div>
         </div>
+        <div class="turn-tag" aria-label="@($"현재 {Turn}턴")">TURN @Turn</div>
     </section>
 
     <div class="team-order" aria-label="내 팀 순서" role="list">
@@ -97,7 +98,7 @@
 
     <section class="command-panel" aria-label="배틀 커맨드" aria-labelledby="command-heading">
         <div class="panel-heading">
-            <p class="eyebrow">TURN @Turn</p>
+            <p class="eyebrow command-eyebrow">TURN @Turn</p>
             <h2 id="command-heading">@MenuTitle</h2>
         </div>
 
