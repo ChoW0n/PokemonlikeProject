@@ -107,7 +107,7 @@
         int poolSize = State.LegendaryUnlocked
             ? 721
             : Math.Clamp(20 + unlocked.Count * 8, 30, 721);
-        int teamSize = Math.Clamp(unlocked.Count, 1, 6);
+        int teamSize = EnemyTeamProvider.GetTeamSizeForRound(State.CurrentRunLevel);
         int enemyLevel = Math.Max(
             1,
             State.CurrentRunLevel + State.CurrentRunDifficultyAdjustment);

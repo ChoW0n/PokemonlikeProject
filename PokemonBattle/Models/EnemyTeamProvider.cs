@@ -49,6 +49,12 @@ public static class EnemyTeamProvider
     public static bool ContainsLegendary(IEnumerable<int> pokemonIds) =>
         pokemonIds.Any(IsLegendary);
 
+    public static int GetTeamSizeForRound(int round)
+    {
+        int safeRound = Math.Max(1, round);
+        return Math.Clamp(1 + (safeRound - 1) / 2, 1, 6);
+    }
+
     private static readonly HashSet<int> FirstStageIds = new()
     {
         1, 4, 7, 10, 13, 16, 19, 21, 23, 25, 27, 29, 32, 35, 37, 39, 41, 43, 46, 48,

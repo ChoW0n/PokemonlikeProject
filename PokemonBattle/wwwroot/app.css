@@ -2119,16 +2119,16 @@ input:focus-visible {
 
 .slot-top {
     top: 5%;
-    right: auto;
-    left: 4%;
-    align-items: flex-start;
+    right: 4%;
+    left: auto;
+    align-items: flex-end;
 }
 
 .slot-bottom {
-    right: 4%;
+    right: auto;
     bottom: 5%;
-    left: auto;
-    align-items: flex-end;
+    left: 4%;
+    align-items: flex-start;
 }
 
 .slot-top .hud-plate {
@@ -2694,14 +2694,16 @@ input:focus-visible {
 
     .slot-top {
         top: 3%;
-        left: 3%;
-        align-items: flex-start;
+        right: 3%;
+        left: auto;
+        align-items: flex-end;
     }
 
     .slot-bottom {
-        right: 3%;
+        right: auto;
         bottom: 3%;
-        align-items: flex-end;
+        left: 3%;
+        align-items: flex-start;
     }
 
     .fighter-sprite {

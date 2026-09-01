@@ -130,24 +130,25 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         {
             if (move.AilmentName == "confusion")
             {
-                if (!defender.IsConfused && !defender.IsImmuneToConfusion())
+                if (!defender.IsConfused && !defender.IsImmuneToConfusion(attacker))
                 {
-                    defender.ApplyConfusion(context.Random);
+                    defender.ApplyConfusion(context.Random, attacker);
                     await context.ShowMessage($"{defender.Data.Name}은(는) 혼란에 빠졌다!");
                 }
             }
-            else if (defender.Status == StatusCondition.None && !defender.IsImmuneToAilment(move.AilmentName))
+            else if (defender.Status == StatusCondition.None
+                && !defender.IsImmuneToAilment(move.AilmentName, attacker))
             {
                 string ailment = context.MoveKey == "toxic" ? "toxic" : move.AilmentName;
-                defender.ApplyAilment(ailment, context.Random);
+                defender.ApplyAilment(ailment, context.Random, attacker);
                 await context.ShowMessage($"{defender.Data.Name}은(는) {AilmentKor(ailment)} 상태가 되었다!");
 
                 if (defender.SelectedAbility == "싱크로"
                     && move.AilmentName is "paralysis" or "poison" or "burn"
                     && attacker.Status == StatusCondition.None
-                    && !attacker.IsImmuneToAilment(move.AilmentName))
+                    && !attacker.IsImmuneToAilment(move.AilmentName, defender))
                 {
-                    attacker.ApplyAilment(move.AilmentName);
+                    attacker.ApplyAilment(move.AilmentName, opponent: defender);
                     await context.ShowMessage($"{defender.Data.Name}의 싱크로가 {attacker.Data.Name}에게 상태 이상을 옮겼다!");
                 }
             }
@@ -287,7 +288,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 break;
 
             case MoveRuleKind.Yawn:
-                if (defender.IsImmuneToAilment("sleep"))
+                if (defender.IsImmuneToAilment("sleep", attacker))
                     await context.ShowMessage($"{defender.Data.Name}은(는) 잠들지 않는다!");
                 else
                 {
@@ -303,7 +304,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 break;
 
             case MoveRuleKind.Disable:
-                if (defender.IsImmuneToMentalEffect("disable"))
+                if (defender.IsImmuneToMentalEffect("disable", attacker))
                 {
                     await context.ShowMessage($"{defender.Data.Name}은(는) 아로마베일로 기술 봉인을 막았다!");
                 }
@@ -322,6 +323,22 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 attacker.ClearLeechSeed();
                 attacker.ClearBinding();
                 await context.ShowMessage($"{attacker.Data.Name} 주변의 지속 효과가 사라졌다!");
+                break;
+        }
+
+        switch (key)
+        {
+            case "reflect":
+                attacker.SetReflect(5);
+                await context.ShowMessage($"{attacker.Data.Name} 주위에 리플렉터가 펼쳐졌다!");
+                break;
+            case "light-screen":
+                attacker.SetLightScreen(5);
+                await context.ShowMessage($"{attacker.Data.Name} 주위에 빛의장막이 펼쳐졌다!");
+                break;
+            case "aurora-veil":
+                attacker.SetAuroraVeil(5);
+                await context.ShowMessage($"{attacker.Data.Name} 주위에 오로라베일이 펼쳐졌다!");
                 break;
         }
 
@@ -409,7 +426,16 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         }
 
         if (key is "brick-break" && !defender.IsFainted)
+        {
+            defender.ClearScreens();
             await context.ShowMessage($"{defender.Data.Name}의 장벽이 부서졌다!");
+        }
+
+        if (key == "defog")
+        {
+            defender.ClearScreens();
+            await context.ShowMessage($"{defender.Data.Name} 주변의 장벽이 사라졌다!");
+        }
 
         bool switchesAttacker = key is "u-turn" or "volt-switch" or "parting-shot"
             or "baton-pass" or "teleport";
@@ -434,7 +460,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         switch (context.MoveKey)
         {
             case "taunt":
-                if (defender.IsImmuneToMentalEffect("taunt"))
+                if (defender.IsImmuneToMentalEffect("taunt", attacker))
                     await context.ShowMessage(
                         $"{defender.Data.Name}은(는) {defender.SelectedAbility}으로 도발을 막았다!");
                 else
@@ -444,7 +470,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 }
                 break;
             case "torment":
-                if (defender.IsImmuneToMentalEffect("torment"))
+                if (defender.IsImmuneToMentalEffect("torment", attacker))
                     await context.ShowMessage($"{defender.Data.Name}은(는) 아로마베일로 괴롭힘을 막았다!");
                 else
                 {
@@ -461,7 +487,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 await context.ShowMessage($"{defender.Data.Name}은(는) 도구를 사용할 수 없게 되었다!");
                 break;
             case "heal-block":
-                if (defender.IsImmuneToMentalEffect("heal-block"))
+                if (defender.IsImmuneToMentalEffect("heal-block", attacker))
                     await context.ShowMessage($"{defender.Data.Name}은(는) 아로마베일로 회복 봉인을 막았다!");
                 else
                 {
@@ -474,7 +500,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 await context.ShowMessage($"{defender.Data.Name}은(는) 상대가 알고 있는 기술을 쓸 수 없게 되었다!");
                 break;
             case "encore" when defender.LastMoveKey != null:
-                if (defender.IsImmuneToMentalEffect("encore"))
+                if (defender.IsImmuneToMentalEffect("encore", attacker))
                     await context.ShowMessage($"{defender.Data.Name}은(는) 아로마베일로 앙코르를 막았다!");
                 else
                 {
@@ -483,7 +509,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 }
                 break;
             case "attract":
-                if (defender.IsImmuneToMentalEffect("infatuation"))
+                if (defender.IsImmuneToMentalEffect("infatuation", attacker))
                 {
                     await context.ShowMessage(
                         $"{defender.Data.Name}은(는) {defender.SelectedAbility}으로 헤롱헤롱을 막았다!");

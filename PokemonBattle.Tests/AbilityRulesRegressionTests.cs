@@ -855,6 +855,125 @@ public sealed class AbilityRulesRegressionTests
             battleEvent.Message?.Contains("유폭", StringComparison.Ordinal) == true);
     }
 
+    [Fact]
+    public async Task Other_battle_abilities_cover_switch_in_damage_and_action_rules()
+    {
+        foreach (var ability in new[]
+        {
+            "틈새포착", "습기", "트레이스", "프레셔", "통찰",
+            "배짱", "틀깨기", "주눅", "천진", "무기력"
+        })
+        {
+            Assert.True(AbilityDatabase.IsImplemented(ability));
+        }
+
+        var traced = CreatePokemon(132, "tackle", ability: "트레이스");
+        var tracedOpponent = CreatePokemon(132, "tackle", ability: "프레셔");
+        var switchMessages = CreateFullEngine().ActivateSwitchIn(traced, tracedOpponent);
+        Assert.Equal("프레셔", traced.SelectedAbility);
+        Assert.Contains(switchMessages, message => message.Contains("트레이스", StringComparison.Ordinal));
+        traced.ResetOnSwitchOut();
+        Assert.Equal("트레이스", traced.SelectedAbility);
+
+        var frisk = CreatePokemon(132, "tackle", ability: "통찰");
+        switchMessages = CreateFullEngine().ActivateSwitchIn(
+            frisk, CreatePokemon(132, "tackle", heldItem: "자뭉열매"));
+        Assert.Contains(switchMessages, message => message.Contains("자뭉열매", StringComparison.Ordinal));
+
+        var pressure = CreatePokemon(132, "tackle", ability: "프레셔");
+        var pressureAttacker = CreatePokemon(132, "tackle");
+        int maxPp = pressureAttacker.CurrentPP["tackle"];
+        await CreateFullEngine().TakeTurnAsync(
+            pressureAttacker, pressure, "tackle", true, _ => Task.CompletedTask);
+        Assert.Equal(maxPp - 2, pressureAttacker.CurrentPP["tackle"]);
+
+        var damp = CreatePokemon(132, "tackle", ability: "습기");
+        var explosiveAttacker = CreatePokemon(132, "explosion");
+        var dampHp = damp.CurrentHp;
+        var dampMessages = new List<BattleEvent>();
+        await CreateFullEngine().TakeTurnAsync(
+            explosiveAttacker, damp, "explosion", true, Capture(dampMessages));
+        Assert.False(explosiveAttacker.IsFainted);
+        Assert.Equal(dampHp, damp.CurrentHp);
+        Assert.Contains(dampMessages, battleEvent =>
+            battleEvent.Message?.Contains("습기", StringComparison.Ordinal) == true);
+
+        var ghost = CreatePokemon(92, "tackle");
+        var scrappy = CreatePokemon(132, "tackle", ability: "배짱");
+        Assert.Equal(1.0, CreateFullEngine().PreviewMultiplier(
+            MoveDatabase.All["tackle"], ghost, scrappy));
+        var ghostHp = ghost.CurrentHp;
+        await CreateFullEngine().TakeTurnAsync(
+            scrappy, ghost, "tackle", true, _ => Task.CompletedTask);
+        Assert.True(ghost.CurrentHp < ghostHp);
+
+        var levitating = CreatePokemon(92, "tackle", ability: "부유");
+        var moldBreaker = CreatePokemon(95, "earthquake", ability: "틀깨기");
+        await CreateFullEngine().TakeTurnAsync(
+            moldBreaker, levitating, "earthquake", true, _ => Task.CompletedTask);
+        Assert.True(levitating.CurrentHp < levitating.MaxHp);
+    }
+
+    [Fact]
+    public async Task Infiltrator_rattled_unaware_and_defeatist_apply_at_their_rule_points()
+    {
+        var screenedTarget = CreatePokemon(132, "tackle");
+        screenedTarget.SetReflect(5);
+        int hpBefore = screenedTarget.CurrentHp;
+        var normalAttacker = CreatePokemon(132, "tackle");
+        await CreateFullEngine().TakeTurnAsync(
+            normalAttacker, screenedTarget, "tackle", true, _ => Task.CompletedTask);
+        int normalDamage = hpBefore - screenedTarget.CurrentHp;
+
+        screenedTarget = CreatePokemon(132, "tackle");
+        screenedTarget.SetReflect(5);
+        hpBefore = screenedTarget.CurrentHp;
+        var infiltrator = CreatePokemon(132, "tackle", ability: "틈새포착");
+        await CreateFullEngine().TakeTurnAsync(
+            infiltrator, screenedTarget, "tackle", true, _ => Task.CompletedTask);
+        Assert.Equal(normalDamage * 2, hpBefore - screenedTarget.CurrentHp);
+
+        var rattled = CreatePokemon(132, "tackle", ability: "주눅");
+        var rattledMessages = new List<BattleEvent>();
+        await CreateFullEngine().TakeTurnAsync(
+            CreatePokemon(92, "shadow-claw"), rattled, "shadow-claw", true,
+            Capture(rattledMessages));
+        Assert.Equal(1, rattled.StatStages["speed"]);
+        Assert.Contains(rattledMessages, battleEvent =>
+            battleEvent.Message?.Contains("주눅", StringComparison.Ordinal) == true);
+
+        var unaware = CreatePokemon(132, "tackle", ability: "천진");
+        unaware.ChangeStage("defense", 2);
+        var boostedAttacker = CreatePokemon(132, "tackle");
+        boostedAttacker.ChangeStage("attack", 2);
+        var tackle = MoveDatabase.All["tackle"];
+        int unawareDamage = Math.Max(0, (int)(((2.0 * boostedAttacker.Level / 5 + 2)
+            * tackle.Power * 1.5
+            * ((double)boostedAttacker.EffectiveAtkAgainst(unaware)
+                / Math.Max(unaware.EffectiveDefAgainst(boostedAttacker), 1))) / 50) + 2);
+        int unawareHp = unaware.CurrentHp;
+        await CreateFullEngine(new FixedRandom(99)).TakeTurnAsync(
+            boostedAttacker, unaware, "tackle", true, _ => Task.CompletedTask);
+        Assert.Equal(unawareDamage, unawareHp - unaware.CurrentHp);
+
+        var defeatist = CreatePokemon(132, "tackle", ability: "무기력");
+        int fullPower = defeatist.EffectiveAtk;
+        defeatist.CurrentHp = defeatist.MaxHp / 2;
+        Assert.Equal(fullPower / 2, defeatist.EffectiveAtk);
+    }
+
+    [Fact]
+    public async Task Reflect_and_light_screen_are_usable_and_expire_after_five_turns()
+    {
+        var user = CreatePokemon(132, "reflect", "light-screen");
+        await CreateFullEngine().TakeTurnAsync(
+            user, CreatePokemon(132, "tackle"), "reflect", true, _ => Task.CompletedTask);
+        Assert.Equal(5, user.ReflectTurnsRemaining);
+
+        for (int i = 0; i < 5; i++) user.AdvanceTurn();
+        Assert.Equal(0, user.ReflectTurnsRemaining);
+    }
+
     private static Pokemon CreatePokemon(
         int pokemonId,
         string move,
