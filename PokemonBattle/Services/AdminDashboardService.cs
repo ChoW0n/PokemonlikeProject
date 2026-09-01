@@ -261,6 +261,10 @@ public sealed class AdminDashboardService
                 .OrderBy(preset => preset.Name)
                 .Select(preset => new AdminPresetSnapshot(preset.Name, preset.UpdatedAt))
                 .ToListAsync();
+            var progression = await db.PlayerProgressions.AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Username == user.Username);
+            var skillRating = await db.PlayerSkillRatings.AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Username == user.Username);
             var unlockedIds = await db.UnlockedPokemons.AsNoTracking()
                 .Where(unlock => unlock.Username == user.Username)
                 .Select(unlock => unlock.PokemonId)
@@ -270,33 +274,34 @@ public sealed class AdminDashboardService
 
             var team = new List<AdminTeamMemberSnapshot>();
             var history = new List<LegendaryEncounterHistoryEntry>();
+            var runLoadouts = new List<PokemonLoadout>();
             if (run != null)
             {
-                try
-                {
-                    var loadouts = JsonSerializer.Deserialize<List<PokemonLoadout>>(
-                        run.LoadoutsJson, JsonOptions) ?? new();
-                    team = loadouts
-                        .Where(loadout => PokemonDatabase.All.ContainsKey(loadout.PokemonId))
-                        .Select(loadout =>
-                        {
-                            var data = PokemonDatabase.All[loadout.PokemonId];
-                            return new AdminTeamMemberSnapshot(
-                                data.Name,
-                                loadout.Level,
-                                loadout.ChosenAbility,
-                                loadout.ChosenItem,
-                                loadout.ChosenMoveNames.ToList());
-                        })
-                        .ToList();
-                    history = JsonSerializer.Deserialize<List<LegendaryEncounterHistoryEntry>>(
-                        run.LegendaryEncounterHistoryJson, JsonOptions) ?? new();
-                }
-                catch (JsonException)
-                {
-                    // Integrity issues are reported by the dashboard; details stay safe to view.
-                }
+                runLoadouts = DeserializeList<PokemonLoadout>(run.LoadoutsJson);
+                team = runLoadouts
+                    .Where(loadout => PokemonDatabase.All.ContainsKey(loadout.PokemonId))
+                    .Select(loadout =>
+                    {
+                        var data = PokemonDatabase.All[loadout.PokemonId];
+                        return new AdminTeamMemberSnapshot(
+                            data.Name,
+                            loadout.Level,
+                            loadout.ChosenAbility,
+                            loadout.ChosenItem,
+                            loadout.ChosenMoveNames.ToList());
+                    })
+                    .ToList();
+                history = DeserializeList<LegendaryEncounterHistoryEntry>(
+                    run.LegendaryEncounterHistoryJson);
             }
+
+            var analyticsLoadouts = progression == null
+                ? runLoadouts
+                : DeserializeList<PokemonLoadout>(progression.LatestLoadoutsJson);
+            var personalAnalytics = BuildPersonalAnalytics(
+                analyticsLoadouts,
+                progression,
+                skillRating);
 
             var unlockedNames = unlockedIds
                 .Where(PokemonDatabase.All.ContainsKey)
@@ -312,8 +317,143 @@ public sealed class AdminDashboardService
                 team,
                 presets,
                 unlockedNames,
-                history);
+                history,
+                personalAnalytics);
         });
+
+    private static AdminUserAnalyticsSnapshot BuildPersonalAnalytics(
+        IReadOnlyList<PokemonLoadout> loadouts,
+        PlayerProgression? progression,
+        PlayerSkillRating? skillRating)
+    {
+        var pokemonBars =
+            loadouts
+                .GroupBy(loadout => loadout.PokemonId)
+                .Select(group => (
+                    Label: PokemonDatabase.All.TryGetValue(group.Key, out var data)
+                        ? data.Name
+                        : $"#{group.Key}",
+                    Count: group.Count()))
+                .OrderByDescending(item => item.Count)
+                .ThenBy(item => item.Label);
+
+        var abilityCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var itemCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var loadout in loadouts)
+        {
+            Increment(abilityCounts, string.IsNullOrWhiteSpace(loadout.ChosenAbility)
+                ? "미선택"
+                : loadout.ChosenAbility);
+            Increment(itemCounts, string.IsNullOrWhiteSpace(loadout.ChosenItem)
+                ? "미선택"
+                : loadout.ChosenItem);
+        }
+
+        var preferences = progression == null
+            ? null
+            : Deserialize<MovePreferenceProfile>(progression.MovePreferencesJson);
+        var moveCounts = preferences?.MoveCounts
+            .Where(pair => pair.Value > 0)
+            .OrderByDescending(pair => pair.Value)
+            .ThenBy(pair => pair.Key)
+            .Take(8)
+            .Select(pair => (
+                Label: MoveDatabase.All.TryGetValue(pair.Key, out var data) ? data.Name : pair.Key,
+                Count: pair.Value))
+            ?? Enumerable.Empty<(string Label, int Count)>();
+
+        var categoryCounts = preferences?.CategoryCounts
+            .Where(pair => pair.Value > 0)
+            .OrderByDescending(pair => pair.Value)
+            .ThenBy(pair => pair.Key)
+            .Select(pair => (Label: MoveCategoryLabel(pair.Key), Count: pair.Value))
+            ?? Enumerable.Empty<(string Label, int Count)>();
+        var typeCounts = preferences?.TypeCounts
+            .Where(pair => pair.Value > 0)
+            .OrderByDescending(pair => pair.Value)
+            .ThenBy(pair => pair.Key)
+            .Select(pair => (Label: MoveTypeLabel(pair.Key), Count: pair.Value))
+            ?? Enumerable.Empty<(string Label, int Count)>();
+        var tacticalCounts = preferences?.TacticalCounts
+            .Where(pair => pair.Value > 0)
+            .OrderByDescending(pair => pair.Value)
+            .ThenBy(pair => pair.Key)
+            .Select(pair => (Label: TacticalLabel(pair.Key), Count: pair.Value))
+            ?? Enumerable.Empty<(string Label, int Count)>();
+
+        return new AdminUserAnalyticsSnapshot(
+            BuildBars(pokemonBars, item => item.Count * 100d / Math.Max(1, loadouts.Count)),
+            BuildBars(moveCounts, item => item.Count * 100d / Math.Max(
+                1,
+                preferences?.MoveCounts.Values.Where(value => value > 0).Sum() ?? 0)),
+            BuildBars(categoryCounts, item => item.Count * 100d / Math.Max(
+                1,
+                preferences?.CategoryCounts.Values.Where(value => value > 0).Sum() ?? 0)),
+            BuildBars(typeCounts, item => item.Count * 100d / Math.Max(
+                1,
+                preferences?.TypeCounts.Values.Where(value => value > 0).Sum() ?? 0)),
+            BuildBars(tacticalCounts, item => item.Count * 100d / Math.Max(
+                1,
+                preferences?.TacticalCounts.Values.Where(value => value > 0).Sum() ?? 0)),
+            BuildBars(
+                abilityCounts
+                    .OrderByDescending(pair => pair.Value)
+                    .ThenBy(pair => pair.Key)
+                    .Select(pair => (Label: pair.Key, Count: pair.Value)),
+                item => item.Count * 100d / Math.Max(1, loadouts.Count)),
+            BuildBars(
+                itemCounts
+                    .OrderByDescending(pair => pair.Value)
+                    .ThenBy(pair => pair.Key)
+                    .Select(pair => (Label: pair.Key, Count: pair.Value)),
+                item => item.Count * 100d / Math.Max(1, loadouts.Count)),
+            loadouts.Count,
+            Math.Max(0, preferences?.MoveCounts.Values.Where(value => value > 0).Sum() ?? 0),
+            Math.Max(0, progression?.CompletedBattles ?? 0),
+            Math.Max(0, skillRating?.CompletedRuns ?? 0),
+            Math.Clamp(skillRating?.Rating ?? SkillRatingCalculator.DefaultRating, 400, 2000));
+    }
+
+    private static string MoveCategoryLabel(string key) => key switch
+    {
+        "physical" => "물리",
+        "special" => "특수",
+        "status" => "변화",
+        _ => key
+    };
+
+    private static string MoveTypeLabel(string key) => key switch
+    {
+        "Normal" => "노말",
+        "Fire" => "불꽃",
+        "Water" => "물",
+        "Electric" => "전기",
+        "Grass" => "풀",
+        "Ice" => "얼음",
+        "Fighting" => "격투",
+        "Poison" => "독",
+        "Ground" => "땅",
+        "Flying" => "비행",
+        "Psychic" => "에스퍼",
+        "Bug" => "벌레",
+        "Rock" => "바위",
+        "Ghost" => "고스트",
+        "Dragon" => "드래곤",
+        "Dark" => "악",
+        "Steel" => "강철",
+        "Fairy" => "페어리",
+        _ => key
+    };
+
+    private static string TacticalLabel(string key) => key switch
+    {
+        "priority" => "선공기",
+        "rank-up" => "능력 상승",
+        "status-effect" => "상태 이상",
+        "protection" => "방어·보호",
+        "damage" => "공격기",
+        _ => key
+    };
 
     public async Task<AdminOperationResult> SetAdminAsync(string username, bool isAdmin) =>
         await _database.ExecuteAsync("admin-dashboard.set-admin", async db =>
@@ -544,7 +684,22 @@ public sealed record AdminUserDetails(
     IReadOnlyList<AdminTeamMemberSnapshot> CurrentTeam,
     IReadOnlyList<AdminPresetSnapshot> Presets,
     IReadOnlyList<string> UnlockedPokemonNames,
-    IReadOnlyList<LegendaryEncounterHistoryEntry> LegendaryHistory);
+    IReadOnlyList<LegendaryEncounterHistoryEntry> LegendaryHistory,
+    AdminUserAnalyticsSnapshot PersonalAnalytics);
+
+public sealed record AdminUserAnalyticsSnapshot(
+    IReadOnlyList<AdminAnalyticsBar> PokemonComposition,
+    IReadOnlyList<AdminAnalyticsBar> MovePreferences,
+    IReadOnlyList<AdminAnalyticsBar> MoveCategoryPreferences,
+    IReadOnlyList<AdminAnalyticsBar> MoveTypePreferences,
+    IReadOnlyList<AdminAnalyticsBar> TacticalPreferences,
+    IReadOnlyList<AdminAnalyticsBar> AbilityPreferences,
+    IReadOnlyList<AdminAnalyticsBar> ItemPreferences,
+    int TeamSize,
+    int TotalMoveSelections,
+    int CompletedBattles,
+    int CompletedRuns,
+    double Rating);
 
 public sealed record AdminTeamMemberSnapshot(
     string Name,

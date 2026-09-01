@@ -196,7 +196,7 @@ public class AdminDashboardRegressionTests
                         LatestLoadoutsJson = """
                             [{"PokemonId":1,"ChosenMoveNames":["tackle"],"ChosenAbility":"심록","ChosenItem":"없음","Level":5}]
                             """,
-                        MovePreferencesJson = """{"MoveCounts":{"tackle":3},"CategoryCounts":{},"TypeCounts":{},"TacticalCounts":{}}"""
+                        MovePreferencesJson = """{"MoveCounts":{"tackle":3},"CategoryCounts":{"physical":3},"TypeCounts":{"Normal":3},"TacticalCounts":{"damage":3}}"""
                     },
                     new PlayerProgression
                     {
@@ -246,6 +246,17 @@ public class AdminDashboardRegressionTests
                 Assert.Equal(2, snapshot.Analytics.UsersWithRoundData);
                 Assert.Equal(1, snapshot.Analytics.WinRateDistribution.Single(bar => bar.Label == "26–50%").Count);
                 Assert.Equal(1, snapshot.Analytics.WinRateDistribution.Single(bar => bar.Label == "76–100%").Count);
+
+                var details = await new AdminDashboardService(db, admin).LoadUserDetailsAsync("alpha");
+                Assert.NotNull(details);
+                Assert.Equal(1, details!.PersonalAnalytics.TeamSize);
+                Assert.Equal(3, details.PersonalAnalytics.TotalMoveSelections);
+                Assert.Equal("이상해씨", details.PersonalAnalytics.PokemonComposition.Single().Label);
+                Assert.Equal("몸통박치기", details.PersonalAnalytics.MovePreferences.Single().Label);
+                Assert.Equal(100, details.PersonalAnalytics.MovePreferences.Single().SharePercent);
+                Assert.Equal("물리", details.PersonalAnalytics.MoveCategoryPreferences.Single().Label);
+                Assert.Equal("노말", details.PersonalAnalytics.MoveTypePreferences.Single().Label);
+                Assert.Equal("심록", details.PersonalAnalytics.AbilityPreferences.Single().Label);
             }
         });
     }

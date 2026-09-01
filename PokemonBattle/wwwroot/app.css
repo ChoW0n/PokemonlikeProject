@@ -1330,6 +1330,55 @@ h1 {
     padding-top: var(--sp-4);
 }
 
+.admin-personal-insights {
+    padding-top: var(--sp-4);
+    border-top: 1px solid rgba(140, 150, 200, 0.12);
+}
+
+.admin-personal-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin: var(--sp-3) 0;
+}
+
+.admin-personal-stat-grid span {
+    display: flex;
+    min-height: 66px;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px;
+    border-radius: 10px;
+    background: rgba(5, 8, 20, 0.35);
+}
+
+.admin-personal-stat-grid small,
+.admin-personal-stat-grid em {
+    color: #8993b8;
+    font-size: 0.64rem;
+    font-style: normal;
+}
+
+.admin-personal-stat-grid strong {
+    color: #fff1a8;
+    font-size: 1rem;
+}
+
+.admin-personal-stat-grid em {
+    margin-top: auto;
+    font-size: 0.6rem;
+}
+
+.admin-personal-chart-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-3);
+}
+
+.admin-personal-chart-grid .admin-chart-card {
+    min-width: 0;
+}
+
 .admin-subheading {
     display: flex;
     align-items: center;
@@ -1628,6 +1677,14 @@ h1 {
 
     .admin-detail-stats {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .admin-personal-stat-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .admin-personal-chart-grid {
+        grid-template-columns: 1fr;
     }
 
     .admin-tool-grid,
