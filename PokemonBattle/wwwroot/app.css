@@ -500,6 +500,33 @@ h1 {
 .action-attack:hover:not(:disabled) { background: rgba(248, 113, 113, 0.12); }
 .action-switch:hover:not(:disabled) { background: rgba(96, 165, 250, 0.12); }
 .action-tile:disabled { opacity: 0.4; cursor: not-allowed; }
+.gimmick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-top: var(--sp-3);
+}
+.gimmick-button {
+    flex: 1 1 9rem;
+    min-height: 42px;
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid rgba(255, 204, 51, 0.45);
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(108, 74, 20, 0.55), rgba(67, 48, 95, 0.55));
+    color: #ffe9a3;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.gimmick-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    background: linear-gradient(135deg, rgba(138, 94, 24, 0.7), rgba(85, 58, 118, 0.7));
+}
+.gimmick-button:disabled { opacity: 0.4; cursor: not-allowed; }
+.gimmick-button:focus-visible { outline: 3px solid #8feaff; outline-offset: 3px; }
+.gimmick-status { color: #ffe08a; border-color: rgba(255, 204, 51, 0.42); }
 
 .move-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
 .move-button {

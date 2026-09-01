@@ -12,38 +12,82 @@ public static class BattleField
     public const string Psychic = "사이코필드";
     public const string Misty = "미스트필드";
 
-    private static string current = None;
+    private sealed class FieldState
+    {
+        public string Current = None;
+        public int TurnsRemaining;
+        public bool TrickRoomActive;
+        public int TrickRoomTurnsRemaining;
+        public bool GravityActive;
+        public int GravityTurnsRemaining;
+    }
+
+    private static readonly AsyncLocal<FieldState?> state = new();
+    private static FieldState CurrentState => state.Value ??= new FieldState();
+
     public static string Current
     {
-        get => current;
+        get => CurrentState.Current;
         set
         {
-            current = value;
-            TurnsRemaining = 0;
+            CurrentState.Current = value;
+            CurrentState.TurnsRemaining = 0;
         }
     }
 
-    public static int TurnsRemaining { get; private set; }
+    public static int TurnsRemaining => CurrentState.TurnsRemaining;
+    public static bool TrickRoomActive => CurrentState.TrickRoomActive;
+    public static int TrickRoomTurnsRemaining => CurrentState.TrickRoomTurnsRemaining;
+    public static bool GravityActive => CurrentState.GravityActive;
+    public static int GravityTurnsRemaining => CurrentState.GravityTurnsRemaining;
 
     public static void Reset()
     {
-        current = None;
-        TurnsRemaining = 0;
+        state.Value = new FieldState();
     }
 
     public static void Set(string field, int turns = 0)
     {
-        current = field;
-        TurnsRemaining = Math.Max(0, turns);
+        CurrentState.Current = field;
+        CurrentState.TurnsRemaining = Math.Max(0, turns);
     }
 
     public static bool AdvanceTurn()
     {
-        if (TurnsRemaining <= 0) return false;
-        TurnsRemaining--;
-        if (TurnsRemaining > 0) return false;
+        bool expired = false;
+        if (CurrentState.TurnsRemaining > 0 && --CurrentState.TurnsRemaining == 0)
+        {
+            CurrentState.Current = None;
+            expired = true;
+        }
+        if (CurrentState.TrickRoomTurnsRemaining > 0 && --CurrentState.TrickRoomTurnsRemaining == 0)
+            CurrentState.TrickRoomActive = false;
+        if (CurrentState.GravityTurnsRemaining > 0 && --CurrentState.GravityTurnsRemaining == 0)
+            CurrentState.GravityActive = false;
+        return expired;
+    }
 
-        current = None;
-        return true;
+    public static void SetTrickRoom(int turns = 5)
+    {
+        CurrentState.TrickRoomActive = true;
+        CurrentState.TrickRoomTurnsRemaining = Math.Max(1, turns);
+    }
+
+    public static void SetGravity(int turns = 5)
+    {
+        CurrentState.GravityActive = true;
+        CurrentState.GravityTurnsRemaining = Math.Max(1, turns);
+    }
+
+    public static void ClearTrickRoom()
+    {
+        CurrentState.TrickRoomActive = false;
+        CurrentState.TrickRoomTurnsRemaining = 0;
+    }
+
+    public static void ClearGravity()
+    {
+        CurrentState.GravityActive = false;
+        CurrentState.GravityTurnsRemaining = 0;
     }
 }

@@ -61,7 +61,14 @@ public enum MoveRuleKind
     VariableType,
     SpecialDefenseCalculation,
     DualTypeDamage,
-    HazardRemoval
+    HazardRemoval,
+    Substitute,
+    TrickRoom,
+    Gravity,
+    Counter,
+    MirrorCoat,
+    ItemSwap,
+    HazardPlacement
 }
 
 public enum ProtectionEffect
@@ -156,6 +163,11 @@ public static class MoveRuleMetadata
         "parting-shot", "baton-pass", "teleport"
     };
 
+    private static readonly HashSet<string> HazardPlacementMoves = new()
+    {
+        "stealth-rock", "spikes", "toxic-spikes", "sticky-web"
+    };
+
     private static readonly HashSet<string> VariablePowerMoves = new()
     {
         "assurance", "avalanche", "brine", "crush-grip", "electro-ball", "facade",
@@ -209,6 +221,13 @@ public static class MoveRuleMetadata
             return new(MoveRuleKind.SpecialDefenseCalculation);
         if (moveKey == "flying-press") return new(MoveRuleKind.DualTypeDamage);
         if (moveKey == "rapid-spin") return new(MoveRuleKind.HazardRemoval);
+        if (moveKey == "substitute") return new(MoveRuleKind.Substitute);
+        if (moveKey == "trick-room") return new(MoveRuleKind.TrickRoom, 5);
+        if (moveKey == "gravity") return new(MoveRuleKind.Gravity, 5);
+        if (moveKey == "counter") return new(MoveRuleKind.Counter);
+        if (moveKey == "mirror-coat") return new(MoveRuleKind.MirrorCoat);
+        if (moveKey is "trick" or "switcheroo") return new(MoveRuleKind.ItemSwap);
+        if (HazardPlacementMoves.Contains(moveKey)) return new(MoveRuleKind.HazardPlacement);
         return move.IsStatus ? new(MoveRuleKind.Status) : new(MoveRuleKind.StandardDamage);
     }
 
@@ -304,16 +323,13 @@ public static class MoveRuleMetadata
     {
         if (attackType is not (PokemonType.Fairy or PokemonType.Dark)) return 1.0;
 
-        bool auraActive = HasActiveAbility(attacker, attackType == PokemonType.Fairy
-                ? "페어리오라"
-                : "다크오라")
-            || HasActiveAbility(defender, attackType == PokemonType.Fairy
-                ? "페어리오라"
-                : "다크오라");
+        string aura = attackType == PokemonType.Fairy ? "페어리오라" : "다크오라";
+        bool auraActive = attacker?.HasActiveAbility(aura, defender) == true
+            || defender?.HasActiveAbility(aura, attacker) == true;
         if (!auraActive) return 1.0;
 
-        bool auraBroken = HasActiveAbility(attacker, "오라브레이크")
-            || HasActiveAbility(defender, "오라브레이크");
+        bool auraBroken = attacker?.HasActiveAbility("오라브레이크", defender) == true
+            || defender?.HasActiveAbility("오라브레이크", attacker) == true;
         return auraBroken ? 0.75 : 4.0 / 3.0;
     }
 

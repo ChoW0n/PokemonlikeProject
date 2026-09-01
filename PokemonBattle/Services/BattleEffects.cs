@@ -157,6 +157,8 @@ public sealed class BattleEffectContext
     public bool RequestSwitch { get; set; }
     public Pokemon? SwitchPokemon { get; set; }
     public string? SwitchReason { get; set; }
+    public BattleSideState AttackerSide { get; }
+    public BattleSideState DefenderSide { get; }
 
     public BattleEffectContext(
         Pokemon attacker,
@@ -167,7 +169,9 @@ public sealed class BattleEffectContext
         Func<BattleEvent, Task> emit,
         string moveKey,
         PokemonType attackType,
-        bool makesContact)
+        bool makesContact,
+        BattleSideState? attackerSide = null,
+        BattleSideState? defenderSide = null)
     {
         Attacker = attacker;
         Defender = defender;
@@ -178,6 +182,8 @@ public sealed class BattleEffectContext
         AttackerIsHero = attackerIsHero;
         Random = random;
         Emit = emit;
+        AttackerSide = attackerSide ?? new BattleSideState();
+        DefenderSide = defenderSide ?? new BattleSideState();
     }
 
     public Task ShowMessage(string message, int baseDelayMs = 1400) =>

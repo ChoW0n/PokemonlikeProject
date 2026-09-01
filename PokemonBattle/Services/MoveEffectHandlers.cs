@@ -109,7 +109,8 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         var defender = context.Defender;
         bool suppressSecondaryEffects = attacker.HasActiveAbility("우격다짐", defender)
             || (defender.HasActiveHeldItem(attacker) && defender.HeldItem == "방호막")
-            || (!move.IsStatus && defender.HasActiveAbility("인분", attacker));
+            || (!move.IsStatus && defender.HasActiveAbility("인분", attacker))
+            || defender.LastHitBlockedBySubstitute;
         int chanceMultiplier = attacker.HasActiveAbility("하늘의은총", defender) ? 2 : 1;
 
         await ApplyMoveSpecificEffectAsync(context);
@@ -270,12 +271,17 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
             }
         }
 
-        if (!pokemon.IsFainted && pokemon.NightmareActive && pokemon.Status == StatusCondition.Sleep)
+        bool nightmareFromMove = pokemon.NightmareActive;
+        bool nightmareFromAbility = context.Opponent?.HasActiveAbility("나이트메어", pokemon) == true;
+        if (!pokemon.IsFainted
+            && (nightmareFromMove || nightmareFromAbility)
+            && pokemon.Status == StatusCondition.Sleep)
         {
             int damage = Math.Max(1, pokemon.MaxHp / 4);
             pokemon.CurrentHp = Math.Max(0, pokemon.CurrentHp - damage);
             if (pokemon.CurrentHp == 0) pokemon.MarkFainted();
-            await context.ShowMessage($"{pokemon.Data.Name}은(는) 악몽으로 고통받았다!", 900);
+            string source = nightmareFromAbility && !nightmareFromMove ? "나이트메어 특성" : "악몽";
+            await context.ShowMessage($"{pokemon.Data.Name}은(는) {source}로 고통받았다!", 900);
         }
     }
 
@@ -343,7 +349,71 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
             case MoveRuleKind.HazardRemoval:
                 attacker.ClearLeechSeed();
                 attacker.ClearBinding();
-                await context.ShowMessage($"{attacker.Data.Name} 주변의 지속 효과가 사라졌다!");
+                context.AttackerSide.ClearHazards();
+                await context.ShowMessage($"{attacker.Data.Name} 주변의 지속 효과와 장애물이 사라졌다!");
+                break;
+
+            case MoveRuleKind.HazardPlacement:
+                bool hazardAdded;
+                switch (key)
+                {
+                    case "stealth-rock":
+                        hazardAdded = !context.DefenderSide.StealthRock;
+                        if (hazardAdded) context.DefenderSide.SetStealthRock();
+                        break;
+                    case "spikes":
+                        hazardAdded = context.DefenderSide.AddSpikes();
+                        break;
+                    case "toxic-spikes":
+                        hazardAdded = context.DefenderSide.AddToxicSpikes();
+                        break;
+                    case "sticky-web":
+                        hazardAdded = !context.DefenderSide.StickyWeb;
+                        if (hazardAdded) context.DefenderSide.SetStickyWeb();
+                        break;
+                    default:
+                        hazardAdded = false;
+                        break;
+                }
+                await context.ShowMessage(hazardAdded
+                    ? $"{defender.Data.Name} 진영에 {move.Name}이(가) 설치되었다!"
+                    : $"{defender.Data.Name} 진영에는 이미 {move.Name}이(가) 가득하다!");
+                break;
+
+            case MoveRuleKind.Substitute:
+                if (attacker.TryCreateSubstitute())
+                    await context.ShowMessage($"{attacker.Data.Name}은(는) 대타를 내보냈다!");
+                else
+                    await context.ShowMessage($"{attacker.Data.Name}은(는) 대타를 만들 수 없다!");
+                break;
+
+            case MoveRuleKind.TrickRoom:
+                BattleField.SetTrickRoom(5);
+                await context.ShowMessage("트릭룸이 펼쳐졌다! 느린 포켓몬부터 움직인다!");
+                break;
+
+            case MoveRuleKind.Gravity:
+                BattleField.SetGravity(5);
+                await context.ShowMessage("중력이 강해졌다! 모든 포켓몬이 땅에 내려왔다!");
+                break;
+
+            case MoveRuleKind.ItemSwap:
+                if (defender.HasActiveAbility("점착", attacker))
+                {
+                    await context.ShowMessage($"{defender.Data.Name}의 점착 때문에 도구를 바꿀 수 없다!");
+                }
+                else if (attacker.HeldItem == defender.HeldItem)
+                {
+                    await context.ShowMessage("두 포켓몬의 도구가 같아 교환되지 않았다!");
+                }
+                else
+                {
+                    string attackerItem = attacker.HeldItem;
+                    attacker.HeldItem = defender.HeldItem;
+                    defender.HeldItem = attackerItem;
+                    await context.ShowMessage(
+                        $"{attacker.Data.Name}과(와) {defender.Data.Name}의 도구가 바뀌었다!");
+                }
                 break;
         }
 
@@ -455,7 +525,9 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         if (key == "defog")
         {
             defender.ClearScreens();
-            await context.ShowMessage($"{defender.Data.Name} 주변의 장벽이 사라졌다!");
+            context.AttackerSide.ClearHazards();
+            context.DefenderSide.ClearHazards();
+            await context.ShowMessage($"{defender.Data.Name} 주변의 장벽과 양쪽 진영의 장애물이 사라졌다!");
         }
 
         bool switchesAttacker = key is "u-turn" or "volt-switch" or "parting-shot"

@@ -39,17 +39,24 @@ public class Pokemon
     public int LightScreenTurnsRemaining { get; private set; }
     public int AuroraVeilTurnsRemaining { get; private set; }
     public bool IsAlternateForm { get; private set; }
+    public BattleGimmickKind ActiveGimmick { get; private set; }
+    public PokemonType? TerastalType { get; private set; }
+    public int GimmickTurnsRemaining { get; private set; }
     public bool HasConsumedBerry { get; private set; }
     public bool HasPickedUpItem { get; private set; }
     public bool HasLostHeldItem { get; private set; }
     public bool HasHoneyGathered { get; private set; }
     public bool IsIllusionActive { get; private set; }
     public bool WasIllusionBroken { get; private set; }
-    public PokemonType CurrentType1 => typeOverride1
+    public PokemonType CurrentType1 => ActiveGimmick == BattleGimmickKind.Terastal && TerastalType != null
+        ? TerastalType.Value
+        : typeOverride1
         ?? (SelectedAbility == "멀티타입"
             ? GetPlateType(HeldItem) ?? Data.Type1
             : Data.Type1);
-    public PokemonType? CurrentType2 => typeOverride1 != null
+    public PokemonType? CurrentType2 => ActiveGimmick == BattleGimmickKind.Terastal
+        ? null
+        : typeOverride1 != null
         ? typeOverride2
         : (SelectedAbility == "멀티타입" && GetPlateType(HeldItem) != null ? null : Data.Type2);
     public string TypeDisplay => CurrentType2 == null
@@ -73,6 +80,12 @@ public class Pokemon
     public bool IsSemiInvulnerable { get; private set; }
     public bool WasDamagedThisTurn { get; private set; }
     public bool LastDamageTakenThisTurn => WasDamagedThisTurn;
+    public int LastDamageTakenAmountThisTurn { get; private set; }
+    public bool LastDamageTakenWasSpecialThisTurn { get; private set; }
+    public Pokemon? LastDamageSourceThisTurn { get; private set; }
+    public bool LastHitBlockedBySubstitute { get; private set; }
+    public int SubstituteHp { get; private set; }
+    public bool HasSubstitute => SubstituteHp > 0;
     public bool IsTransformed { get; private set; }
     public bool IsBadlyPoisoned { get; private set; }
     public int ToxicTurns { get; private set; }
@@ -136,7 +149,16 @@ public class Pokemon
     private int StatHp(int baseStat) => (2 * baseStat + 31) * Level / 100 + Level + 10;
     private int StatOther(int baseStat) => (2 * baseStat + 31) * Level / 100 + 5;
 
-    public int MaxHp => StatHp(IsTransformed || IsIllusionActive ? originalData.BaseHp : Data.BaseHp);
+    public int MaxHp
+    {
+        get
+        {
+            int baseHp = StatHp(IsTransformed || IsIllusionActive ? originalData.BaseHp : Data.BaseHp);
+            return ActiveGimmick is BattleGimmickKind.Dynamax or BattleGimmickKind.Gigantamax
+                ? baseHp * 2
+                : baseHp;
+        }
+    }
 
     public double EffectiveWeight => GetEffectiveWeight();
 
@@ -418,6 +440,7 @@ public class Pokemon
 
     public void ResetOnSwitchOut()
     {
+        DeactivateGimmick();
         SelectedAbility = originalAbility;
         if (IsTransformed)
         {
@@ -466,6 +489,11 @@ public class Pokemon
         MustRecharge = false;
         IsSemiInvulnerable = false;
         WasDamagedThisTurn = false;
+        LastDamageTakenAmountThisTurn = 0;
+        LastDamageTakenWasSpecialThisTurn = false;
+        LastDamageSourceThisTurn = null;
+        LastHitBlockedBySubstitute = false;
+        SubstituteHp = 0;
         IsBadlyPoisoned = false;
         ToxicTurns = 0;
         LeechSeeded = false;
@@ -559,9 +587,46 @@ public class Pokemon
         if (ReflectTurnsRemaining > 0) ReflectTurnsRemaining--;
         if (LightScreenTurnsRemaining > 0) LightScreenTurnsRemaining--;
         if (AuroraVeilTurnsRemaining > 0) AuroraVeilTurnsRemaining--;
+        LastDamageTakenAmountThisTurn = 0;
+        LastDamageTakenWasSpecialThisTurn = false;
+        LastDamageSourceThisTurn = null;
+        LastHitBlockedBySubstitute = false;
     }
 
     public void ResetFieldCounter() => TurnsOnField = 0;
+
+    public bool ActivateGimmick(BattleGimmickKind kind, PokemonType? teraType = null)
+    {
+        if (kind == BattleGimmickKind.None || ActiveGimmick != BattleGimmickKind.None || IsFainted)
+            return false;
+        if (kind == BattleGimmickKind.Terastal && teraType == null)
+            return false;
+
+        ActiveGimmick = kind;
+        GimmickTurnsRemaining = kind is BattleGimmickKind.Dynamax or BattleGimmickKind.Gigantamax ? 3 : 0;
+        if (kind == BattleGimmickKind.Terastal) TerastalType = teraType;
+        if (kind is BattleGimmickKind.Dynamax or BattleGimmickKind.Gigantamax)
+            CurrentHp = Math.Min(MaxHp, CurrentHp * 2);
+        return true;
+    }
+
+    public bool AdvanceGimmickTurn()
+    {
+        if (GimmickTurnsRemaining <= 0) return false;
+        GimmickTurnsRemaining--;
+        if (GimmickTurnsRemaining > 0) return false;
+        DeactivateGimmick();
+        return true;
+    }
+
+    public void DeactivateGimmick()
+    {
+        if (ActiveGimmick is BattleGimmickKind.Dynamax or BattleGimmickKind.Gigantamax)
+            CurrentHp = Math.Min(StatHp(originalData.BaseHp), (int)Math.Ceiling(CurrentHp / 2.0));
+        ActiveGimmick = BattleGimmickKind.None;
+        TerastalType = null;
+        GimmickTurnsRemaining = 0;
+    }
 
     public bool ShouldSkipTurn => SelectedAbility == "게으름" && TurnsOnField % 2 == 1;
 
@@ -852,6 +917,7 @@ public class Pokemon
         bool wasFullHp = CurrentHp == MaxHp;
         SurvivedByEndure = false;
         LastHitWasCritical = isCritical;
+        LastHitBlockedBySubstitute = false;
 
         double dmgMultiplier = 1.0;
         bool abilitySuppressed = IsAbilitySuppressedBy(attacker);
@@ -869,11 +935,20 @@ public class Pokemon
         LastMultiplier = multiplier;
 
         int finalDamage = (int)(rawDamage * multiplier * dmgMultiplier);
+        if (finalDamage > 0 && SubstituteHp > 0)
+        {
+            SubstituteHp = Math.Max(0, SubstituteHp - finalDamage);
+            finalDamage = 0;
+            LastHitBlockedBySubstitute = true;
+        }
 
         CurrentHp -= finalDamage;
         if (finalDamage > 0)
         {
             WasDamagedThisTurn = true;
+            LastDamageTakenAmountThisTurn = finalDamage;
+            LastDamageTakenWasSpecialThisTurn = isSpecial;
+            LastDamageSourceThisTurn = attacker;
             if (HeldItem == "풍선" && HasActiveHeldItem(attacker))
                 HeldItem = "없음";
         }
@@ -1090,6 +1165,32 @@ public class Pokemon
         CurrentHp = 0;
         IsFainted = true;
         ClearRampage();
+        SubstituteHp = 0;
+    }
+
+    public bool TryCreateSubstitute()
+    {
+        if (IsFainted || HasSubstitute) return false;
+        int cost = Math.Max(1, MaxHp / 4);
+        if (CurrentHp <= cost) return false;
+        CurrentHp -= cost;
+        SubstituteHp = cost;
+        return true;
+    }
+
+    public void ClearSubstitute() => SubstituteHp = 0;
+
+    public void ApplyDirectDamage(int damage, Pokemon? source = null, bool isSpecial = false)
+    {
+        LastHitBlockedBySubstitute = false;
+        int actualDamage = Math.Max(0, damage);
+        if (actualDamage <= 0 || IsFainted) return;
+        CurrentHp = Math.Max(0, CurrentHp - actualDamage);
+        WasDamagedThisTurn = true;
+        LastDamageTakenAmountThisTurn = actualDamage;
+        LastDamageTakenWasSpecialThisTurn = isSpecial;
+        LastDamageSourceThisTurn = source;
+        if (CurrentHp == 0) MarkFainted();
     }
 
     public void ClearStatStages()
@@ -1357,8 +1458,9 @@ public class Pokemon
     public bool IsImmuneToMoveType(PokemonType attackType, Pokemon? attacker = null)
     {
         if (IsAbilitySuppressedBy(attacker)) return false;
-        return (HasActiveAbility("부유", attacker) && attackType == PokemonType.Ground)
-            || (HasActiveHeldItem(attacker) && HeldItem == "풍선" && attackType == PokemonType.Ground)
+        bool gravityGrounds = BattleField.GravityActive;
+        return (!gravityGrounds && HasActiveAbility("부유", attacker) && attackType == PokemonType.Ground)
+            || (!gravityGrounds && HasActiveHeldItem(attacker) && HeldItem == "풍선" && attackType == PokemonType.Ground)
             || ((HasActiveAbility("피뢰침", attacker) || HasActiveAbility("축전", attacker)
                 || HasActiveAbility("전기엔진", attacker)) && attackType == PokemonType.Electric)
             || ((HasActiveAbility("저수", attacker) || HasActiveAbility("건조피부", attacker))
@@ -1367,6 +1469,12 @@ public class Pokemon
             || (HasActiveAbility("타오르는불꽃", attacker) && attackType == PokemonType.Fire)
             || (HasActiveAbility("초식", attacker) && attackType == PokemonType.Grass);
     }
+
+    public bool IsGrounded(Pokemon? opponent = null) =>
+        BattleField.GravityActive
+        || (!HasType(PokemonType.Flying)
+            && !HasActiveAbility("부유", opponent)
+            && !(HasActiveHeldItem(opponent) && HeldItem == "풍선"));
 
     public bool IsImmuneToWindMove(string moveKey, Pokemon? attacker = null) =>
         HasActiveAbility("바람타기", attacker) && MoveRuleMetadata.IsWindMove(moveKey);
