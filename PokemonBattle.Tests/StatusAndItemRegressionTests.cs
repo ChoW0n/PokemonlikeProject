@@ -159,6 +159,105 @@ public sealed class StatusAndItemRegressionTests
     }
 
     [Fact]
+    public void Assault_vest_boosts_special_defense_and_blocks_status_moves()
+    {
+        var withoutItem = CreatePokemon(25, "thunderbolt");
+        var withVest = CreatePokemon(25, "thunderbolt", heldItem: "돌격조끼");
+        var statusUser = CreatePokemon(25, "growl", heldItem: "돌격조끼");
+
+        Assert.Equal((int)(withoutItem.SpDef * 1.5), withVest.SpDef);
+        Assert.False(statusUser.CanUseMove("growl"));
+    }
+
+    [Fact]
+    public async Task Air_balloon_blocks_ground_damage_then_pops_on_damage()
+    {
+        var attacker = CreatePokemon(25, "earthquake");
+        var defender = CreatePokemon(202, "tackle", heldItem: "풍선");
+        int hpBefore = defender.CurrentHp;
+        var engine = CreateFullEngine();
+
+        await engine.TakeTurnAsync(attacker, defender, "earthquake", true, _ => Task.CompletedTask);
+
+        Assert.Equal(hpBefore, defender.CurrentHp);
+        Assert.Equal("풍선", defender.HeldItem);
+
+        await engine.TakeTurnAsync(attacker, defender, "tackle", true, _ => Task.CompletedTask);
+
+        Assert.True(defender.CurrentHp < hpBefore);
+        Assert.Equal("없음", defender.HeldItem);
+    }
+
+    [Fact]
+    public async Task Rocky_helmet_reflects_contact_damage()
+    {
+        var attacker = CreatePokemon(25, "tackle");
+        var defender = CreatePokemon(202, "tackle", heldItem: "울퉁불퉁멧");
+        int hpBefore = attacker.CurrentHp;
+
+        await CreateFullEngine().TakeTurnAsync(
+            attacker, defender, "tackle", attackerIsHero: true, _ => Task.CompletedTask);
+
+        Assert.Equal(hpBefore - Math.Max(1, attacker.MaxHp / 6), attacker.CurrentHp);
+    }
+
+    [Fact]
+    public async Task Black_sludge_heals_poison_types_at_turn_end()
+    {
+        var pokemon = CreatePokemon(1, "tackle", heldItem: "검은진흙");
+        pokemon.CurrentHp -= 20;
+        int before = pokemon.CurrentHp;
+
+        await CreateFullEngine().ApplyEndOfTurnEffectsAsync(
+            new[] { pokemon }, _ => Task.CompletedTask);
+
+        Assert.Equal(before + Math.Max(1, pokemon.MaxHp / 16), pokemon.CurrentHp);
+    }
+
+    [Fact]
+    public async Task Weakness_policy_boosts_both_attack_stats_once()
+    {
+        var attacker = CreatePokemon(25, "thunderbolt");
+        var defender = CreatePokemon(7, "tackle", heldItem: "약점보험");
+        var events = new List<BattleEvent>();
+
+        await CreateFullEngine().TakeTurnAsync(
+            attacker, defender, "thunderbolt", attackerIsHero: true, Capture(events));
+
+        Assert.Equal("없음", defender.HeldItem);
+        Assert.Equal(2, defender.StatStages["attack"]);
+        Assert.Equal(2, defender.StatStages["special-attack"]);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("약점보험", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task Safety_goggles_prevent_powder_status()
+    {
+        var attacker = CreatePokemon(1, "sleep-powder");
+        var defender = CreatePokemon(202, "tackle", heldItem: "방진고글");
+
+        await CreateFullEngine().TakeTurnAsync(
+            attacker, defender, "sleep-powder", attackerIsHero: true, _ => Task.CompletedTask);
+
+        Assert.Equal(StatusCondition.None, defender.Status);
+    }
+
+    [Fact]
+    public async Task White_herb_restores_self_stat_drop()
+    {
+        var attacker = CreatePokemon(25, "close-combat", heldItem: "하얀허브");
+        var defender = CreatePokemon(202, "tackle");
+
+        await CreateFullEngine().TakeTurnAsync(
+            attacker, defender, "close-combat", attackerIsHero: true, _ => Task.CompletedTask);
+
+        Assert.Equal(0, attacker.StatStages["defense"]);
+        Assert.Equal(0, attacker.StatStages["special-defense"]);
+        Assert.Equal("없음", attacker.HeldItem);
+    }
+
+    [Fact]
     public async Task Endure_takes_normal_damage_but_prevents_a_lethal_hit()
     {
         const string moveKey = "regression-endure-lethal";

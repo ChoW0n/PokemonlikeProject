@@ -495,6 +495,126 @@ public sealed class AbilityRulesRegressionTests
     }
 
     [Fact]
+    public void Remaining_ability_catalog_is_registered()
+    {
+        foreach (var ability in new[]
+        {
+            "해감액", "예지몽", "화학변화가스", "곡예", "바람타기", "위험예지",
+            "기분파", "라이트메탈", "꿀모으기", "서투름", "나쁜손버릇", "예리함",
+            "일루전", "점착", "터보블레이즈", "테라볼티지"
+        })
+        {
+            Assert.True(AbilityDatabase.IsImplemented(ability), ability);
+        }
+    }
+
+    [Fact]
+    public async Task Remaining_item_and_damage_abilities_apply_at_their_rule_points()
+    {
+        var acrobat = CreatePokemon(132, "acrobatics", ability: "곡예", heldItem: "자뭉열매");
+        int normalSpeed = acrobat.EffectiveSpd;
+        acrobat.HeldItem = "없음";
+        Assert.True(acrobat.HasLostHeldItem);
+        Assert.Equal(normalSpeed * 2, acrobat.EffectiveSpd);
+
+        var klutz = CreatePokemon(132, "tackle", ability: "서투름", heldItem: "구애스카프");
+        Assert.False(klutz.HasActiveHeldItem());
+        Assert.True(klutz.CanUseMove("tackle"));
+        Assert.True(klutz.CanUseMove("tackle"));
+
+        var slicing = CreatePokemon(132, "slash", ability: "예리함");
+        var powerContext = new BattlePowerContext(
+            slicing,
+            CreatePokemon(202, "tackle"),
+            MoveDatabase.All["slash"],
+            PokemonType.Normal,
+            makesContact: true,
+            power: 70,
+            moveKey: "slash");
+        new DamageModifierEffectHandler().ModifyPower(powerContext);
+        Assert.Equal(105, powerContext.Power);
+
+        var holder = CreatePokemon(132, "tackle", heldItem: "자뭉열매");
+        var sticky = CreatePokemon(132, "tackle", ability: "점착");
+        await CreateFullEngine(new FixedRandom(0)).TakeTurnAsync(
+            holder, sticky, "thief", true, _ => Task.CompletedTask);
+        Assert.Equal("자뭉열매", holder.HeldItem);
+        Assert.Equal("없음", sticky.HeldItem);
+    }
+
+    [Fact]
+    public async Task Liquid_ooze_wind_runner_and_ability_suppression_are_consistent()
+    {
+        var ooze = CreatePokemon(132, "giga-drain", ability: "해감액");
+        var target = CreatePokemon(202, "tackle");
+        int hpBefore = ooze.CurrentHp;
+        await CreateFullEngine(new FixedRandom(99)).TakeTurnAsync(
+            ooze, target, "giga-drain", true, _ => Task.CompletedTask);
+        Assert.True(ooze.CurrentHp < hpBefore);
+
+        var windRunner = CreatePokemon(132, "tackle", ability: "바람타기");
+        var wind = CreatePokemon(132, "gust");
+        await CreateFullEngine(new FixedRandom(99)).TakeTurnAsync(
+            wind, windRunner, "gust", true, _ => Task.CompletedTask);
+        Assert.Equal(1, windRunner.StatStages["attack"]);
+
+        var gas = CreatePokemon(132, "tackle", ability: "화학변화가스");
+        var waterAbsorber = CreatePokemon(7, "tackle", ability: "저수");
+        Assert.False(waterAbsorber.HasActiveAbility("저수", gas));
+        Assert.True(gas.HasActiveAbility("화학변화가스", waterAbsorber));
+
+        var mold = CreatePokemon(95, "earthquake", ability: "터보블레이즈");
+        var levitating = CreatePokemon(92, "tackle", ability: "부유");
+        int levitateHp = levitating.CurrentHp;
+        await CreateFullEngine(new FixedRandom(99)).TakeTurnAsync(
+            mold, levitating, "earthquake", true, _ => Task.CompletedTask);
+        Assert.True(levitating.CurrentHp < levitateHp);
+
+        var tera = CreatePokemon(95, "earthquake", ability: "테라볼티지");
+        levitating = CreatePokemon(92, "tackle", ability: "부유");
+        levitateHp = levitating.CurrentHp;
+        await CreateFullEngine(new FixedRandom(99)).TakeTurnAsync(
+            tera, levitating, "earthquake", true, _ => Task.CompletedTask);
+        Assert.True(levitating.CurrentHp < levitateHp);
+    }
+
+    [Fact]
+    public void Forecast_forms_illusion_and_switch_information_are_visible()
+    {
+        BattleWeather.Reset();
+        try
+        {
+            var castform = CreatePokemon(351, "weather-ball", ability: "기분파");
+            BattleWeather.Set(BattleWeather.Sun);
+            Assert.True(castform.UpdateWeatherForm());
+            Assert.Equal(PokemonType.Fire, castform.CurrentType1);
+            Assert.Equal("sunny", castform.FormKey);
+
+            var illusion = CreatePokemon(132, "tackle", ability: "일루전");
+            var disguise = CreatePokemon(4, "ember");
+            Assert.True(illusion.TryActivateIllusion(disguise));
+            Assert.Equal("파이리", illusion.Data.Name);
+            Assert.True(illusion.IsIllusionActive);
+            Assert.True(illusion.BreakIllusion());
+            Assert.Equal("메타몽", illusion.Data.Name);
+            Assert.True(illusion.WasIllusionBroken);
+
+            var forewarn = CreatePokemon(124, "tackle", ability: "예지몽");
+            var danger = CreatePokemon(4, "flamethrower");
+            var messages = CreateFullEngine().ActivateSwitchIn(forewarn, danger);
+            Assert.Contains(messages, message => message.Contains("예지몽", StringComparison.Ordinal));
+
+            var warning = CreatePokemon(1, "tackle", ability: "위험예지");
+            messages = CreateFullEngine().ActivateSwitchIn(warning, danger);
+            Assert.Contains(messages, message => message.Contains("위험예지", StringComparison.Ordinal));
+        }
+        finally
+        {
+            BattleWeather.Reset();
+        }
+    }
+
+    [Fact]
     public void Simple_uses_existing_stage_rules()
     {
         var simple = CreatePokemon(132, "tackle", ability: "단순");

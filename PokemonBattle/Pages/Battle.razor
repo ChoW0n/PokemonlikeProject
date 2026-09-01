@@ -446,7 +446,11 @@
         HeroMoveKeys = ResolveMoveKeys(Hero);
         EnemyMoveKeys = ResolveMoveKeys(Enemy);
 
-        var initialAbilityMessages = Rules.InitializeWeather(Hero, Enemy);
+        var initialAbilityMessages = Rules.InitializeWeather(
+            Hero,
+            Enemy,
+            GetIllusionTarget(Hero, PlayerTeam),
+            GetIllusionTarget(Enemy, EnemyTeam));
         if (initialAbilityMessages.Count > 0)
         {
             LogHistory = initialAbilityMessages
@@ -482,6 +486,9 @@
     }
 
     private static List<string> ResolveMoveKeys(Pokemon pokemon) => pokemon.CurrentPP.Keys.ToList();
+
+    private static Pokemon? GetIllusionTarget(Pokemon entrant, IReadOnlyList<Pokemon> team) =>
+        team.FirstOrDefault(member => !ReferenceEquals(member, entrant) && !member.IsFainted);
 
     private void OpenAttackMenu()
     {
@@ -635,7 +642,7 @@
         EnemyTeamIndex++;
         EnemyMoveKeys = ResolveMoveKeys(Enemy);
         await ShowMessage($"{Enemy.Data.Name}이(가) 기술의 효과로 교체되어 나왔다!");
-        foreach (var message in Rules.ActivateSwitchIn(Enemy, Hero))
+        foreach (var message in Rules.ActivateSwitchIn(Enemy, Hero, GetIllusionTarget(Enemy, EnemyTeam)))
             await ShowMessage(message, 1000);
         return false;
     }
@@ -665,7 +672,7 @@
                 EnemyTeamIndex++;
                 EnemyMoveKeys = ResolveMoveKeys(Enemy);
                 await ShowMessage($"상대가 {Enemy.Data.Name}을(를) 내보냈다!");
-                foreach (var message in Rules.ActivateSwitchIn(Enemy, Hero))
+                foreach (var message in Rules.ActivateSwitchIn(Enemy, Hero, GetIllusionTarget(Enemy, EnemyTeam)))
                 {
                     await ShowMessage(message, 1000);
                 }
@@ -772,7 +779,7 @@
         PlayerTeamIndex = newIndex;
         HeroMoveKeys = ResolveMoveKeys(Hero);
         await ShowMessage($"{Hero.Data.Name}을(를) 내보냈다!");
-        foreach (var message in Rules.ActivateSwitchIn(Hero, Enemy))
+        foreach (var message in Rules.ActivateSwitchIn(Hero, Enemy, GetIllusionTarget(Hero, PlayerTeam)))
         {
             await ShowMessage(message, 1000);
         }
@@ -808,7 +815,7 @@
         HeroMoveKeys = ResolveMoveKeys(Hero);
         Menu = BattleMenu.Main;
         await ShowMessage($"{Hero.Data.Name}을(를) 내보냈다!");
-        foreach (var message in Rules.ActivateSwitchIn(Hero, Enemy))
+        foreach (var message in Rules.ActivateSwitchIn(Hero, Enemy, GetIllusionTarget(Hero, PlayerTeam)))
         {
             await ShowMessage(message, 1000);
         }

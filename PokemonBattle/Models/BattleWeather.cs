@@ -23,7 +23,7 @@ public static class BattleWeather
     public static int TurnsRemaining { get; private set; }
 
     public static bool AreEffectsSuppressed(Pokemon? first, Pokemon? second) =>
-        HasWeatherNullifier(first) || HasWeatherNullifier(second);
+        HasWeatherNullifier(first, second) || HasWeatherNullifier(second, first);
 
     public static void Reset()
     {
@@ -47,8 +47,10 @@ public static class BattleWeather
         return true;
     }
 
-    private static bool HasWeatherNullifier(Pokemon? pokemon) =>
+    private static bool HasWeatherNullifier(Pokemon? pokemon, Pokemon? opponent) =>
         pokemon != null
         && !pokemon.IsFainted
-        && pokemon.SelectedAbility is "에어록" or "날씨부정";
+        && (pokemon.HasActiveAbility("에어록", opponent)
+            || pokemon.HasActiveAbility("날씨부정", opponent)
+            || pokemon.HasActiveAbility("화학변화가스", opponent));
 }
