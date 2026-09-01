@@ -6,9 +6,11 @@
 - [Blazor browser test timing](blazor-browser-test-timing.md) — use event-aware input and stable rendered markers around Interactive Server UI actions.
 - [Post-merge workspace setup](post-merge-workspace-setup.md) — recover catalog lockfile drift, but never force an empty Drizzle schema over Blazor EF tables.
 - [Battle environment state](battle-environment-state.md) — shared weather/terrain state requires reset and serialized tests.
+- [Artifact workflow stale port](artifact-workflow-stale-port.md) — restart can collide with a leftover dotnet listener; verify and clear it before retrying.
 - [Battle FX contracts](battle-fx-contracts.md) — presentation keys must share the CSS/config vocabulary and normalize legacy aliases.
 - [Switch and escape rules](switch-escape-rules.md) — separate wild escape permissions, voluntary traps, and opponent-directed forced-switch immunity.
 - [Protection move catalog](protection-move-catalog.md) — adding a protection rule requires matching move data and presentation registration, not metadata alone.
 - [Ally ability boundaries](ally-ability-boundaries.md) — 1v1 must not infer the opponent as an ally; only owner-protecting effects run without a partner.
 - [Skill rating persistence](skill-rating-persistence.md) — account rating is separate from the run; active-run difficulty is persisted and fixed until reset.
 - [Trace ability lifecycle](trace-ability-lifecycle.md) — copied abilities are temporary and restore on switch-out.
+- [Enemy team scaling](enemy-team-scaling.md) — opponent team size follows the current run round; unlock count only expands the selection pool.

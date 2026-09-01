@@ -434,6 +434,19 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public void EnemyTeamSizeScalesWithRunRoundInsteadOfUnlockCount()
+    {
+        Assert.Equal(1, EnemyTeamProvider.GetTeamSizeForRound(1));
+        Assert.Equal(1, EnemyTeamProvider.GetTeamSizeForRound(2));
+        Assert.Equal(2, EnemyTeamProvider.GetTeamSizeForRound(3));
+        Assert.Equal(3, EnemyTeamProvider.GetTeamSizeForRound(5));
+        Assert.Equal(5, EnemyTeamProvider.GetTeamSizeForRound(9));
+        Assert.Equal(6, EnemyTeamProvider.GetTeamSizeForRound(11));
+        Assert.Equal(6, EnemyTeamProvider.GetTeamSizeForRound(999));
+        Assert.Equal(1, EnemyTeamProvider.GetTeamSizeForRound(0));
+    }
+
+    [Fact]
     public void LegendaryPoolOpensOnlyAfterUnlock()
     {
         var excluded = new HashSet<int>();
