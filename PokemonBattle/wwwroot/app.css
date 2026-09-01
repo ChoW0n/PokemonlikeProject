@@ -148,6 +148,8 @@ h1 {
     height: 22px;
     background: radial-gradient(ellipse, rgba(0,0,0,0.4), transparent 70%);
     margin: -10px 0;
+    transform: scaleX(var(--species-scale, 1));
+    transform-origin: center center;
 }
 
 .fighter-sprite {
@@ -155,6 +157,7 @@ h1 {
     height: 116px;
     object-fit: contain;
     image-rendering: pixelated;
+    transform-origin: bottom center;
     filter: drop-shadow(0 6px 8px rgba(0,0,0,0.3));
 }
 
@@ -2011,6 +2014,138 @@ button:disabled {
     }
 }
 
+.risk-covenant-card {
+    border-left: 3px solid #b34b52;
+    background:
+        linear-gradient(90deg, rgba(105, 30, 45, .34), transparent 56%),
+        rgba(17, 10, 13, .92);
+}
+
+.risk-covenant-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.risk-covenant-heading strong {
+    color: var(--cream);
+}
+
+.risk-covenant-heading span {
+    flex: 0 0 auto;
+    padding: 4px 7px;
+    border: 1px solid rgba(179, 75, 82, .75);
+    color: #e59a9f;
+    font-family: var(--font-mono);
+    font-size: .56rem;
+    letter-spacing: .08em;
+}
+
+.risk-choice-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.risk-choice-actions button {
+    min-height: 44px;
+    border-radius: 0;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.risk-accept {
+    border: 1px solid var(--gold-500);
+    background: var(--wine-700);
+    color: var(--cream);
+}
+
+.risk-decline {
+    border: 1px solid var(--line-soft);
+    background: var(--steel-900);
+    color: var(--ash);
+}
+
+.starter-tools {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(150px, .38fr);
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.starter-tools label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--gold-500);
+    font-family: var(--font-mono);
+    font-size: .58rem;
+    letter-spacing: .08em;
+}
+
+.starter-tools .dex-search,
+.starter-tools select {
+    width: 100%;
+    min-height: 44px;
+    margin: 0;
+}
+
+.starter-tools select {
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 0;
+    background: rgba(4, 6, 7, .78);
+    color: var(--cream);
+    font: inherit;
+    font-size: .78rem;
+}
+
+.starter-results {
+    min-height: 1.6em;
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: .6rem;
+}
+
+.starter-grid {
+    max-height: min(58vh, 560px);
+    padding: 2px;
+    scroll-behavior: smooth;
+    overscroll-behavior: contain;
+}
+
+.starter-actions {
+    position: sticky;
+    bottom: max(6px, env(safe-area-inset-bottom));
+    z-index: 35;
+    padding: 10px;
+    border: 1px solid var(--line-soft);
+    background: rgba(10, 8, 9, .96);
+    backdrop-filter: blur(12px);
+}
+
+@media (max-width: 760px) {
+    .starter-tools,
+    .risk-choice-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .starter-grid {
+        max-height: min(52vh, 480px);
+    }
+
+    .starter-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .starter-actions button {
+        width: 100%;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -3021,19 +3156,34 @@ p { line-height: 1.72; }
     width: clamp(240px, 27vw, 430px);
     height: clamp(240px, 27vw, 430px);
     scale: var(--species-scale, 1);
+    transform-origin: bottom center;
     image-rendering: pixelated;
     filter: drop-shadow(0 22px 15px rgba(0,0,0,.84)) drop-shadow(0 0 28px rgba(190, 141, 65, .16));
 }
 .fighter-sprite.enemy-sprite {
     filter: saturate(.72) hue-rotate(-7deg) drop-shadow(0 22px 15px rgba(0,0,0,.84)) drop-shadow(0 0 30px rgba(142,52,70,.32));
 }
+.slot-top .fighter-sprite {
+    transform-origin: bottom right;
+}
+.slot-bottom .fighter-sprite {
+    transform-origin: bottom left;
+}
 .platform-shadow {
     width: clamp(190px, 25vw, 360px);
     height: 38px;
     margin: -18px 0;
+    transform: scaleX(var(--species-scale, 1));
+    transform-origin: center center;
     border-radius: 50%;
     background: radial-gradient(ellipse, rgba(0,0,0,.92), rgba(91,34,39,.24) 45%, transparent 74%);
     filter: blur(2px);
+}
+.slot-top .platform-shadow {
+    transform-origin: right center;
+}
+.slot-bottom .platform-shadow {
+    transform-origin: left center;
 }
 .hud-plate {
     width: min(224px, 100%);

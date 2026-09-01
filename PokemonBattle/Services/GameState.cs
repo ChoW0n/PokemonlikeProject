@@ -315,8 +315,11 @@ public class GameState
 
         if (RunMeta.RiskCovenantStage != stage)
         {
+            var selectedCovenant = RunMetaCatalog.RiskCovenants
+                .OrderBy(_ => _metaRandom.Next())
+                .FirstOrDefault();
             RunMeta.RiskCovenantStage = stage;
-            RunMeta.RiskCovenantId = null;
+            RunMeta.RiskCovenantId = selectedCovenant?.Id;
             RunMeta.RiskCovenantDecisionMade = false;
             RunMeta.RiskCovenantAccepted = false;
             RunMeta.BonusLegacyClaims = 0;
@@ -332,12 +335,12 @@ public class GameState
 
     public async Task<bool> ChooseRiskCovenantAsync(bool accept)
     {
-        if (!CanChooseRiskCovenant) return false;
+        var covenant = CurrentRiskCovenant;
+        if (!CanChooseRiskCovenant || covenant == null) return false;
 
-        var covenant = RunMetaCatalog.RiskCovenants.First();
         RunMeta.RiskCovenantDecisionMade = true;
         RunMeta.RiskCovenantAccepted = accept;
-        RunMeta.RiskCovenantId = accept ? covenant.Id : null;
+        RunMeta.RiskCovenantId = covenant.Id;
         RunMeta.BonusLegacyClaims = accept ? covenant.BonusLegacyClaims : 0;
 
         if (accept)

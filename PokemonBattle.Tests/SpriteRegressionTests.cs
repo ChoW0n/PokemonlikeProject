@@ -26,4 +26,18 @@ public class SpriteRegressionTests
         Assert.Equal(pikachu.ImageUrl, pikachu.EffectiveImageUrl);
         Assert.Equal(pikachu.BackImageUrl, pikachu.EffectiveBackImageUrl);
     }
+
+    [Fact]
+    public void Official_height_data_is_applied_to_sprite_scaling()
+    {
+        Assert.Equal(7, PokemonDatabase.All[1].HeightDecimeters);
+        Assert.Equal(145, PokemonDatabase.All[321].HeightDecimeters);
+        Assert.Equal(0.7, PokemonDatabase.All[1].HeightMeters);
+        Assert.Equal(
+            PokemonSpriteScale.ForHeight(7),
+            PokemonSpriteScale.ForHeight(PokemonDatabase.All[1].HeightDecimeters));
+        Assert.True(
+            PokemonSpriteScale.ForHeight(PokemonDatabase.All[321].HeightDecimeters)
+            > PokemonSpriteScale.ForHeight(PokemonDatabase.All[1].HeightDecimeters));
+    }
 }
