@@ -518,15 +518,23 @@ public class Pokemon
         if (SelectedAbility == "심술꾸러기") delta = -delta;
         if (SelectedAbility == "단순") delta *= 2;
         StatStages[stat] = Math.Clamp(StatStages[stat] + delta, -6, 6);
-        if (delta < 0 && HasActiveHeldItem() && HeldItem == "하얀허브"
-            && StatStages.Values.Any(stage => stage < 0))
+    }
+
+    public bool TryRestoreWithWhiteHerb()
+    {
+        if (!HasActiveHeldItem() || HeldItem != "하얀허브"
+            || !StatStages.Values.Any(stage => stage < 0))
         {
-            foreach (string stageKey in StatStages.Keys.ToArray())
-            {
-                if (StatStages[stageKey] < 0) StatStages[stageKey] = 0;
-            }
-            HeldItem = "없음";
+            return false;
         }
+
+        foreach (string stageKey in StatStages.Keys.ToArray())
+        {
+            if (StatStages[stageKey] < 0) StatStages[stageKey] = 0;
+        }
+
+        HeldItem = "없음";
+        return true;
     }
 
     public void AdvanceTurn()
@@ -1350,6 +1358,7 @@ public class Pokemon
     {
         if (IsAbilitySuppressedBy(attacker)) return false;
         return (HasActiveAbility("부유", attacker) && attackType == PokemonType.Ground)
+            || (HasActiveHeldItem(attacker) && HeldItem == "풍선" && attackType == PokemonType.Ground)
             || ((HasActiveAbility("피뢰침", attacker) || HasActiveAbility("축전", attacker)
                 || HasActiveAbility("전기엔진", attacker)) && attackType == PokemonType.Electric)
             || ((HasActiveAbility("저수", attacker) || HasActiveAbility("건조피부", attacker))
