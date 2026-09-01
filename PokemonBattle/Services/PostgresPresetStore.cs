@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using PokemonBattle.Data;
 using PokemonBattle.Models;
 
@@ -7,17 +8,23 @@ namespace PokemonBattle.Services;
 
 public class PostgresPresetStore : IPresetStore
 {
-    private readonly AppDbContext _db;
+    private readonly DatabaseContextExecutor _database;
     private readonly CurrentUserService _currentUser;
     private static readonly JsonSerializerOptions LoadoutJsonOptions = new()
     {
         IncludeFields = true
     };
 
-    public PostgresPresetStore(AppDbContext db, CurrentUserService currentUser)
+    [ActivatorUtilitiesConstructor]
+    public PostgresPresetStore(DatabaseContextExecutor database, CurrentUserService currentUser)
     {
-        _db = db;
+        _database = database;
         _currentUser = currentUser;
+    }
+
+    public PostgresPresetStore(AppDbContext db, CurrentUserService currentUser)
+        : this(new DatabaseContextExecutor(db), currentUser)
+    {
     }
 
     public async Task SaveAsync(string name, List<PokemonLoadout> team)
@@ -32,13 +39,13 @@ public class PostgresPresetStore : IPresetStore
         string json = JsonSerializer.Serialize(snapshot, LoadoutJsonOptions);
 
         // The unique key plus ON CONFLICT makes simultaneous saves a deterministic update.
-        await _db.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO "UserPresets" ("Username", "Name", "LoadoutsJson", "UpdatedAt")
-            VALUES ({username}, {normalizedName}, {json}, CURRENT_TIMESTAMP)
-            ON CONFLICT ("Username", "Name")
-            DO UPDATE SET "LoadoutsJson" = EXCLUDED."LoadoutsJson",
-                          "UpdatedAt" = CURRENT_TIMESTAMP;
-            """);
+        await _database.ExecuteAsync("preset.save", db => db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO "UserPresets" ("Username", "Name", "LoadoutsJson", "UpdatedAt")
+                VALUES ({username}, {normalizedName}, {json}, CURRENT_TIMESTAMP)
+                ON CONFLICT ("Username", "Name")
+                DO UPDATE SET "LoadoutsJson" = EXCLUDED."LoadoutsJson",
+                              "UpdatedAt" = CURRENT_TIMESTAMP;
+                """));
     }
 
     public async Task<List<PokemonLoadout>?> LoadAsync(string name)
@@ -47,29 +54,32 @@ public class PostgresPresetStore : IPresetStore
         string normalizedName = NormalizeName(name);
         if (normalizedName.Length == 0) return null;
 
-        var preset = await _db.UserPresets
-            .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.Username == username && item.Name == normalizedName);
-        if (preset == null) return null;
+        return await _database.ExecuteAsync("preset.load", async db =>
+        {
+            var preset = await db.UserPresets
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Username == username && item.Name == normalizedName);
+            if (preset == null) return null;
 
-        var loadouts = JsonSerializer.Deserialize<List<PokemonLoadout>>(
-            preset.LoadoutsJson,
-            LoadoutJsonOptions) ?? new List<PokemonLoadout>();
+            var loadouts = JsonSerializer.Deserialize<List<PokemonLoadout>>(
+                preset.LoadoutsJson,
+                LoadoutJsonOptions) ?? new List<PokemonLoadout>();
 
-        return TeamLoadoutRules.NormalizeUniqueItems(loadouts)
-            .Select(loadout => loadout.Clone(level: 1))
-            .ToList();
+            return TeamLoadoutRules.NormalizeUniqueItems(loadouts)
+                .Select(loadout => loadout.Clone(level: 1))
+                .ToList();
+        });
     }
 
     public async Task<List<string>> ListNamesAsync()
     {
         string username = RequireUsername();
-        return await _db.UserPresets
+        return await _database.ExecuteAsync("preset.list", db => db.UserPresets
             .AsNoTracking()
             .Where(item => item.Username == username)
             .OrderBy(item => item.Name)
             .Select(item => item.Name)
-            .ToListAsync();
+            .ToListAsync());
     }
 
     public async Task<bool> DeleteAsync(string name)
@@ -78,9 +88,10 @@ public class PostgresPresetStore : IPresetStore
         string normalizedName = NormalizeName(name);
         if (normalizedName.Length == 0) return false;
 
-        return await _db.UserPresets
-            .Where(item => item.Username == username && item.Name == normalizedName)
-            .ExecuteDeleteAsync() > 0;
+        return await _database.ExecuteAsync("preset.delete", async db =>
+            await db.UserPresets
+                .Where(item => item.Username == username && item.Name == normalizedName)
+                .ExecuteDeleteAsync() > 0);
     }
 
     private string RequireUsername() =>

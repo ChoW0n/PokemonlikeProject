@@ -2,21 +2,44 @@ using PokemonBattle.Components;
 using PokemonBattle.Data;
 using PokemonBattle.Services;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
 string connectionString = BuildConnectionString();
-builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+builder.Services.AddDbContextFactory<AppDbContext>(options => options.UseNpgsql(
+    connectionString,
+    npgsqlOptions => npgsqlOptions.EnableRetryOnFailure(
+        maxRetryCount: 5,
+        maxRetryDelay: TimeSpan.FromSeconds(10),
+        errorCodesToAdd: null)));
 
 builder.Services.AddScoped<CurrentUserService>();
-builder.Services.AddScoped<AuthService>();
-builder.Services.AddScoped<UnlockService>();
-builder.Services.AddScoped<RunStore>();
-builder.Services.AddScoped<SkillRatingService>();
+builder.Services.AddScoped<DatabaseContextExecutor>(serviceProvider =>
+    new DatabaseContextExecutor(
+        serviceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>(),
+        serviceProvider.GetRequiredService<ILogger<DatabaseContextExecutor>>()));
+builder.Services.AddScoped<AuthService>(serviceProvider =>
+    new AuthService(serviceProvider.GetRequiredService<DatabaseContextExecutor>()));
+builder.Services.AddScoped<UnlockService>(serviceProvider =>
+    new UnlockService(
+        serviceProvider.GetRequiredService<DatabaseContextExecutor>(),
+        serviceProvider.GetRequiredService<CurrentUserService>()));
+builder.Services.AddScoped<RunStore>(serviceProvider =>
+    new RunStore(serviceProvider.GetRequiredService<DatabaseContextExecutor>()));
+builder.Services.AddScoped<SkillRatingService>(serviceProvider =>
+    new SkillRatingService(serviceProvider.GetRequiredService<DatabaseContextExecutor>()));
 builder.Services.AddScoped<LeaderboardService>();
-builder.Services.AddScoped<PlayerProgressionStore>();
-builder.Services.AddScoped<AdminDashboardService>();
-builder.Services.AddScoped<AdminOperationsService>();
+builder.Services.AddScoped<PlayerProgressionStore>(serviceProvider =>
+    new PlayerProgressionStore(serviceProvider.GetRequiredService<DatabaseContextExecutor>()));
+builder.Services.AddScoped<AdminDashboardService>(serviceProvider =>
+    new AdminDashboardService(
+        serviceProvider.GetRequiredService<DatabaseContextExecutor>(),
+        serviceProvider.GetRequiredService<CurrentUserService>()));
+builder.Services.AddScoped<AdminOperationsService>(serviceProvider =>
+    new AdminOperationsService(
+        serviceProvider.GetRequiredService<DatabaseContextExecutor>(),
+        serviceProvider.GetRequiredService<CurrentUserService>()));
 builder.Services.AddScoped<BattleEngine>();
 foreach (var handlerType in typeof(BattleEngine).Assembly.GetTypes()
     .Where(type => type is { IsClass: true, IsAbstract: false }
@@ -26,7 +49,10 @@ foreach (var handlerType in typeof(BattleEngine).Assembly.GetTypes()
 }
 
 builder.Services.AddSingleton<IScoreStore, InMemoryScoreStore>();
-builder.Services.AddScoped<IPresetStore, PostgresPresetStore>();
+builder.Services.AddScoped<IPresetStore>(serviceProvider =>
+    new PostgresPresetStore(
+        serviceProvider.GetRequiredService<DatabaseContextExecutor>(),
+        serviceProvider.GetRequiredService<CurrentUserService>()));
 builder.Services.AddScoped<GameState>();
 
 builder.Services.AddRazorComponents()
