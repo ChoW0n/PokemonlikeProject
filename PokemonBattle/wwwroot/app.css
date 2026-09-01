@@ -5704,3 +5704,124 @@ p {
         box-shadow: none;
     }
 }
+
+/* ===== Final viewport-safe layout pass =====
+   Keep the wide-screen rhythm bounded while allowing dense data to reflow on
+   phones. The table wrappers remain available for unusual content, but the
+   normal mobile layouts no longer require horizontal scrolling. */
+.battle-page {
+    max-width: 1480px;
+}
+
+.preview-page {
+    max-width: 1360px;
+}
+
+.result-page {
+    max-width: 900px;
+}
+
+.admin-page {
+    max-width: 1500px;
+}
+
+.leaderboard-page {
+    max-width: 820px;
+}
+
+@media (max-width: 720px) {
+    .leaderboard-table-wrap,
+    .admin-table-wrap {
+        overflow-x: hidden;
+    }
+
+    .leaderboard-table,
+    .admin-table {
+        width: 100%;
+        min-width: 0;
+        table-layout: fixed;
+    }
+
+    .leaderboard-table th,
+    .leaderboard-table td,
+    .admin-table th,
+    .admin-table td {
+        padding: 9px 6px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    .leaderboard-column-rank {
+        width: 44px;
+    }
+
+    .leaderboard-column-rating,
+    .leaderboard-column-runs {
+        width: 68px;
+    }
+
+    .leaderboard-table th:first-child,
+    .leaderboard-table td:first-child,
+    .leaderboard-table th:nth-child(n + 3),
+    .leaderboard-table td:nth-child(n + 3) {
+        white-space: nowrap;
+    }
+
+    .leaderboard-table th,
+    .admin-table thead th {
+        font-size: .62rem;
+    }
+
+    .leaderboard-table td,
+    .admin-table {
+        font-size: .72rem;
+    }
+
+    .admin-table {
+        min-width: 0;
+    }
+
+    .admin-audit-table {
+        min-width: 0;
+    }
+
+    .admin-audit-table th:last-child,
+    .admin-audit-table td:last-child {
+        min-width: 0;
+    }
+}
+
+@media (max-height: 620px) {
+    .auth-page {
+        margin-top: 12px;
+        margin-bottom: 12px;
+        padding-block: 18px;
+    }
+
+    .auth-header {
+        margin-bottom: 12px;
+    }
+
+    .auth-form {
+        gap: 8px;
+        padding: 14px;
+    }
+
+    .auth-form label {
+        margin-top: 2px;
+    }
+
+    .auth-form .auth-input {
+        min-height: 42px;
+    }
+
+    .auth-form .auth-primary {
+        min-height: 44px;
+        margin-top: 0;
+    }
+
+    .auth-secondary {
+        margin-top: 8px;
+    }
+}
