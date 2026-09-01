@@ -8,6 +8,8 @@
 <PageTitle>배틀 결과</PageTitle>
 
 <main class="result-page">
+    <p class="eyebrow result-kicker">BATTLE REPORT / RUN STATUS</p>
+    <p class="result-context">이번 전투가 끝났습니다. 보상과 다음 행동을 확인하세요.</p>
     <section class="result-skill-summary" aria-label="실력 평점 결과">
         <h2>실력 평점</h2>
         <p>
@@ -159,7 +161,10 @@
             <p>@ClaimMessage</p>
         }
 
-        <button type="button" disabled="@IsSubmitting" @onclick="NextRound">다음 상대와 계속하기</button>
+        <div class="result-primary-actions">
+            <span class="result-next-label">NEXT STAGE</span>
+            <button type="button" disabled="@IsSubmitting" @onclick="NextRound">다음 상대와 계속하기</button>
+        </div>
         <details class="result-secondary-actions">
             <summary>추가 메뉴</summary>
             <button type="button" disabled="@IsSubmitting" @onclick="RestartGame">새 런 시작</button>
