@@ -18,3 +18,4 @@
 - [GitHub change control](github-change-control.md) — never commit or push unless the user explicitly asks for it.
 - [Gimmick scope](gimmick-scope.md) — gimmick work is paused and the active scope ends at Mega Evolution.
 - [DI constructor ambiguity](di-constructor-ambiguity.md) — legacy test constructors need explicit production DI factory registrations.
+- [Production app URL](production-app-url.md) — public Render URL for deployed-site checks and verification.
