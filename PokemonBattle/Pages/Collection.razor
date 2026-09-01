@@ -18,7 +18,13 @@
             </div>
         </div>
 
-        <div class="pokedex-screen">
+        <div id="collection-top" class="pokedex-screen">
+            <div class="collection-sticky-nav" aria-label="컬렉션 탐색">
+                <button type="button" class="collection-back" @onclick="GoBack">← 홈으로</button>
+                <span class="collection-nav-title">COLLECTION</span>
+                <a class="collection-nav-top" href="#collection-top">↑ 맨 위</a>
+            </div>
+
             <div class="collection-header">
                 <div>
                     <h1>획득한 포켓몬</h1>
@@ -33,8 +39,38 @@
             }
             else
             {
+                <div class="collection-tools" role="search" aria-label="보유 포켓몬 검색 및 필터">
+                    <div class="collection-search-field">
+                        <label for="collection-search">포켓몬 찾기</label>
+                        <input id="collection-search" class="dex-search" type="search"
+                               placeholder="이름, 영문 이름, 도감 번호로 검색"
+                               value="@SearchText" @oninput="OnSearchChanged" />
+                    </div>
+                    <div class="collection-filter-field">
+                        <label for="collection-type-filter">타입 필터</label>
+                        <select id="collection-type-filter" value="@SelectedType" @onchange="OnTypeChanged">
+                            <option value="all">전체 타입</option>
+                            @foreach (var type in PokemonTypes)
+                            {
+                                <option value="@type.Type">@type.Label</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="collection-results" role="status" aria-live="polite">
+                    @if (FilteredOwnedPokemon.Count == 0)
+                    {
+                        <span>조건에 맞는 포켓몬이 없습니다. 검색어 또는 타입 필터를 바꿔보세요.</span>
+                    }
+                    else
+                    {
+                        <span>@(FilteredOwnedPokemon.Count) / @(OwnedPokemon.Count)마리 표시 중</span>
+                    }
+                </div>
+
                 <div class="dex-grid collection-grid" role="list" aria-label="획득한 포켓몬 목록">
-                    @foreach (var entry in OwnedPokemon)
+                    @foreach (var entry in FilteredOwnedPokemon)
                     {
                         <article class="dex-entry collection-card" role="listitem">
                             <span class="dex-number">No.@entry.Key.ToString("D3")</span>
@@ -53,7 +89,7 @@
             }
 
             <div class="collection-actions">
-                <button type="button" @onclick="GoBack">돌아가기</button>
+                <a class="collection-bottom-top" href="#collection-top">↑ 목록 맨 위로</a>
             </div>
         </div>
     </div>
@@ -61,6 +97,49 @@
 
 @code {
     private List<KeyValuePair<int, PokemonData>> OwnedPokemon = new();
+    private string SearchText = "";
+    private string SelectedType = "all";
+
+    private static readonly IReadOnlyList<(PokemonType Type, string Label)> PokemonTypes =
+        new[]
+        {
+            (PokemonType.Normal, "노말"),
+            (PokemonType.Fire, "불꽃"),
+            (PokemonType.Water, "물"),
+            (PokemonType.Electric, "전기"),
+            (PokemonType.Grass, "풀"),
+            (PokemonType.Ice, "얼음"),
+            (PokemonType.Fighting, "격투"),
+            (PokemonType.Poison, "독"),
+            (PokemonType.Ground, "땅"),
+            (PokemonType.Flying, "비행"),
+            (PokemonType.Psychic, "에스퍼"),
+            (PokemonType.Bug, "벌레"),
+            (PokemonType.Rock, "바위"),
+            (PokemonType.Ghost, "고스트"),
+            (PokemonType.Dragon, "드래곤"),
+            (PokemonType.Dark, "악"),
+            (PokemonType.Steel, "강철"),
+            (PokemonType.Fairy, "페어리")
+        };
+
+    private List<KeyValuePair<int, PokemonData>> FilteredOwnedPokemon =>
+        OwnedPokemon
+            .Where(entry =>
+            {
+                string search = SearchText.Trim();
+                bool isDexNumber = int.TryParse(search, out int dexNumber);
+                bool matchesSearch = string.IsNullOrEmpty(search)
+                    || (isDexNumber
+                        ? entry.Key == dexNumber
+                        : entry.Value.Name.Contains(search, StringComparison.CurrentCultureIgnoreCase)
+                            || entry.Value.EnglishName.Contains(search, StringComparison.OrdinalIgnoreCase));
+                bool matchesType = SelectedType == "all"
+                    || entry.Value.Type1.ToString() == SelectedType
+                    || (entry.Value.Type2?.ToString() == SelectedType);
+                return matchesSearch && matchesType;
+            })
+            .ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -77,6 +156,12 @@
             .Select(id => new KeyValuePair<int, PokemonData>(id, PokemonDatabase.All[id]))
             .ToList();
     }
+
+    private void OnSearchChanged(ChangeEventArgs args) =>
+        SearchText = args.Value?.ToString() ?? "";
+
+    private void OnTypeChanged(ChangeEventArgs args) =>
+        SelectedType = args.Value?.ToString() ?? "all";
 
     private void GoBack() => Nav.NavigateTo("/");
 }
