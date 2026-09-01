@@ -275,7 +275,10 @@ public sealed class AbilityRulesRegressionTests
         var flying = CreatePokemon(6, "tackle");
         var levitating = CreatePokemon(92, "tackle", ability: "부유");
         var arenaTrap = CreatePokemon(132, "tackle", ability: "개미지옥");
+        var rampaging = CreatePokemon(132, "outrage");
+        rampaging.StartRampage("outrage", 3);
 
+        Assert.False(engine.CanSwitch(rampaging, grounded));
         Assert.False(engine.CanSwitch(grounded, arenaTrap));
         Assert.True(engine.CanSwitch(flying, arenaTrap));
         Assert.True(engine.CanSwitch(levitating, arenaTrap));

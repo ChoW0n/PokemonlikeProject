@@ -13,6 +13,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UnlockService>();
 builder.Services.AddScoped<RunStore>();
 builder.Services.AddScoped<SkillRatingService>();
+builder.Services.AddScoped<PlayerProgressionStore>();
 builder.Services.AddScoped<AdminDashboardService>();
 builder.Services.AddScoped<AdminOperationsService>();
 builder.Services.AddScoped<BattleEngine>();
@@ -95,6 +96,37 @@ using (var scope = app.Services.CreateScope())
             ADD COLUMN IF NOT EXISTS ""RoundPerformancesJson"" TEXT NOT NULL DEFAULT '[]';
         CREATE UNIQUE INDEX IF NOT EXISTS ""IX_PlayerSkillRatings_Username""
             ON ""PlayerSkillRatings"" (""Username"");
+        CREATE TABLE IF NOT EXISTS ""PlayerProgressions"" (
+            ""Id"" SERIAL PRIMARY KEY,
+            ""Username"" TEXT NOT NULL,
+            ""CompletedBattles"" INTEGER NOT NULL DEFAULT 0,
+            ""RivalPending"" BOOLEAN NOT NULL DEFAULT FALSE,
+            ""RivalNumber"" INTEGER NOT NULL DEFAULT 0,
+            ""LatestLoadoutsJson"" TEXT NOT NULL DEFAULT '[]',
+            ""MovePreferencesJson"" TEXT NOT NULL DEFAULT '{{}}',
+            ""UpdatedAtUtc"" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ""IX_PlayerProgressions_Username""
+            ON ""PlayerProgressions"" (""Username"");
+        CREATE TABLE IF NOT EXISTS ""MailboxMessages"" (
+            ""Id"" SERIAL PRIMARY KEY,
+            ""Username"" TEXT NOT NULL,
+            ""DeduplicationKey"" TEXT NOT NULL,
+            ""Title"" TEXT NOT NULL,
+            ""Body"" TEXT NOT NULL,
+            ""IsRead"" BOOLEAN NOT NULL DEFAULT FALSE,
+            ""CreatedAtUtc"" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ""IX_MailboxMessages_Username_DeduplicationKey""
+            ON ""MailboxMessages"" (""Username"", ""DeduplicationKey"");
+        CREATE TABLE IF NOT EXISTS ""TechnicalMachines"" (
+            ""Id"" SERIAL PRIMARY KEY,
+            ""Username"" TEXT NOT NULL,
+            ""MoveKey"" TEXT NOT NULL,
+            ""Quantity"" INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ""IX_TechnicalMachines_Username_MoveKey""
+            ON ""TechnicalMachines"" (""Username"", ""MoveKey"");
     ");
 
     if (!db.Users.Any(u => u.Username == "admin"))

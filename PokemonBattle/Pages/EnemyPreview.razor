@@ -94,6 +94,15 @@
     {
         var unlocked = await Unlocks.GetUnlockedIds();
 
+        var rival = await State.GetPendingRivalLoadoutsAsync();
+        if (rival != null)
+        {
+            EnemyLoadouts = rival;
+            await State.SetEnemyLoadouts(EnemyLoadouts);
+            return;
+        }
+
+        State.MarkNormalBattle();
         bool firstStageOnly = unlocked.Count < 12 && !State.LegendaryUnlocked;
         int poolSize = State.LegendaryUnlocked
             ? 721
@@ -140,6 +149,7 @@
     private async Task ConfirmTeamAndGo()
     {
         await State.SetEnemyLoadouts(EnemyLoadouts);
+        State.BeginBattle();
 
         if (State.PlayerLoadouts.Count == 0)
         {

@@ -506,6 +506,66 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public async Task PlayerProgressionSchedules_one_rival_at_fifty_battles_and_rewards_once()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreatePlayerRunsTable(schema);
+            await CreateProgressionTables(schema);
+            const string username = "rival-progress";
+            var loadouts = new List<PokemonLoadout>
+            {
+                new()
+                {
+                    PokemonId = 1,
+                    ChosenMoveNames = new List<string> { "tackle", "growl" },
+                    ChosenAbility = "심록",
+                    ChosenItem = "없음",
+                    Level = 4
+                }
+            };
+
+            await using (var db = CreateDbContext(schema))
+            {
+                var store = new PlayerProgressionStore(db);
+                await store.SaveLatestLoadoutsAsync(username, loadouts);
+                await store.RecordTeamSelectionsAsync(username, loadouts);
+                for (var battle = 0; battle < 50; battle++)
+                {
+                    await store.CompleteBattleAsync(username, loadouts, isRivalBattle: false, won: true);
+                }
+
+                var pending = await store.GetPendingRivalAsync(username);
+                var rival = Assert.Single(pending!);
+                Assert.Equal(1, rival.PokemonId);
+                Assert.All(rival.ChosenMoveNames, move => Assert.Contains(move, PokemonDatabase.All[1].MoveNames));
+
+                await store.CompleteBattleAsync(username, loadouts, isRivalBattle: true, won: true);
+                await store.CompleteBattleAsync(username, loadouts, isRivalBattle: true, won: true);
+            }
+
+            await using (var freshDb = CreateDbContext(schema))
+            {
+                var restored = await new PlayerProgressionStore(freshDb).LoadAsync(username);
+                Assert.Equal(50, restored.completedBattles);
+                Assert.False(restored.rivalPending);
+                Assert.Contains(restored.messages, message => message.Title == "라이벌전 승리");
+                Assert.Contains(restored.messages, message => message.Title == "기술머신 보상");
+                Assert.Single(restored.machines);
+                Assert.Equal(1, restored.machines[0].Quantity);
+            }
+
+            await using (var isolatedDb = CreateDbContext(schema))
+            {
+                var other = await new PlayerProgressionStore(isolatedDb).LoadAsync("other-user");
+                Assert.Equal(0, other.completedBattles);
+                Assert.Empty(other.messages);
+                Assert.Empty(other.machines);
+            }
+        });
+    }
+
+    [Fact]
     public async Task GameStatePersistsHighScoreAcrossNewRunAndFreshContext()
     {
         await WithTemporarySchema(async schema =>
@@ -824,6 +884,44 @@ public class ProgressionRegressionTests
                 "UpdatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 CONSTRAINT "UX_UserPresets_Username_Name" UNIQUE ("Username", "Name")
             );
+            """);
+    }
+
+    private static async Task CreateProgressionTables(string schema)
+    {
+        await using var db = CreateDbContext(schema);
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE "PlayerProgressions" (
+                "Id" SERIAL PRIMARY KEY,
+                "Username" TEXT NOT NULL,
+                "CompletedBattles" INTEGER NOT NULL DEFAULT 0,
+                "RivalPending" BOOLEAN NOT NULL DEFAULT FALSE,
+                "RivalNumber" INTEGER NOT NULL DEFAULT 0,
+                "LatestLoadoutsJson" TEXT NOT NULL DEFAULT '[]',
+                "MovePreferencesJson" TEXT NOT NULL DEFAULT '{{}}',
+                "UpdatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE UNIQUE INDEX "IX_PlayerProgressions_Username"
+                ON "PlayerProgressions" ("Username");
+            CREATE TABLE "MailboxMessages" (
+                "Id" SERIAL PRIMARY KEY,
+                "Username" TEXT NOT NULL,
+                "DeduplicationKey" TEXT NOT NULL,
+                "Title" TEXT NOT NULL,
+                "Body" TEXT NOT NULL,
+                "IsRead" BOOLEAN NOT NULL DEFAULT FALSE,
+                "CreatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE UNIQUE INDEX "IX_MailboxMessages_Username_DeduplicationKey"
+                ON "MailboxMessages" ("Username", "DeduplicationKey");
+            CREATE TABLE "TechnicalMachines" (
+                "Id" SERIAL PRIMARY KEY,
+                "Username" TEXT NOT NULL,
+                "MoveKey" TEXT NOT NULL,
+                "Quantity" INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE UNIQUE INDEX "IX_TechnicalMachines_Username_MoveKey"
+                ON "TechnicalMachines" ("Username", "MoveKey");
             """);
     }
 

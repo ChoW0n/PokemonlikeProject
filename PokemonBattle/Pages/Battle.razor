@@ -701,6 +701,11 @@
             return;
         }
 
+        if (heroMoveKey != null)
+        {
+            await State.RecordMoveSelectionAsync(heroMoveKey);
+        }
+
         BeginActionLog();
         PendingMoveKey = null;
         IsBusy = true;
@@ -732,10 +737,7 @@
         if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }
         if (Enemy.IsFainted) { if (await HandleFaint(Enemy, false)) return; }
 
-        PromptText = "행동을 선택하세요.";
-        IsBusy = false;
-        await EndEffects();
-        StateHasChanged();
+        await FinishPlayerAction();
     }
 
     private async void SwitchTo(int newIndex)
@@ -775,10 +777,7 @@
         await Rules.ApplyEndOfTurnEffectsAsync(new[] { Hero, Enemy }, PlayBattleEvent);
         if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }
 
-        PromptText = "행동을 선택하세요.";
-        IsBusy = false;
-        await EndEffects();
-        StateHasChanged();
+        await FinishPlayerAction();
     }
 
     private async void ForcedSwitchTo(int idx)
@@ -812,15 +811,27 @@
         if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }
         if (Enemy.IsFainted) { if (await HandleFaint(Enemy, false)) return; }
 
-        PromptText = "행동을 선택하세요.";
-        IsBusy = false;
-        await EndEffects();
-        StateHasChanged();
+        await FinishPlayerAction();
     }
 
     private void BeginActionLog()
     {
         LogHistory.Clear();
         PromptText = null;
+    }
+
+    private async Task FinishPlayerAction()
+    {
+        await EndEffects();
+        IsBusy = false;
+
+        if (!Hero.IsFainted && Hero.RampageMoveKey != null)
+        {
+            UseMove(null);
+            return;
+        }
+
+        PromptText = "행동을 선택하세요.";
+        StateHasChanged();
     }
 }

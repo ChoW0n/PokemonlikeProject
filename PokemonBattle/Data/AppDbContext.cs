@@ -17,6 +17,12 @@ public class AppDbContext : DbContext
 
     public DbSet<PlayerSkillRating> PlayerSkillRatings => Set<PlayerSkillRating>();
 
+    public DbSet<PlayerProgression> PlayerProgressions => Set<PlayerProgression>();
+
+    public DbSet<MailboxMessage> MailboxMessages => Set<MailboxMessage>();
+
+    public DbSet<TechnicalMachineInventory> TechnicalMachines => Set<TechnicalMachineInventory>();
+
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -27,6 +33,18 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<PlayerSkillRating>()
             .HasIndex(rating => rating.Username)
+            .IsUnique();
+
+        modelBuilder.Entity<PlayerProgression>()
+            .HasIndex(profile => profile.Username)
+            .IsUnique();
+
+        modelBuilder.Entity<MailboxMessage>()
+            .HasIndex(message => new { message.Username, message.DeduplicationKey })
+            .IsUnique();
+
+        modelBuilder.Entity<TechnicalMachineInventory>()
+            .HasIndex(machine => new { machine.Username, machine.MoveKey })
             .IsUnique();
     }
 }
