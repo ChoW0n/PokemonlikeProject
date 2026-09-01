@@ -1779,7 +1779,17 @@ button:disabled {
     font-weight: 800;
 }
 
-.dex-entry-button,
+.dex-entry-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0;
+    width: 100%;
+    font: inherit;
+    color: inherit;
+}
+
 .preset-entry {
     width: 100%;
     font: inherit;
