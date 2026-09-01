@@ -22,10 +22,36 @@
         <div id="starter-top" class="pokedex-screen">
             <div class="starter-header">
                 <div>
+                    <p class="eyebrow">NEW RUN / STEP 1</p>
                     <h1>스타터 선택</h1>
                     <p class="intro">이번 런에 함께할 포켓몬 3마리를 선택하세요. 스타터 기술은 우선 앞 4개로 구성되며, 시작 후 포켓몬 변경 화면에서 직접 다시 고를 수 있습니다.</p>
                 </div>
-                <strong class="starter-count">@SelectedIds.Count / 3</strong>
+                <div class="flow-count starter-count" aria-label="@($"스타터 선택 {SelectedIds.Count} / 3")">
+                    <strong>@SelectedIds.Count</strong>
+                    <span>/ 3 선택</span>
+                </div>
+            </div>
+            <div class="flow-steps" aria-label="스타터 시작 단계">
+                <span class="is-active"><b>1</b> 스타터 선택</span>
+                <span><b>2</b> 상대 확인</span>
+                <span><b>3</b> 배틀 시작</span>
+            </div>
+            <div class="selection-tray" role="status" aria-live="polite">
+                <span class="selection-tray-label">현재 선택</span>
+                @if (SelectedIds.Count == 0)
+                {
+                    <span class="selection-tray-empty">아직 선택한 포켓몬이 없습니다.</span>
+                }
+                else
+                {
+                    @foreach (var selectedId in SelectedIds)
+                    {
+                        <span class="selection-chip">
+                            <span class="selection-chip-index">@(SelectedIds.IndexOf(selectedId) + 1)</span>
+                            @(PokemonDatabase.All.TryGetValue(selectedId, out var selectedData) ? selectedData.Name : "알 수 없음")
+                        </span>
+                    }
+                }
             </div>
 
             <div class="starter-tools" role="search" aria-label="스타터 포켓몬 검색 및 필터">
@@ -53,25 +79,36 @@
                     : $"{FilteredPokemon.Count} / {AvailablePokemon.Count}마리 표시 중")
             </p>
 
-            <div class="dex-grid starter-grid" role="list" aria-label="스타터 선택 포켓몬 목록">
-                @foreach (var entry in FilteredPokemon)
-                {
-                    bool isSelected = SelectedIds.Contains(entry.Key);
-                    <button type="button"
-                            class="dex-entry dex-entry-button @(isSelected ? "is-selected" : string.Empty)"
-                            aria-label="@($"{entry.Value.Name}, 도감 번호 {entry.Key}{(isSelected ? ", 선택됨" : "")}")"
-                            aria-pressed="@(isSelected ? "true" : "false")"
-                            @onclick="() => ToggleSelection(entry.Key)">
-                        <span class="dex-number">No.@entry.Key.ToString("D3")</span>
-                        <img src="@entry.Value.EffectiveImageUrl" alt="@entry.Value.Name" class="dex-sprite" />
-                        <span class="dex-name">@entry.Value.Name</span>
-                        <span class="dex-type-icons">
-                            <img src="@TypeIcons.GetUrl(entry.Value.Type1)" class="type-icon-img small" alt="@entry.Value.Type1" />
-                            @if (entry.Value.Type2 != null)
-                            {
-                                <img src="@TypeIcons.GetUrl(entry.Value.Type2.Value)" class="type-icon-img small" alt="@entry.Value.Type2" />
-                            }
-                        </span>
+            @if (FilteredPokemon.Count == 0)
+            {
+                <div class="empty-state list-empty" role="status">
+                    <span class="empty-mark">⌕</span>
+                    <strong>조건에 맞는 포켓몬이 없습니다.</strong>
+                    <span>검색어를 지우거나 타입 필터를 전체로 바꿔보세요.</span>
+                </div>
+            }
+            else
+            {
+                <div class="dex-grid starter-grid" role="list" aria-label="스타터 선택 포켓몬 목록">
+                    @foreach (var entry in FilteredPokemon)
+                    {
+                        bool isSelected = SelectedIds.Contains(entry.Key);
+                        <button type="button"
+                                class="dex-entry dex-entry-button @(isSelected ? "is-selected" : string.Empty)"
+                                aria-label="@($"{entry.Value.Name}, 도감 번호 {entry.Key}{(isSelected ? ", 선택됨" : "")}")"
+                                aria-pressed="@(isSelected ? "true" : "false")"
+                                @onclick="() => ToggleSelection(entry.Key)">
+                            <span class="dex-number">No.@entry.Key.ToString("D3")</span>
+                            <img src="@entry.Value.EffectiveImageUrl" alt="@entry.Value.Name" class="dex-sprite" />
+                            <span class="dex-name">@entry.Value.Name</span>
+                            <span class="card-state @(isSelected ? "is-selected" : "")">@(isSelected ? $"선택됨 · {SelectedIds.IndexOf(entry.Key) + 1}번" : "선택하기")</span>
+                            <span class="dex-type-icons">
+                                <img src="@TypeIcons.GetUrl(entry.Value.Type1)" class="type-icon-img small" alt="@entry.Value.Type1" />
+                                @if (entry.Value.Type2 != null)
+                                {
+                                    <img src="@TypeIcons.GetUrl(entry.Value.Type2.Value)" class="type-icon-img small" alt="@entry.Value.Type2" />
+                                }
+                            </span>
                             <div class="starter-stat-gauges" aria-label="@($"{entry.Value.Name} 종족값")">
                                 <GaugeBar Label="HP" Percent="@StatBarHelper.StatPercent(entry.Value.BaseHp)" ColorClass="@StatBarHelper.StatColor(entry.Value.BaseHp)" DisplayText="@entry.Value.BaseHp.ToString()" />
                                 <GaugeBar Label="공격" Percent="@StatBarHelper.StatPercent(entry.Value.BaseAtk)" ColorClass="@StatBarHelper.StatColor(entry.Value.BaseAtk)" DisplayText="@entry.Value.BaseAtk.ToString()" />
@@ -80,9 +117,10 @@
                                 <GaugeBar Label="특방" Percent="@StatBarHelper.StatPercent(entry.Value.BaseSpDef)" ColorClass="@StatBarHelper.StatColor(entry.Value.BaseSpDef)" DisplayText="@entry.Value.BaseSpDef.ToString()" />
                                 <GaugeBar Label="속도" Percent="@StatBarHelper.StatPercent(entry.Value.BaseSpd)" ColorClass="@StatBarHelper.StatColor(entry.Value.BaseSpd)" DisplayText="@entry.Value.BaseSpd.ToString()" />
                             </div>
-                    </button>
-                }
-            </div>
+                        </button>
+                    }
+                </div>
+            }
 
             <p class="starter-hint" aria-live="polite">
                 @(SelectedIds.Count == 3
@@ -92,7 +130,7 @@
 
             <div class="starter-actions">
                 <button type="button" @onclick="GoHome">취소</button>
-                <button type="button" disabled="@(SelectedIds.Count != 3 || IsSubmitting)" @onclick="ConfirmSelection">
+                <button type="button" class="primary-action" disabled="@(SelectedIds.Count != 3 || IsSubmitting)" @onclick="ConfirmSelection">
                     @(IsSubmitting ? "저장 중..." : "이 3마리로 시작하기")
                 </button>
             </div>
