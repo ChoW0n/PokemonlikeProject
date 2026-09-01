@@ -12,12 +12,17 @@
 
     @if (State.CanChooseRiskCovenant && State.CurrentRiskCovenant != null)
     {
-        <section class="info-panel" aria-label="위험 서약">
-            <strong>위험 서약 · @State.CurrentRiskCovenant.Name</strong>
+        <section class="info-panel risk-covenant-card" aria-label="위험 서약 선택">
+            <div class="risk-covenant-heading">
+                <strong>위험 서약 · @State.CurrentRiskCovenant.Name</strong>
+                <span>선택 필요</span>
+            </div>
             <p class="info-desc">@State.CurrentRiskCovenant.Description</p>
             <p class="config-label">보상: @State.CurrentRiskCovenant.RewardDescription</p>
-            <button type="button" @onclick="() => ChooseRisk(true)">서약 수락</button>
-            <button type="button" @onclick="() => ChooseRisk(false)">이번에는 거절</button>
+            <div class="risk-choice-actions">
+                <button type="button" class="risk-accept" @onclick="() => ChooseRisk(true)">서약 수락</button>
+                <button type="button" class="risk-decline" @onclick="() => ChooseRisk(false)">이번에는 거절</button>
+            </div>
         </section>
     }
     else if (State.RunMeta.RiskCovenantDecisionMade)
@@ -49,6 +54,12 @@
     //유효하지 않은(도감에 없는) PokemonId는 화면에서 걸러냄 (예전 데이터 꼬임 방지)
     private List<PokemonLoadout> ValidLoadouts =>
         State.PlayerLoadouts.Where(l => PokemonDatabase.All.ContainsKey(l.PokemonId)).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await State.LoadRunForCurrentUser();
+        await State.EnsureStageMetaAsync();
+    }
 
     private void GoChange()
     {

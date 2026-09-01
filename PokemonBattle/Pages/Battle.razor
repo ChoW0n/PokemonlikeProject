@@ -52,13 +52,16 @@
                     <span class="hud-status">@StatusText(Enemy)</span>
                 }
             </div>
-            <div class="platform-shadow"></div>
+            <div class="platform-shadow"
+                 style="@SpriteStyle(Enemy.Data)"
+                 aria-hidden="true"></div>
             <img id="sprite-enemy" src="@Enemy.Data.EffectiveImageUrl" alt="@Enemy.Data.Name"
                  @key="Enemy.ActorId"
                   class="fighter-sprite enemy-sprite @(Enemy.IsFainted ? "is-fainted" : "")"
                  style="@SpriteStyle(Enemy.Data)"
                  data-slot="enemy" data-actor-id="@Enemy.ActorId" data-species="@Enemy.Data.EnglishName"
-                 data-form="@Enemy.FormKey" data-state="@(Enemy.IsFainted ? "fainted" : "idle")" />
+                  data-form="@Enemy.FormKey" data-height-m="@Enemy.Data.HeightMeters.ToString("0.0", CultureInfo.InvariantCulture)"
+                  data-state="@(Enemy.IsFainted ? "fainted" : "idle")" />
         </div>
 
         <div class="stage-slot slot-bottom">
@@ -67,8 +70,11 @@
                  class="fighter-sprite @(Hero.IsFainted ? "is-fainted" : "")"
                  style="@SpriteStyle(Hero.Data)"
                  data-slot="hero" data-actor-id="@Hero.ActorId" data-species="@Hero.Data.EnglishName"
-                 data-form="@Hero.FormKey" data-state="@(Hero.IsFainted ? "fainted" : "idle")" />
-            <div class="platform-shadow"></div>
+                  data-form="@Hero.FormKey" data-height-m="@Hero.Data.HeightMeters.ToString("0.0", CultureInfo.InvariantCulture)"
+                  data-state="@(Hero.IsFainted ? "fainted" : "idle")" />
+            <div class="platform-shadow"
+                 style="@SpriteStyle(Hero.Data)"
+                 aria-hidden="true"></div>
             <div class="hud-plate hud-hero" aria-label="@($"{Hero.Data.Name} 상태: HP {Hero.CurrentHp}/{Hero.MaxHp}{(StatusText(Hero) == "" ? "" : $", {StatusText(Hero)}")}")">
                 <span class="hud-name">@Hero.Data.Name</span>
                 <span class="hud-level">Lv.@Hero.Level</span>
@@ -342,8 +348,14 @@
 
     private string HpClass(int percent) => percent <= 20 ? "hp-low" : percent <= 50 ? "hp-mid" : "hp-high";
 
-    private static string SpriteStyle(PokemonData data) =>
-        $"--species-scale:{PokemonSpriteScale.ForHeight(data.HeightDecimeters).ToString("0.###", CultureInfo.InvariantCulture)};";
+    private static string SpriteStyle(PokemonData data)
+    {
+        double scale = PokemonSpriteScale.ForHeight(data.HeightDecimeters);
+        return string.Join(
+            " ",
+            $"--species-scale:{scale.ToString("0.###", CultureInfo.InvariantCulture)};",
+            $"--species-height-m:{data.HeightMeters.ToString("0.0", CultureInfo.InvariantCulture)};");
+    }
 
     private string StatusText(Pokemon p)
     {

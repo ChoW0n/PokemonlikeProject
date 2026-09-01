@@ -19,7 +19,7 @@
             </div>
         </div>
 
-        <div class="pokedex-screen">
+        <div id="starter-top" class="pokedex-screen">
             <div class="starter-header">
                 <div>
                     <h1>스타터 선택</h1>
@@ -28,8 +28,33 @@
                 <strong class="starter-count">@SelectedIds.Count / 3</strong>
             </div>
 
+            <div class="starter-tools" role="search" aria-label="스타터 포켓몬 검색 및 필터">
+                <div class="collection-search-field">
+                    <label for="starter-search">포켓몬 찾기</label>
+                    <input id="starter-search" class="dex-search" type="search"
+                           placeholder="이름, 영문 이름, 도감 번호로 검색"
+                           value="@SearchText" @oninput="OnSearchChanged" />
+                </div>
+                <div class="collection-filter-field">
+                    <label for="starter-type-filter">타입 필터</label>
+                    <select id="starter-type-filter" value="@SelectedType" @onchange="OnTypeChanged">
+                        <option value="all">전체 타입</option>
+                        @foreach (var type in PokemonTypes)
+                        {
+                            <option value="@type.Type">@type.Label</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <p class="starter-results" role="status" aria-live="polite">
+                @(FilteredPokemon.Count == 0
+                    ? "조건에 맞는 포켓몬이 없습니다."
+                    : $"{FilteredPokemon.Count} / {AvailablePokemon.Count}마리 표시 중")
+            </p>
+
             <div class="dex-grid starter-grid" role="list" aria-label="스타터 선택 포켓몬 목록">
-                @foreach (var entry in AvailablePokemon)
+                @foreach (var entry in FilteredPokemon)
                 {
                     bool isSelected = SelectedIds.Contains(entry.Key);
                     <button type="button"
@@ -70,6 +95,40 @@
 @code {
     private readonly List<int> SelectedIds = new();
     private List<KeyValuePair<int, PokemonData>> AvailablePokemon = new();
+    private string SearchText = "";
+    private string SelectedType = "all";
+
+    private static readonly IReadOnlyList<(PokemonType Type, string Label)> PokemonTypes =
+        new[]
+        {
+            (PokemonType.Normal, "노말"), (PokemonType.Fire, "불꽃"),
+            (PokemonType.Water, "물"), (PokemonType.Electric, "전기"),
+            (PokemonType.Grass, "풀"), (PokemonType.Ice, "얼음"),
+            (PokemonType.Fighting, "격투"), (PokemonType.Poison, "독"),
+            (PokemonType.Ground, "땅"), (PokemonType.Flying, "비행"),
+            (PokemonType.Psychic, "에스퍼"), (PokemonType.Bug, "벌레"),
+            (PokemonType.Rock, "바위"), (PokemonType.Ghost, "고스트"),
+            (PokemonType.Dragon, "드래곤"), (PokemonType.Dark, "악"),
+            (PokemonType.Steel, "강철"), (PokemonType.Fairy, "페어리")
+        };
+
+    private List<KeyValuePair<int, PokemonData>> FilteredPokemon =>
+        AvailablePokemon
+            .Where(entry =>
+            {
+                string search = SearchText.Trim();
+                bool isDexNumber = int.TryParse(search, out int dexNumber);
+                bool matchesSearch = string.IsNullOrEmpty(search)
+                    || (isDexNumber
+                        ? entry.Key == dexNumber
+                        : entry.Value.Name.Contains(search, StringComparison.CurrentCultureIgnoreCase)
+                            || entry.Value.EnglishName.Contains(search, StringComparison.OrdinalIgnoreCase));
+                bool matchesType = SelectedType == "all"
+                    || entry.Value.Type1.ToString() == SelectedType
+                    || entry.Value.Type2?.ToString() == SelectedType;
+                return matchesSearch && matchesType;
+            })
+            .ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -86,6 +145,12 @@
             .Select(id => new KeyValuePair<int, PokemonData>(id, PokemonDatabase.All[id]))
             .ToList();
     }
+
+    private void OnSearchChanged(ChangeEventArgs args) =>
+        SearchText = args.Value?.ToString() ?? "";
+
+    private void OnTypeChanged(ChangeEventArgs args) =>
+        SelectedType = args.Value?.ToString() ?? "all";
 
     private void ToggleSelection(int pokemonId)
     {
