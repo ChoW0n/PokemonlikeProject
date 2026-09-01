@@ -14,6 +14,7 @@ public class Pokemon
     public int Level;
     public int CurrentHp;
     public bool IsFainted;
+    public PokemonGender Gender { get; set; }
     public double LastMultiplier;
     public bool SurvivedByEndure;
     public Dictionary<string, int> CurrentPP = new();
@@ -247,12 +248,19 @@ public class Pokemon
         return (int)spd;
     }
 
-    public Pokemon(PokemonData data, List<string>? chosenMoves = null, string ability = "", string item = "없음", int level = 1)
+    public Pokemon(
+        PokemonData data,
+        List<string>? chosenMoves = null,
+        string ability = "",
+        string item = "없음",
+        int level = 1,
+        PokemonGender? gender = null)
     {
         originalData = data;
         Data = data;
         ActorId = $"{data.EnglishName}-{Interlocked.Increment(ref nextActorNumber)}";
         Level = level;
+        Gender = gender ?? InferGender(data);
         CurrentHp = MaxHp;
         IsFainted = false;
         SelectedAbility = ability;
@@ -274,6 +282,24 @@ public class Pokemon
             if (fallback != null) CurrentPP[fallback] = MoveDatabase.All[fallback].MaxPP;
             else if (MoveDatabase.All.ContainsKey("tackle")) CurrentPP["tackle"] = MoveDatabase.All["tackle"].MaxPP;
         }
+    }
+
+    private static PokemonGender InferGender(PokemonData data)
+    {
+        string englishName = data.EnglishName.ToLowerInvariant();
+        if (englishName.EndsWith("-male") || englishName.EndsWith("-m")
+            || data.Name.EndsWith('♂'))
+        {
+            return PokemonGender.Male;
+        }
+
+        if (englishName.EndsWith("-female") || englishName.EndsWith("-f")
+            || data.Name.EndsWith('♀'))
+        {
+            return PokemonGender.Female;
+        }
+
+        return PokemonGender.Unknown;
     }
 
     private static Dictionary<string, int> CreateMovePp(IEnumerable<string> moveKeys) =>
@@ -472,8 +498,21 @@ public class Pokemon
         SelectedAbility == "마이페이스" || BattleField.Current == BattleField.Misty;
 
     public bool IsImmuneToMentalEffect(string effectName) =>
-        SelectedAbility == "아로마베일"
-        && effectName is "disable" or "encore" or "heal-block" or "taunt" or "torment";
+        (SelectedAbility == "둔감"
+            && (effectName is "infatuation" or "attract" or "taunt"))
+        || (SelectedAbility == "아로마베일"
+            && (effectName is "disable" or "encore" or "heal-block" or "taunt" or "torment"));
+
+    public bool HasSameKnownGenderAs(Pokemon? other) =>
+        other != null
+        && Gender != PokemonGender.Unknown
+        && Gender == other.Gender;
+
+    public bool HasOppositeKnownGenderTo(Pokemon? other) =>
+        other != null
+        && Gender != PokemonGender.Unknown
+        && other.Gender != PokemonGender.Unknown
+        && Gender != other.Gender;
 
     public void ApplyAilment(string ailmentName, Random? random = null, Pokemon? opponent = null)
     {

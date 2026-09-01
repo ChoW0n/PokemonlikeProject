@@ -419,6 +419,7 @@ public static class MoveDatabase
         All["heal-block"] = new Move("회복봉인", 0, PokemonType.Psychic, 15, 100, false, 0, true, false, "heal-block", 100, 0, new List<StatChangeEntry>(), 0, "5턴 동안 기술이나 특성, 지니고 있는 도구에 의한 HP 회복을 할 수 없게 한다.", 0, 0, 1, 1);
         All["leafage"] = new Move("나뭇잎", 40, PokemonType.Grass, 40, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "잎을 상대에 맞춰 공격한다.", 0, 0, 1, 1);
         All["thief"] = new Move("도둑질", 60, PokemonType.Dark, 25, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "공격과 동시에 도구를 훔친다. 자신이 도구를 지니고 있을 경우에는 훔칠 수 없다.", 0, 0, 1, 1);
+        All["taunt"] = new Move("도발", 0, PokemonType.Dark, 20, 100, false, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "3턴 동안 상대는 변화 기술을 사용할 수 없게 된다.", 0, 0, 1, 1);
         All["attract"] = new Move("헤롱헤롱", 0, PokemonType.Normal, 15, 100, false, 0, true, false, "infatuation", 100, 0, new List<StatChangeEntry>(), 0, "수컷은 암컷을 암컷은 수컷을 유혹하여 헤롱헤롱하게 만든다. 상대가 기술을 쓰기 어려워진다.", 0, 0, 1, 1);
         All["mystical-fire"] = new Move("매지컬플레임", 75, PokemonType.Fire, 10, 100, false, 0, false, true, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "special-attack", Change = -1, TargetsSelf = false } }, 100, "입에서 내뱉는 아주 뜨거운 불꽃으로 공격한다. 상대의 특수공격을 떨어뜨린다.", 0, 0, 1, 1);
         All["force-palm"] = new Move("발경", 60, PokemonType.Fighting, 10, 100, false, 0, false, false, "paralysis", 30, 0, new List<StatChangeEntry>(), 0, "상대의 몸에 충격파를 부딪쳐 공격한다. 마비 상태로 만들 때가 있다.", 0, 0, 1, 1);
