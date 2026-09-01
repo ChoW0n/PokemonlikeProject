@@ -6,19 +6,28 @@
 
 <PageTitle>로그인</PageTitle>
 
-    <main class="start-page auth-page">
-    <h1>포켓몬 배틀 로그인</h1>
-        <p class="form-message" role="status" aria-live="polite">@Message</p>
+<main class="start-page auth-page" aria-labelledby="login-title">
+    <header class="page-header auth-header">
+        <p class="eyebrow">ACCOUNT ACCESS</p>
+        <h1 id="login-title">포켓몬 배틀 로그인</h1>
+        <p class="intro">저장된 진행 상황을 불러오려면 계정에 로그인해주세요.</p>
+    </header>
 
-        <form class="auth-form" @onsubmit="DoLogin" @onsubmit:preventDefault>
+    <p class="form-message" role="status" aria-live="polite">@Message</p>
+
+    <form class="auth-form" @onsubmit="DoLogin" @onsubmit:preventDefault>
+        <div class="form-field">
             <label for="login-username">아이디</label>
-            <input id="login-username" class="dex-search" placeholder="아이디" autocomplete="username" required @bind-value="Username" @bind-value:event="oninput" />
+            <input id="login-username" class="dex-search auth-input" placeholder="아이디" autocomplete="username" required @bind-value="Username" @bind-value:event="oninput" />
+        </div>
+        <div class="form-field">
             <label for="login-password">비밀번호</label>
-            <input id="login-password" class="dex-search" placeholder="비밀번호" type="password" autocomplete="current-password" required @bind-value="Password" @bind-value:event="oninput" />
+            <input id="login-password" class="dex-search auth-input" placeholder="비밀번호" type="password" autocomplete="current-password" required @bind-value="Password" @bind-value:event="oninput" />
+        </div>
 
-            <button type="submit" disabled="@IsSubmitting">@(IsSubmitting ? "로그인 중..." : "로그인")</button>
-        </form>
-        <button type="button" @onclick="GoRegister">회원가입 하러 가기</button>
+        <button type="submit" class="auth-primary" disabled="@IsSubmitting">@(IsSubmitting ? "로그인 중..." : "로그인")</button>
+    </form>
+    <button type="button" class="auth-secondary" @onclick="GoRegister">회원가입 하러 가기</button>
 </main>
 
 @code {

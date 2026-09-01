@@ -4041,3 +4041,399 @@ p { line-height: 1.72; }
         padding: 12px;
     }
 }
+
+/* ==========================================================================
+   Shared foundation
+   Keep page rhythm and controls predictable for every screen. Page-specific
+   layouts can still opt into their own max-width, but use the same gutter,
+   type scale, control height, focus treatment and text wrapping rules.
+   ========================================================================== */
+:root {
+    --page-gutter: clamp(16px, 3.5vw, 28px);
+    --control-height: 46px;
+    --surface-raised: rgba(18, 27, 31, 0.82);
+    --surface-inset: rgba(4, 6, 7, 0.62);
+    --text-strong: var(--cream);
+    --text-muted: var(--ash);
+}
+
+html,
+body {
+    min-width: 320px;
+}
+
+body {
+    overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+button {
+    display: inline-flex;
+    min-height: var(--control-height);
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    line-height: 1.35;
+    text-align: center;
+}
+
+button::after {
+    display: none;
+}
+
+button:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+button:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+    transform: none !important;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+    outline: 2px solid var(--gold-300);
+    outline-offset: 3px;
+}
+
+input,
+select,
+textarea {
+    min-height: var(--control-height);
+}
+
+h1,
+h2,
+h3,
+p,
+dt,
+dd,
+strong,
+span,
+label,
+button {
+    overflow-wrap: anywhere;
+}
+
+p {
+    text-wrap: pretty;
+}
+
+.preview-page,
+.dex-page,
+.battle-page,
+.start-page,
+.result-page,
+.admin-page,
+.leaderboard-page {
+    width: calc(100% - (var(--page-gutter) * 2));
+}
+
+.page-header {
+    margin-bottom: 24px;
+    text-align: left;
+}
+
+.page-header h1 {
+    margin-bottom: 8px;
+}
+
+.page-header h1[tabindex="-1"]:focus {
+    outline: none;
+}
+
+.page-header .intro {
+    max-width: 62ch;
+    margin-bottom: 0;
+    line-height: 1.65;
+}
+
+.section-heading {
+    margin-bottom: 14px;
+}
+
+.section-heading .eyebrow {
+    margin-bottom: 6px;
+}
+
+.section-heading h2 {
+    margin-bottom: 0;
+}
+
+/* Start and authentication screens share one compact, left-aligned frame. */
+.start-page {
+    width: min(calc(100% - (var(--page-gutter) * 2)), 760px);
+    margin: clamp(24px, 6vh, 64px) auto;
+    padding: clamp(24px, 4vw, 42px);
+    text-align: left;
+}
+
+.start-screen {
+    max-width: 760px;
+}
+
+.auth-page {
+    max-width: 560px;
+}
+
+.auth-page::after {
+    display: none;
+}
+
+.auth-header {
+    margin-bottom: 20px;
+}
+
+.auth-header h1 {
+    font-size: clamp(1.5rem, 4vw, 2.25rem);
+    letter-spacing: 0.035em;
+}
+
+.form-message {
+    min-height: 1.5em;
+    margin: 0 0 12px;
+    color: #d8998e !important;
+    font-size: 0.78rem;
+    line-height: 1.55;
+    text-align: left;
+}
+
+.form-message:not(:empty) {
+    padding: 10px 12px;
+    border-left: 2px solid var(--crimson-bright);
+    background: rgba(105, 30, 45, 0.2);
+}
+
+.auth-form {
+    max-width: none;
+    margin: 0;
+    padding: 20px;
+    gap: 14px;
+    border-left: 2px solid var(--gold-500);
+    background: var(--surface-inset);
+}
+
+.form-field {
+    display: grid;
+    gap: 7px;
+    min-width: 0;
+}
+
+.auth-form label {
+    margin: 0;
+    color: var(--gold-300);
+    font-size: 0.74rem;
+    letter-spacing: 0.06em;
+}
+
+.auth-form .auth-input {
+    width: 100%;
+    min-height: var(--control-height);
+    margin: 0;
+    padding: 10px 12px;
+}
+
+.auth-form .auth-primary {
+    width: 100%;
+    min-height: 50px;
+    margin: 4px 0 0;
+    background: var(--wine-700);
+    color: var(--cream);
+}
+
+.auth-form .auth-primary:hover:not(:disabled) {
+    background: var(--wine-500);
+}
+
+.auth-secondary {
+    width: 100%;
+    margin: 12px 0 0;
+    border-color: var(--line-soft);
+    background: transparent;
+    color: var(--ash);
+}
+
+.auth-secondary:hover:not(:disabled) {
+    background: var(--steel-900);
+    color: var(--gold-300);
+}
+
+.run-summary {
+    margin: 0 0 24px;
+    padding: 18px;
+    border: 1px solid var(--line-soft);
+    border-left: 2px solid var(--gold-500);
+    background: var(--surface-inset);
+}
+
+.run-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0;
+}
+
+.run-stat {
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid rgba(195, 166, 99, 0.12);
+    background: rgba(30, 45, 52, 0.54);
+}
+
+.run-stat dt {
+    margin-bottom: 6px;
+    color: var(--ash);
+    font-size: 0.7rem;
+    line-height: 1.45;
+}
+
+.run-stat dd {
+    margin: 0;
+    color: var(--gold-300);
+    font-family: var(--font-display);
+    font-size: clamp(1.15rem, 3vw, 1.55rem);
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.run-stat dd span {
+    margin-left: 3px;
+    color: var(--ash);
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    font-weight: 400;
+}
+
+.start-screen .legendary-history {
+    margin: 0 0 24px;
+}
+
+.start-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.start-actions button {
+    width: 100%;
+    min-width: 0;
+    min-height: 50px;
+    margin: 0;
+    padding: 12px 14px;
+    text-align: left;
+    justify-content: flex-start;
+    background: var(--wine-700);
+    color: var(--cream);
+}
+
+.start-actions .start-primary {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    min-height: 56px;
+    border-color: var(--gold-500);
+    background: linear-gradient(100deg, var(--wine-700), var(--wine-900));
+    color: var(--gold-300);
+    font-size: 0.92rem;
+}
+
+.start-actions .secondary-action,
+.start-actions .admin-link {
+    background: var(--steel-900);
+    color: var(--ash);
+}
+
+.start-actions .admin-link {
+    grid-row: 2;
+    border-color: var(--gold-700);
+    color: var(--gold-300);
+}
+
+.start-actions button:hover:not(:disabled) {
+    background: var(--wine-500);
+    color: var(--gold-300);
+}
+
+.start-actions .secondary-action:hover:not(:disabled),
+.start-actions .admin-link:hover:not(:disabled) {
+    background: var(--steel-800);
+}
+
+/* Names and feed content should wrap before they become clipped controls. */
+.hud-name,
+.move-name,
+.move-name-text,
+.enemy-card-title,
+.dex-name,
+.preset-name,
+.team-move-summary,
+.battle-log-panel .log-text,
+.legendary-history-list span,
+.legendary-history-list time,
+.move-chip {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.move-cast-banner {
+    max-width: min(92vw, 520px);
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
+}
+
+@media (max-width: 680px) {
+    .start-page {
+        margin-top: 24px;
+        padding: 24px 18px;
+    }
+
+    .start-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .start-actions .start-primary {
+        grid-column: auto;
+    }
+
+    .start-actions .admin-link {
+        grid-row: auto;
+    }
+
+    .run-summary {
+        padding: 16px 14px;
+    }
+}
+
+@media (max-width: 420px) {
+    .auth-form {
+        padding: 16px 14px;
+    }
+
+    .run-stats {
+        gap: 6px;
+    }
+
+    .run-stat {
+        padding: 10px 8px;
+    }
+
+    .run-stat dt {
+        font-size: 0.64rem;
+    }
+}
