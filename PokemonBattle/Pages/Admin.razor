@@ -236,6 +236,143 @@
                         </div>
                     </div>
 
+                    <section class="admin-tools admin-personal-insights" aria-labelledby="personal-insights-title">
+                        <div class="admin-subheading">
+                            <div>
+                                <p class="eyebrow">PERSONAL INSIGHTS</p>
+                                <h3 id="personal-insights-title">개인 유저 성향</h3>
+                            </div>
+                            <span class="admin-generated">선택 유저 기준</span>
+                        </div>
+                        <p class="admin-analytics-intro">
+                            저장된 최신 팀 구성과 누적 기술 선택 기록을 @SelectedDetails.Username 계정 단위로 보여줍니다.
+                        </p>
+                        <div class="admin-personal-stat-grid">
+                            <span><small>팀 규모</small><strong>@($"{SelectedDetails.PersonalAnalytics.TeamSize}명")</strong></span>
+                            <span><small>기술 선택 기록</small><strong>@($"{SelectedDetails.PersonalAnalytics.TotalMoveSelections}회")</strong></span>
+                            <span><small>완료 전투</small><strong>@($"{SelectedDetails.PersonalAnalytics.CompletedBattles}회")</strong></span>
+                            <span><small>레이팅</small><strong>@SelectedDetails.PersonalAnalytics.Rating.ToString("0")</strong><em>@($"{SelectedDetails.PersonalAnalytics.CompletedRuns}회 완료 런")</em></span>
+                        </div>
+                        <div class="admin-personal-chart-grid">
+                            <div class="admin-chart-card">
+                                <div class="admin-chart-heading">
+                                    <div><h3>팀 구성 성향</h3><small>저장된 최신 팀</small></div>
+                                    <span class="admin-chart-icon">TEAM</span>
+                                </div>
+                                @if (SelectedDetails.PersonalAnalytics.PokemonComposition.Count == 0)
+                                {
+                                    <p class="admin-muted">저장된 팀 데이터가 없습니다.</p>
+                                }
+                                else
+                                {
+                                    @foreach (var bar in SelectedDetails.PersonalAnalytics.PokemonComposition)
+                                    {
+                                        <div class="admin-bar-row">
+                                            <div class="admin-bar-label"><span>@bar.Label</span><strong>@($"{bar.Count}명 · {bar.SharePercent:0.#}%")</strong></div>
+                                            <div class="admin-bar-track"><span style="width:@bar.FillPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%"></span></div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                            <div class="admin-chart-card">
+                                <div class="admin-chart-heading">
+                                    <div><h3>기술 선택 성향</h3><small>누적 선택 기록 상위</small></div>
+                                    <span class="admin-chart-icon">MOVE</span>
+                                </div>
+                                @if (SelectedDetails.PersonalAnalytics.MovePreferences.Count == 0)
+                                {
+                                    <p class="admin-muted">누적 기술 선택 데이터가 없습니다.</p>
+                                }
+                                else
+                                {
+                                    @foreach (var bar in SelectedDetails.PersonalAnalytics.MovePreferences)
+                                    {
+                                        <div class="admin-bar-row">
+                                            <div class="admin-bar-label"><span>@bar.Label</span><strong>@($"{bar.Count}회 · {bar.SharePercent:0.#}%")</strong></div>
+                                            <div class="admin-bar-track is-cyan"><span style="width:@bar.FillPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%"></span></div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                            <div class="admin-chart-card">
+                                <div class="admin-chart-heading">
+                                    <div><h3>기술 분류·타입</h3><small>누적 선택 기준</small></div>
+                                    <span class="admin-chart-icon">STYLE</span>
+                                </div>
+                                @if (SelectedDetails.PersonalAnalytics.MoveCategoryPreferences.Count == 0
+                                    && SelectedDetails.PersonalAnalytics.MoveTypePreferences.Count == 0)
+                                {
+                                    <p class="admin-muted">기술 분류 데이터가 없습니다.</p>
+                                }
+                                else
+                                {
+                                    @foreach (var bar in SelectedDetails.PersonalAnalytics.MoveCategoryPreferences)
+                                    {
+                                        <div class="admin-bar-row">
+                                            <div class="admin-bar-label"><span>@bar.Label 기술</span><strong>@($"{bar.Count}회 · {bar.SharePercent:0.#}%")</strong></div>
+                                            <div class="admin-bar-track is-purple"><span style="width:@bar.FillPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%"></span></div>
+                                        </div>
+                                    }
+                                    @foreach (var bar in SelectedDetails.PersonalAnalytics.MoveTypePreferences)
+                                    {
+                                        <div class="admin-bar-row">
+                                            <div class="admin-bar-label"><span>@bar.Label 타입</span><strong>@($"{bar.Count}회 · {bar.SharePercent:0.#}%")</strong></div>
+                                            <div class="admin-bar-track is-green"><span style="width:@bar.FillPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%"></span></div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                            <div class="admin-chart-card">
+                                <div class="admin-chart-heading">
+                                    <div><h3>현재 팀 선택</h3><small>특성·아이템 분포</small></div>
+                                    <span class="admin-chart-icon">BUILD</span>
+                                </div>
+                                @if (SelectedDetails.PersonalAnalytics.AbilityPreferences.Count == 0
+                                    && SelectedDetails.PersonalAnalytics.ItemPreferences.Count == 0)
+                                {
+                                    <p class="admin-muted">팀 특성·아이템 데이터가 없습니다.</p>
+                                }
+                                else
+                                {
+                                    @foreach (var bar in SelectedDetails.PersonalAnalytics.AbilityPreferences)
+                                    {
+                                        <div class="admin-bar-row">
+                                            <div class="admin-bar-label"><span>특성 · @bar.Label</span><strong>@($"{bar.Count}명")</strong></div>
+                                            <div class="admin-bar-track is-purple"><span style="width:@bar.FillPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%"></span></div>
+                                        </div>
+                                    }
+                                    @foreach (var bar in SelectedDetails.PersonalAnalytics.ItemPreferences)
+                                    {
+                                        <div class="admin-bar-row">
+                                            <div class="admin-bar-label"><span>아이템 · @bar.Label</span><strong>@($"{bar.Count}명")</strong></div>
+                                            <div class="admin-bar-track is-cyan"><span style="width:@bar.FillPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%"></span></div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                            <div class="admin-chart-card">
+                                <div class="admin-chart-heading">
+                                    <div><h3>전술 성향</h3><small>기술 효과 태그 기준</small></div>
+                                    <span class="admin-chart-icon">TACTIC</span>
+                                </div>
+                                @if (SelectedDetails.PersonalAnalytics.TacticalPreferences.Count == 0)
+                                {
+                                    <p class="admin-muted">전술 성향 데이터가 없습니다.</p>
+                                }
+                                else
+                                {
+                                    @foreach (var bar in SelectedDetails.PersonalAnalytics.TacticalPreferences)
+                                    {
+                                        <div class="admin-bar-row">
+                                            <div class="admin-bar-label"><span>@bar.Label</span><strong>@($"{bar.Count}회 · {bar.SharePercent:0.#}%")</strong></div>
+                                            <div class="admin-bar-track is-green"><span style="width:@bar.FillPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%"></span></div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    </section>
+
                     <section class="admin-tools" aria-labelledby="account-tools-title">
                         <div class="admin-subheading">
                             <div>
