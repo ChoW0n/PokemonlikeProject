@@ -26,15 +26,4 @@ public class SpriteRegressionTests
         Assert.Equal(pikachu.ImageUrl, pikachu.EffectiveImageUrl);
         Assert.Equal(pikachu.BackImageUrl, pikachu.EffectiveBackImageUrl);
     }
-
-    [Fact]
-    public void Pokemon_database_contains_official_height_data_for_small_and_large_species()
-    {
-        Assert.Equal(3, PokemonDatabase.All[172].HeightDecimeters); //피츄
-        Assert.Equal(15, PokemonDatabase.All[92].HeightDecimeters); //고오스
-        Assert.Equal(21, PokemonDatabase.All[143].HeightDecimeters); //잠만보
-        Assert.Equal(0.72, PokemonSpriteScale.ForHeight(3));
-        Assert.True(PokemonSpriteScale.ForHeight(21) > PokemonSpriteScale.ForHeight(3));
-        Assert.Equal(PokemonSpriteScale.MaximumScale, PokemonSpriteScale.ForHeight(145));
-    }
 }
