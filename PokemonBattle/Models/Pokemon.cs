@@ -10,6 +10,7 @@ public class Pokemon
     private PokemonType? typeOverride1;
     private PokemonType? typeOverride2;
     private string heldItem = "없음";
+    private int runMaxHpPenaltyPercent;
 
     public PokemonData Data;
     public string ActorId { get; }
@@ -142,7 +143,17 @@ public class Pokemon
     private int StatHp(int baseStat) => (2 * baseStat + 31) * Level / 100 + Level + 10;
     private int StatOther(int baseStat) => (2 * baseStat + 31) * Level / 100 + 5;
 
-    public int MaxHp => StatHp(IsTransformed || IsIllusionActive ? originalData.BaseHp : Data.BaseHp);
+    public int MaxHp => Math.Max(1,
+        StatHp(IsTransformed || IsIllusionActive ? originalData.BaseHp : Data.BaseHp)
+        * (100 - runMaxHpPenaltyPercent) / 100);
+    public bool ResistsStatusStatPenalties { get; private set; }
+
+    public void ApplyRunModifiers(int maxHpPenaltyPercent, bool resistsStatusStatPenalties)
+    {
+        runMaxHpPenaltyPercent = Math.Clamp(maxHpPenaltyPercent, 0, 90);
+        ResistsStatusStatPenalties = resistsStatusStatPenalties;
+        CurrentHp = Math.Min(CurrentHp, MaxHp);
+    }
 
     public double EffectiveWeight => GetEffectiveWeight();
 
@@ -237,7 +248,8 @@ public class Pokemon
         bool opponentIgnoresStages = opponent?.SelectedAbility == "천진"
             && !opponent.IsAbilitySuppressedBy(this);
         double value = Atk * (opponentIgnoresStages ? 1.0 : StageMult("attack"));
-        if (Status == StatusCondition.Burn && SelectedAbility != "근성") value *= 0.5;
+        if (Status == StatusCondition.Burn && SelectedAbility != "근성")
+            value *= ResistsStatusStatPenalties ? 0.75 : 0.5;
         if (HasActiveAbility("근성", opponent) && Status != StatusCondition.None) value *= 1.5;
         if (HasActiveAbility("의욕", opponent)) value *= 1.5;
         if (HasActiveAbility("천하장사", opponent) || HasActiveAbility("순수한힘", opponent)) value *= 2.0;
@@ -308,7 +320,8 @@ public class Pokemon
     public int EffectiveSpdAgainst(Pokemon? opponent = null)
     {
         double spd = Spd * StageMult("speed");
-        if (Status == StatusCondition.Paralysis && SelectedAbility != "속보") spd *= 0.5;
+        if (Status == StatusCondition.Paralysis && SelectedAbility != "속보")
+            spd *= ResistsStatusStatPenalties ? 0.75 : 0.5;
         if (!BattleWeather.AreEffectsSuppressed(this, opponent))
         {
             if (HasActiveAbility("엽록소", opponent) && BattleWeather.Current == "쾌청") spd *= 2.0;

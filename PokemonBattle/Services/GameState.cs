@@ -38,6 +38,7 @@ public class GameState
     public int EnemyPokemonId { get; private set; } = 4;
     public bool LastBattleWon { get; private set; }
     public List<string> EvolutionMessages { get; private set; } = new();
+    public string CovenantRewardMessage { get; private set; } = "";
 
     public List<int> PlayerTeamIds { get; private set; } = new();
     public List<int> EnemyTeamIds { get; private set; } = new();
@@ -295,6 +296,7 @@ public class GameState
         if (rival.HasValue) IsRivalBattle = rival.Value;
         _battleOutcomeProcessed = false;
         _battleUsedEnemyMoves.Clear();
+        CovenantRewardMessage = "";
     }
 
     public async Task EnsureStageMetaAsync()
@@ -315,7 +317,9 @@ public class GameState
 
         if (RunMeta.RiskCovenantStage != stage)
         {
+            string? previousCovenantId = RunMeta.RiskCovenantId;
             var selectedCovenant = RunMetaCatalog.RiskCovenants
+                .Where(covenant => covenant.Id != previousCovenantId)
                 .OrderBy(_ => _metaRandom.Next())
                 .FirstOrDefault();
             RunMeta.RiskCovenantStage = stage;
@@ -323,6 +327,7 @@ public class GameState
             RunMeta.RiskCovenantDecisionMade = false;
             RunMeta.RiskCovenantAccepted = false;
             RunMeta.BonusLegacyClaims = 0;
+            RunMeta.BonusTechnicalMachineRewards = 0;
             changed = true;
         }
 
@@ -342,12 +347,32 @@ public class GameState
         RunMeta.RiskCovenantAccepted = accept;
         RunMeta.RiskCovenantId = covenant.Id;
         RunMeta.BonusLegacyClaims = accept ? covenant.BonusLegacyClaims : 0;
+        RunMeta.BonusTechnicalMachineRewards =
+            accept ? covenant.BonusTechnicalMachineRewards : 0;
 
         if (accept)
         {
             foreach (var loadout in EnemyLoadouts)
             {
                 loadout.Level += covenant.EnemyLevelBonus;
+            }
+
+            RunMeta.MaxHpPenaltyPercent = Math.Max(
+                RunMeta.MaxHpPenaltyPercent,
+                covenant.MaxHpPenaltyPercent);
+
+            if (covenant.GrantsImmediateLegacy)
+            {
+                var grantedLegacy = RunMetaCatalog.Legacies
+                    .Where(legacy => !RunMeta.LegacyIds.Contains(legacy.Id))
+                    .OrderBy(_ => _metaRandom.Next())
+                    .FirstOrDefault();
+                if (grantedLegacy != null)
+                {
+                    RunMeta.LegacyIds.Add(grantedLegacy.Id);
+                    CovenantRewardMessage =
+                        $"폭주의 저주 보상으로 {grantedLegacy.Name} 유산을 즉시 획득했습니다.";
+                }
             }
         }
 
@@ -399,21 +424,22 @@ public class GameState
         return true;
     }
 
-    public async Task<bool> ClaimStolenMoveAsync(int pokemonId, string moveKey)
+    public async Task<bool> ClaimStolenMoveAsync(
+        int pokemonId,
+        string moveKey,
+        string? replaceMoveKey = null)
     {
         var option = RunMeta.PendingStolenMoveChoices.FirstOrDefault(candidate =>
             candidate.MoveKey == moveKey);
         var loadout = PlayerLoadouts.FirstOrDefault(candidate =>
             candidate.PokemonId == pokemonId);
         if (option == null || loadout == null
-            || loadout.ChosenMoveNames.Count >= 4
             || !RunMetaCatalog.IsStolenMoveEligible(moveKey, option.SourcePokemonId)
-            || loadout.ChosenMoveNames.Contains(moveKey))
+            || !RunMetaCatalog.TryApplyStolenMove(loadout, moveKey, replaceMoveKey))
         {
             return false;
         }
 
-        loadout.ChosenMoveNames.Add(moveKey);
         RunMeta.StolenMoves.Add(new StolenMoveRecord
         {
             PokemonId = pokemonId,
@@ -484,6 +510,19 @@ public class GameState
         }
     }
 
+    public async Task MarkAllMailboxMessagesReadAsync()
+    {
+        if (_progression == null || !_currentUser.IsLoggedIn) return;
+        int markedCount = await _progression.MarkAllMessagesReadAsync(_currentUser.Username!);
+        if (markedCount == 0) return;
+
+        foreach (var message in MailboxMessages)
+        {
+            message.IsRead = true;
+        }
+        NotifyChange();
+    }
+
     public int UnreadMailboxCount => MailboxMessages.Count(message => !message.IsRead);
 
     private async Task RefreshAccountProgress()
@@ -516,6 +555,27 @@ public class GameState
         LastBattleWon = true;
         EvolutionMessages = new List<string>();
         PrepareVictoryRewards();
+        if (RunMeta.BonusTechnicalMachineRewards > 0)
+        {
+            if (_progression != null && _currentUser.IsLoggedIn)
+            {
+                var rewards = new List<string>();
+                for (int i = 0; i < RunMeta.BonusTechnicalMachineRewards; i++)
+                {
+                    string? rewardName = await _progression.GrantTechnicalMachineRewardAsync(
+                        _currentUser.Username!,
+                        PlayerLoadouts);
+                    if (rewardName != null) rewards.Add(rewardName);
+                }
+
+                if (rewards.Count > 0)
+                {
+                    CovenantRewardMessage =
+                        $"어둠의 서약 보상: {string.Join(", ", rewards)} 기술머신을 획득했습니다.";
+                }
+            }
+            RunMeta.BonusTechnicalMachineRewards = 0;
+        }
 
         foreach (var loadout in PlayerLoadouts)
         {
@@ -675,10 +735,13 @@ public class GameState
             .Take(3)
             .Select(legacy => legacy.Id)
             .ToList();
-        RunMeta.PendingLegacyChoices = availableLegacies;
+        int scheduledClaims = RunMetaCatalog.ScheduledLegacyClaimsForWin(CurrentScore);
         RunMeta.LegacyClaimsRemaining = Math.Min(
-            1 + RunMeta.BonusLegacyClaims,
+            scheduledClaims + RunMeta.BonusLegacyClaims,
             availableLegacies.Count);
+        RunMeta.PendingLegacyChoices = RunMeta.LegacyClaimsRemaining > 0
+            ? availableLegacies
+            : new List<string>();
         RunMeta.BonusLegacyClaims = 0;
 
         RunMeta.PendingStolenMoveChoices = _battleUsedEnemyMoves

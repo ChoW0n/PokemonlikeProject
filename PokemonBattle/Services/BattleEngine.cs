@@ -907,7 +907,7 @@ public sealed class BattleEngine
             {
                 if (defender.IsFainted) break;
 
-                bool isCritical = RollCriticalHit(attacker, defender, moveKey);
+                bool isCritical = RollCriticalHit(attacker, defender, moveKey, attackerIsHero);
                 if (isCritical)
                 {
                     await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 공격이 급소에 맞았다!"));
@@ -1105,7 +1105,7 @@ public sealed class BattleEngine
         return rng.Next(move.MinHits, move.MaxHits + 1);
     }
 
-    private int CriticalStage(Pokemon attacker, string moveKey)
+    private int CriticalStage(Pokemon attacker, string moveKey, bool attackerIsHero)
     {
         if (MoveRuleMetadata.GuaranteesCriticalHit(moveKey)) return 3;
 
@@ -1114,14 +1114,20 @@ public sealed class BattleEngine
         if (attacker.SelectedAbility == "대운") stage++;
         if (attacker.HasActiveHeldItem() && attacker.HeldItem == "대파") stage += 2;
         if (attacker.HasActiveHeldItem() && attacker.HeldItem == "예리한손톱") stage++;
+        if (attackerIsHero
+            && ActiveRunMeta?.LegacyIds.Contains("hunters-eye") == true) stage++;
         return Math.Min(stage, 3);
     }
 
-    private bool RollCriticalHit(Pokemon attacker, Pokemon defender, string moveKey)
+    private bool RollCriticalHit(
+        Pokemon attacker,
+        Pokemon defender,
+        string moveKey,
+        bool attackerIsHero)
     {
         if (defender.IsCriticalImmune(attacker)) return false;
 
-        int stage = CriticalStage(attacker, moveKey);
+        int stage = CriticalStage(attacker, moveKey, attackerIsHero);
         int denominator = stage switch
         {
             3 => 1,

@@ -20,20 +20,39 @@ public sealed class RunMetaEffectHandler : IBattleEffectHandler
             {
                 case RunLegacyEffect.FirstStrikePower
                     when context.AttackerIsHero && context.AttackerMovedFirst:
-                    context.Power *= 1.2;
+                    context.Power *= 1.25;
                     break;
                 case RunLegacyEffect.AfflictedTargetPower
                     when context.AttackerIsHero
                         && (context.Defender.Status != StatusCondition.None
                         || context.Defender.IsConfused):
-                    context.Power *= 1.2;
+                    context.Power *= 1.25;
                     break;
                 case RunLegacyEffect.HighHpDefense
                     when !context.AttackerIsHero
                         && context.Defender.CurrentHp >= context.Defender.MaxHp * 0.75:
-                    context.Power *= 0.8;
+                    context.Power *= 0.75;
+                    break;
+                case RunLegacyEffect.LowHpOffense
+                    when context.AttackerIsHero
+                        && context.Attacker.CurrentHp <= context.Attacker.MaxHp * 0.25:
+                    context.Power *= 1.2;
+                    break;
+                case RunLegacyEffect.WeatherPower
+                    when context.AttackerIsHero
+                        && BattleWeather.Current != BattleWeather.Clear:
+                    context.Power *= 1.1;
                     break;
             }
+        }
+
+        if (!context.AttackerIsHero
+            && meta.RiskCovenantAccepted
+            && meta.RiskCovenantId == "dark-pact"
+            && !string.IsNullOrWhiteSpace(context.Attacker.SelectedAbility)
+            && !context.Attacker.IsAbilitySuppressedBy(context.Defender))
+        {
+            context.Power *= 1.15;
         }
     }
 
@@ -46,7 +65,7 @@ public sealed class RunMetaEffectHandler : IBattleEffectHandler
         int before = context.Pokemon.CurrentHp;
         context.Pokemon.CurrentHp = Math.Min(
             context.Pokemon.MaxHp,
-            context.Pokemon.CurrentHp + Math.Max(1, context.Pokemon.MaxHp / 16));
+            context.Pokemon.CurrentHp + Math.Max(1, context.Pokemon.MaxHp / 12));
         if (context.Pokemon.CurrentHp > before)
         {
             await context.ShowMessage(

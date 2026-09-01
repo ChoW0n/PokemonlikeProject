@@ -42,6 +42,9 @@
                 <img src="@data.EffectiveImageUrl" alt="@data.Name" class="enemy-sprite" />
                 <h3>@data.Name</h3>
                 <p>Lv.@loadout.Level</p>
+                <p class="team-move-summary" title="@MoveSummary(loadout)">
+                    기술: @MoveSummary(loadout)
+                </p>
         </article>
         }
     </div>
@@ -54,6 +57,12 @@
     //유효하지 않은(도감에 없는) PokemonId는 화면에서 걸러냄 (예전 데이터 꼬임 방지)
     private List<PokemonLoadout> ValidLoadouts =>
         State.PlayerLoadouts.Where(l => PokemonDatabase.All.ContainsKey(l.PokemonId)).ToList();
+
+    private static string MoveSummary(PokemonLoadout loadout) =>
+        string.Join(" · ", loadout.ChosenMoveNames
+            .Select(moveKey => MoveDatabase.All.TryGetValue(moveKey, out var move)
+                ? move.Name
+                : moveKey));
 
     protected override async Task OnInitializedAsync()
     {

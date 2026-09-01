@@ -41,6 +41,8 @@
         }
         else
         {
+            <button type="button" disabled="@(!State.MailboxMessages.Any(message => !message.IsRead))"
+                    @onclick="MarkAllRead">전체 읽음</button>
             <div class="preset-list" role="list" aria-label="보관함 메시지 목록">
                 @foreach (var message in State.MailboxMessages)
                 {
@@ -77,6 +79,9 @@
 
     private async Task MarkRead(int messageId) =>
         await State.MarkMailboxMessageReadAsync(messageId);
+
+    private async Task MarkAllRead() =>
+        await State.MarkAllMailboxMessagesReadAsync();
 
     private void GoHome() => Nav.NavigateTo("/");
 }

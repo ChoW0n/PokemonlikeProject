@@ -115,7 +115,10 @@ public static class EnemyTeamProvider
     //프로급 기술 선택: 자속(STAB) 우선 + 서로 다른 속성으로 커버리지 확보 + 변화기 최소 1개 포함
     public static List<string> PickProMoveset(PokemonData data)
     {
-        var candidates = data.MoveNames.Select(k => (Key: k, Move: MoveDatabase.All[k])).ToList();
+        var candidates = data.MoveNames
+            .Where(MoveDatabase.All.ContainsKey)
+            .Select(k => (Key: k, Move: MoveDatabase.All[k]))
+            .ToList();
 
         double Score((string Key, Move Move) c)
         {

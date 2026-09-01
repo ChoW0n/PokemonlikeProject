@@ -174,6 +174,82 @@ public class AdminDashboardRegressionTests
         });
     }
 
+    [Fact]
+    public async Task LeaderboardAndAdminAnalyticsUsePersistedPlayerData()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreateTables(schema);
+            await using (var seedDb = CreateDbContext(schema))
+            {
+                seedDb.Users.AddRange(
+                    new UserAccount { Username = "admin", PasswordHash = "x", IsAdmin = true },
+                    new UserAccount { Username = "alpha", PasswordHash = "x", IsAdmin = false },
+                    new UserAccount { Username = "beta", PasswordHash = "x", IsAdmin = false });
+                seedDb.PlayerSkillRatings.AddRange(
+                    new PlayerSkillRating { Username = "alpha", Rating = 1100, CompletedRuns = 2 },
+                    new PlayerSkillRating { Username = "beta", Rating = 1250, CompletedRuns = 4 });
+                seedDb.PlayerProgressions.AddRange(
+                    new PlayerProgression
+                    {
+                        Username = "alpha",
+                        LatestLoadoutsJson = """
+                            [{"PokemonId":1,"ChosenMoveNames":["tackle"],"ChosenAbility":"심록","ChosenItem":"없음","Level":5}]
+                            """,
+                        MovePreferencesJson = """{"MoveCounts":{"tackle":3},"CategoryCounts":{},"TypeCounts":{},"TacticalCounts":{}}"""
+                    },
+                    new PlayerProgression
+                    {
+                        Username = "beta",
+                        LatestLoadoutsJson = """
+                            [{"PokemonId":1,"ChosenMoveNames":["tackle"],"ChosenAbility":"심록","ChosenItem":"없음","Level":8}]
+                            """,
+                        MovePreferencesJson = """{"MoveCounts":{"tackle":2},"CategoryCounts":{},"TypeCounts":{},"TacticalCounts":{}}"""
+                    });
+                seedDb.PlayerRuns.AddRange(
+                    new PlayerRun
+                    {
+                        Username = "alpha",
+                        LoadoutsJson = "[]",
+                        RoundPerformancesJson = """[{"Cleared":true},{"Cleared":false}]"""
+                    },
+                    new PlayerRun
+                    {
+                        Username = "beta",
+                        LoadoutsJson = "[]",
+                        RoundPerformancesJson = """[{"Cleared":true},{"Cleared":true}]"""
+                    });
+                await seedDb.SaveChangesAsync();
+            }
+
+            var player = new CurrentUserService();
+            player.SignIn("alpha", isAdmin: false);
+            await using (var db = CreateDbContext(schema))
+            {
+                var leaderboard = await new LeaderboardService(db, player).LoadAsync();
+                Assert.NotNull(leaderboard);
+                Assert.Equal("beta", leaderboard!.Entries[0].Username);
+                Assert.Equal(2, leaderboard.CurrentUser!.Rank);
+                Assert.DoesNotContain(leaderboard.Entries, entry => entry.Username == "admin");
+            }
+
+            var admin = new CurrentUserService();
+            admin.SignIn("admin", isAdmin: true);
+            await using (var db = CreateDbContext(schema))
+            {
+                var snapshot = await new AdminDashboardService(db, admin).LoadAsync();
+                Assert.NotNull(snapshot);
+                Assert.Equal("이상해씨", snapshot!.Analytics.PokemonPopularity[0].Label);
+                Assert.Equal(100, snapshot.Analytics.PokemonPopularity[0].SharePercent);
+                Assert.Equal("몸통박치기", snapshot.Analytics.MovePopularity[0].Label);
+                Assert.Equal("심록", snapshot.Analytics.AbilityPopularity[0].Label);
+                Assert.Equal(2, snapshot.Analytics.UsersWithRoundData);
+                Assert.Equal(1, snapshot.Analytics.WinRateDistribution.Single(bar => bar.Label == "26–50%").Count);
+                Assert.Equal(1, snapshot.Analytics.WinRateDistribution.Single(bar => bar.Label == "76–100%").Count);
+            }
+        });
+    }
+
     private static AppDbContext CreateDbContext(string schema)
     {
         var rawConnectionString = Environment.GetEnvironmentVariable("DATABASE_URL");
@@ -244,6 +320,25 @@ public class AdminDashboardRegressionTests
                 "LoadoutsJson" TEXT NOT NULL,
                 "UpdatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 CONSTRAINT "UX_UserPresets_Username_Name" UNIQUE ("Username", "Name")
+            );
+            CREATE TABLE "PlayerProgressions" (
+                "Id" SERIAL PRIMARY KEY,
+                "Username" TEXT NOT NULL,
+                "CompletedBattles" INTEGER NOT NULL DEFAULT 0,
+                "RivalPending" BOOLEAN NOT NULL DEFAULT FALSE,
+                "RivalNumber" INTEGER NOT NULL DEFAULT 0,
+                "LatestLoadoutsJson" TEXT NOT NULL DEFAULT '[]',
+                "MovePreferencesJson" TEXT NOT NULL DEFAULT '{{}}',
+                "UpdatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT "UX_PlayerProgressions_Username" UNIQUE ("Username")
+            );
+            CREATE TABLE "AdminAuditLogs" (
+                "Id" SERIAL PRIMARY KEY,
+                "AdminUsername" TEXT NOT NULL,
+                "Action" TEXT NOT NULL,
+                "TargetUsername" TEXT NOT NULL,
+                "Details" TEXT NOT NULL DEFAULT '',
+                "CreatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             """);
     }

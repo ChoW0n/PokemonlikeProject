@@ -23,7 +23,7 @@
             <div class="starter-header">
                 <div>
                     <h1>스타터 선택</h1>
-                    <p class="intro">이번 런에 함께할 포켓몬 3마리를 선택하세요.</p>
+                    <p class="intro">이번 런에 함께할 포켓몬 3마리를 선택하세요. 스타터 기술은 우선 앞 4개로 구성되며, 시작 후 포켓몬 변경 화면에서 직접 다시 고를 수 있습니다.</p>
                 </div>
                 <strong class="starter-count">@SelectedIds.Count / 3</strong>
             </div>
@@ -72,6 +72,14 @@
                                 <img src="@TypeIcons.GetUrl(entry.Value.Type2.Value)" class="type-icon-img small" alt="@entry.Value.Type2" />
                             }
                         </span>
+                            <div class="starter-stat-gauges" aria-label="@($"{entry.Value.Name} 종족값")">
+                                <GaugeBar Label="HP" Percent="@StatBarHelper.StatPercent(entry.Value.BaseHp)" ColorClass="@StatBarHelper.StatColor(entry.Value.BaseHp)" DisplayText="@entry.Value.BaseHp.ToString()" />
+                                <GaugeBar Label="공격" Percent="@StatBarHelper.StatPercent(entry.Value.BaseAtk)" ColorClass="@StatBarHelper.StatColor(entry.Value.BaseAtk)" DisplayText="@entry.Value.BaseAtk.ToString()" />
+                                <GaugeBar Label="방어" Percent="@StatBarHelper.StatPercent(entry.Value.BaseDef)" ColorClass="@StatBarHelper.StatColor(entry.Value.BaseDef)" DisplayText="@entry.Value.BaseDef.ToString()" />
+                                <GaugeBar Label="특공" Percent="@StatBarHelper.StatPercent(entry.Value.BaseSpAtk)" ColorClass="@StatBarHelper.StatColor(entry.Value.BaseSpAtk)" DisplayText="@entry.Value.BaseSpAtk.ToString()" />
+                                <GaugeBar Label="특방" Percent="@StatBarHelper.StatPercent(entry.Value.BaseSpDef)" ColorClass="@StatBarHelper.StatColor(entry.Value.BaseSpDef)" DisplayText="@entry.Value.BaseSpDef.ToString()" />
+                                <GaugeBar Label="속도" Percent="@StatBarHelper.StatPercent(entry.Value.BaseSpd)" ColorClass="@StatBarHelper.StatColor(entry.Value.BaseSpd)" DisplayText="@entry.Value.BaseSpd.ToString()" />
+                            </div>
                     </button>
                 }
             </div>
@@ -176,7 +184,10 @@
                 return new PokemonLoadout
                 {
                     PokemonId = id,
-                    ChosenMoveNames = data.MoveNames.Take(4).ToList(),
+                    ChosenMoveNames = data.MoveNames
+                        .Where(MoveDatabase.All.ContainsKey)
+                        .Take(4)
+                        .ToList(),
                     ChosenAbility = data.AbilityNames.FirstOrDefault() ?? "",
                     ChosenItem = TeamLoadoutRules.NoItem,
                     Level = State.CurrentRunLevel

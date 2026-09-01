@@ -13,6 +13,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UnlockService>();
 builder.Services.AddScoped<RunStore>();
 builder.Services.AddScoped<SkillRatingService>();
+builder.Services.AddScoped<LeaderboardService>();
 builder.Services.AddScoped<PlayerProgressionStore>();
 builder.Services.AddScoped<AdminDashboardService>();
 builder.Services.AddScoped<AdminOperationsService>();

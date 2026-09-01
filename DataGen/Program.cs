@@ -19,6 +19,7 @@ var typeMap = new Dictionary<string, string>
 var abilityCache = new Dictionary<string, string>();
 var abilityWritten = new HashSet<string>();
 var moveCache = new HashSet<string>();
+var unsupportedMoveCache = new HashSet<string>();
 var evolutionChainCache = new Dictionary<string, PokeApiEvolutionChain?>();
 var nameToId = new Dictionary<string, int>();
 
@@ -44,7 +45,7 @@ moveSb.AppendLine("    {");
 
 abilitySb.AppendLine("namespace PokemonBattle.Models;");
 abilitySb.AppendLine();
-abilitySb.AppendLine("public static class AbilityDatabase");
+abilitySb.AppendLine("public static partial class AbilityDatabase");
 abilitySb.AppendLine("{");
 abilitySb.AppendLine("    public static Dictionary<string, AbilityInfo> All = new Dictionary<string, AbilityInfo>();");
 abilitySb.AppendLine();
@@ -90,19 +91,29 @@ for (int id = 1; id <= 721; id++)
         int spDef = pokemon.stats.First(s => s.stat.name == "special-defense").base_stat;
         int spd = pokemon.stats.First(s => s.stat.name == "speed").base_stat;
 
+        var apiLearnableMoveKeys = pokemon.moves
+            .Where(moveSlot => moveSlot.version_group_details.Any(v =>
+                v.move_learn_method.name is "level-up" or "egg" or "tutor" or "machine"))
+            .Select(moveSlot => moveSlot.move.name)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var generatedMoveKeys = pokemon.moves
+            .Where(moveSlot => moveSlot.version_group_details.Any(v =>
+                v.move_learn_method.name == "level-up"))
+            .Select(moveSlot => moveSlot.move.name)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
         var learnableMoveKeys = new List<string>();
-        foreach (var moveSlot in pokemon.moves)
+        foreach (var slug in generatedMoveKeys)
         {
-            bool learnsByLevelUp = moveSlot.version_group_details.Any(v => v.move_learn_method.name == "level-up");
-            if (!learnsByLevelUp) continue;
-
-            string slug = moveSlot.move.name;
-
-            if (!moveCache.Contains(slug))
+            if (!moveCache.Contains(slug) && !unsupportedMoveCache.Contains(slug))
             {
                 var moveDetail = await http.GetFromJsonAsync<PokeApiMoveDetail>($"https://pokeapi.co/api/v2/move/{slug}");
-                if (moveDetail == null) continue;
-                if (!typeMap.ContainsKey(moveDetail.type.name)) continue;
+                if (moveDetail == null || !typeMap.ContainsKey(moveDetail.type.name))
+                {
+                    unsupportedMoveCache.Add(slug);
+                    continue;
+                }
 
                 string ailmentRaw = moveDetail.meta?.ailment?.name ?? "none";
                 bool hasDamage = moveDetail.power != null && moveDetail.power > 0;
@@ -112,7 +123,11 @@ for (int id = 1; id <= 721; id++)
                 bool hasHealing = (moveDetail.meta?.healing ?? 0) != 0;
                 bool hasDrain = (moveDetail.meta?.drain ?? 0) != 0;
 
-                if (!hasDamage && !hasAilment && !hasStatChange && !hasFlinch && !hasHealing && !hasDrain) continue;
+                if (!hasDamage && !hasAilment && !hasStatChange && !hasFlinch && !hasHealing && !hasDrain)
+                {
+                    unsupportedMoveCache.Add(slug);
+                    continue;
+                }
 
                 bool isStatus = moveDetail.damage_class.name == "status";
                 bool isSpecial = moveDetail.damage_class.name == "special";
@@ -162,6 +177,7 @@ for (int id = 1; id <= 721; id++)
         if (learnableMoveKeys.Count == 0) learnableMoveKeys.Add("tackle");
 
         string moveList = string.Join(", ", learnableMoveKeys.Distinct().Select(m => $"\"{m}\""));
+        string apiLearnableMoveList = string.Join(", ", apiLearnableMoveKeys.Select(m => $"\"{m}\""));
 
         var abilityNames = new List<string>();
         foreach (var slot in pokemon.abilities.Take(2))
@@ -207,7 +223,7 @@ for (int id = 1; id <= 721; id++)
             evolvesToLine = nextId.ToString();
         }
 
-        pokemonSb.AppendLine($"        All[{id}] = new PokemonData(\"{korName}\", \"{pokemon.name}\", PokemonType.{type1}, {type2Line}, {hp}, {atk}, {def}, {spAtk}, {spDef}, {spd}, new[] {{ {moveList} }}, new[] {{ {abilityList} }}, \"{imageUrl}\", \"{backImageUrl}\", {evolvesToLine}, 5);");
+        pokemonSb.AppendLine($"        All[{id}] = new PokemonData(\"{korName}\", \"{pokemon.name}\", PokemonType.{type1}, {type2Line}, {hp}, {atk}, {def}, {spAtk}, {spDef}, {spd}, new[] {{ {moveList} }}, new[] {{ {abilityList} }}, \"{imageUrl}\", \"{backImageUrl}\", {evolvesToLine}, 5, new[] {{ {apiLearnableMoveList} }});");
 
         Console.WriteLine($"[{id}/721] {korName} 완료");
     }
