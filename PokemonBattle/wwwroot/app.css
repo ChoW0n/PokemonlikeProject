@@ -4826,3 +4826,417 @@ p {
         width: 100%;
     }
 }
+
+/* Team, starter and collection flow: shared hierarchy and touch-safe states. */
+.screen-heading,
+.continue-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 16px;
+}
+
+.screen-heading h1,
+.continue-heading h1 {
+    margin-bottom: 4px;
+}
+
+.screen-heading .intro,
+.continue-heading > div:first-child > p:last-child {
+    max-width: 680px;
+    line-height: 1.65;
+}
+
+.flow-count {
+    display: inline-flex;
+    flex: 0 0 auto;
+    min-width: 76px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 9px 11px;
+    border: 1px solid var(--gold-700);
+    background: rgba(195, 166, 99, .08);
+    color: var(--gold-300);
+    text-align: center;
+}
+
+.flow-count strong {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.flow-count span {
+    color: var(--ash);
+    font-family: var(--font-mono);
+    font-size: .56rem;
+    white-space: nowrap;
+}
+
+.flow-steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin: 0 0 16px;
+}
+
+.flow-steps span {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 7px 6px;
+    border: 1px solid var(--line-soft);
+    background: rgba(20, 30, 35, .58);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: .56rem;
+    text-align: center;
+}
+
+.flow-steps b {
+    color: var(--muted);
+    font-size: .62rem;
+}
+
+.flow-steps span.is-active {
+    border-color: var(--gold-500);
+    background: rgba(195, 166, 99, .12);
+    color: var(--gold-300);
+}
+
+.flow-steps span.is-active b,
+.flow-steps span.is-complete b {
+    color: var(--gold-300);
+}
+
+.flow-steps span.is-complete {
+    border-color: rgba(142, 52, 70, .62);
+    color: var(--ash);
+}
+
+.team-status-bar {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 5px 12px;
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border-left: 2px solid var(--gold-500);
+    background: rgba(195, 166, 99, .06);
+    color: var(--ash);
+    font-size: .72rem;
+}
+
+.team-status-bar strong {
+    color: var(--gold-300);
+}
+
+.card-state {
+    display: block;
+    min-height: 1.1em;
+    margin-top: 3px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: .54rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    line-height: 1.35;
+}
+
+.card-state.is-selected {
+    color: var(--gold-300);
+}
+
+.dex-entry-button:focus-visible,
+.collection-back:focus-visible,
+.collection-nav-top:focus-visible,
+.collection-bottom-top:focus-visible,
+.flow-steps span:focus-visible {
+    outline: 2px solid var(--gold-300);
+    outline-offset: 2px;
+}
+
+.detail-heading {
+    margin-bottom: 12px;
+}
+
+.detail-state {
+    flex: 0 0 auto;
+    padding: 7px 9px;
+    border: 1px solid var(--line);
+    color: var(--gold-300);
+    font-family: var(--font-mono);
+    font-size: .56rem;
+    font-weight: 700;
+}
+
+.footer-copy {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+}
+
+.footer-copy strong {
+    color: var(--gold-300);
+    font-size: .78rem;
+}
+
+.footer-copy span {
+    color: var(--ash);
+    font-size: .65rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.footer-actions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.selection-tray {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 14px;
+    padding: 9px 10px;
+    border: 1px solid var(--line-soft);
+    background: rgba(20, 30, 35, .54);
+}
+
+.selection-tray-label {
+    margin-right: 3px;
+    color: var(--gold-500);
+    font-family: var(--font-mono);
+    font-size: .56rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+}
+
+.selection-tray-empty {
+    color: var(--muted);
+    font-size: .7rem;
+}
+
+.selection-chip {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    padding: 4px 7px;
+    border: 1px solid var(--gold-700);
+    background: rgba(195, 166, 99, .1);
+    color: var(--cream);
+    font-size: .66rem;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.selection-chip-index {
+    color: var(--gold-300);
+    font-family: var(--font-mono);
+    font-size: .56rem;
+}
+
+.list-empty,
+.collection-empty {
+    display: flex;
+    min-height: 190px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 30px 18px;
+    border: 1px dashed var(--line);
+    background: rgba(20, 30, 35, .46);
+    color: var(--ash);
+    text-align: center;
+}
+
+.compact-empty {
+    margin-top: 10px;
+    padding: 18px 12px;
+    border: 1px dashed var(--line);
+    background: rgba(20, 30, 35, .46);
+    color: var(--muted);
+    font-size: .7rem;
+    text-align: center;
+}
+
+.empty-mark {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border: 1px solid var(--gold-700);
+    color: var(--gold-300);
+    font-size: 1.25rem;
+}
+
+.list-empty strong,
+.collection-empty h2 {
+    margin: 0;
+    color: var(--cream);
+    font-size: .88rem;
+}
+
+.list-empty > span:last-child,
+.collection-empty p {
+    margin: 0;
+    color: var(--muted);
+    font-size: .7rem;
+    line-height: 1.6;
+}
+
+.collection-empty {
+    min-height: 280px;
+}
+
+.collection-empty .collection-back {
+    margin-top: 8px;
+}
+
+.continue-team-grid {
+    margin-top: 14px;
+}
+
+.continue-heading > div:first-child > p:last-child {
+    margin-bottom: 0;
+    color: var(--ash);
+    font-size: .82rem;
+}
+
+.continue-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line-soft);
+}
+
+.continue-actions > div:first-child {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+}
+
+.continue-actions > div:first-child strong {
+    color: var(--gold-300);
+    font-size: .8rem;
+}
+
+.continue-actions > div:first-child span {
+    color: var(--muted);
+    font-size: .68rem;
+    line-height: 1.5;
+}
+
+.continue-action-buttons {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.continue-action-buttons button {
+    margin: 0;
+}
+
+.continue-action-buttons .primary-action {
+    border-color: var(--gold-500);
+    background: var(--wine-700);
+    color: var(--gold-300);
+}
+
+@media (max-width: 680px) {
+    .screen-heading,
+    .continue-heading {
+        gap: 12px;
+    }
+
+    .flow-count {
+        min-width: 68px;
+        padding-inline: 8px;
+    }
+
+    .flow-steps span {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 2px;
+        justify-content: center;
+        min-height: 46px;
+    }
+
+    .pokedex-footer {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .footer-actions,
+    .footer-actions button,
+    .continue-action-buttons,
+    .continue-action-buttons button {
+        width: 100%;
+    }
+
+    .footer-actions,
+    .continue-action-buttons {
+        justify-content: stretch;
+    }
+
+    .continue-actions {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .continue-status {
+        margin-top: 14px;
+    }
+}
+
+@media (max-width: 420px) {
+    .screen-heading,
+    .continue-heading {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .screen-heading .intro,
+    .continue-heading > div:first-child > p:last-child {
+        font-size: .72rem;
+    }
+
+    .flow-steps {
+        gap: 4px;
+    }
+
+    .flow-steps span {
+        font-size: .5rem;
+    }
+
+    .team-status-bar {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .selection-tray {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

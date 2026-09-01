@@ -27,15 +27,24 @@
 
             <div class="collection-header">
                 <div>
+                    <p class="eyebrow">COLLECTION / DEX</p>
                     <h1>획득한 포켓몬</h1>
                     <p class="intro">지금까지 모은 포켓몬을 확인하세요.</p>
                 </div>
-                <strong class="collection-count">@(OwnedPokemon.Count)마리</strong>
+                <div class="flow-count collection-count" aria-label="@($"획득한 포켓몬 {OwnedPokemon.Count}마리")">
+                    <strong>@OwnedPokemon.Count</strong>
+                    <span>마리</span>
+                </div>
             </div>
 
             @if (OwnedPokemon.Count == 0)
             {
-                <p class="collection-empty">아직 획득한 포켓몬이 없습니다.</p>
+                <div class="empty-state collection-empty">
+                    <span class="empty-mark">◈</span>
+                    <h2>도감이 아직 비어 있습니다</h2>
+                    <p>배틀에서 포켓몬을 해금하면 이곳에서 다시 확인할 수 있습니다.</p>
+                    <button type="button" class="collection-back" @onclick="GoBack">홈으로 돌아가기</button>
+                </div>
             }
             else
             {
