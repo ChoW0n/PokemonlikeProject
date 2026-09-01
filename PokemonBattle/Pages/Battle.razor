@@ -9,6 +9,7 @@
 @inject IJSRuntime JS
 @inject BattleEngine Rules
 @inject CurrentUserService CurrentUser
+@inject ILogger<Battle> Logger
 
 <PageTitle>포켓몬 배틀</PageTitle>
 
@@ -246,6 +247,13 @@
         }
 
         <div class="battle-log-panel" role="log" aria-live="polite" aria-atomic="false" aria-label="전투 로그">
+            @if (!string.IsNullOrWhiteSpace(ActionError))
+            {
+                <div class="form-message battle-recovery-message" role="alert">
+                    @ActionError
+                    <button type="button" class="secondary-action" @onclick="RetryBattleAction">다시 시도</button>
+                </div>
+            }
             @for (int logIndex = 0; logIndex < LogHistory.Count; logIndex++)
             {
                 var entry = LogHistory[logIndex];
@@ -282,6 +290,7 @@
 
     private int Turn;
     private bool IsBusy;
+    private string? ActionError;
     private int narrationCursor;
     private TaskCompletionSource<bool>? pendingLogRender;
 
@@ -747,6 +756,8 @@
     private async Task UseMove(string? heroMoveKey)
     {
         if (IsBusy) return;
+        IsBusy = true;
+        ActionError = null;
 
         try
         {
@@ -758,6 +769,7 @@
             if (heroMoveKey == null && HeroHasUsableMove)
             {
                 await ShowMessage("사용할 수 있는 기술이 남아 있습니다.", 800);
+                IsBusy = false;
                 return;
             }
 
@@ -767,6 +779,7 @@
                 Menu = BattleMenu.Attack;
                 await ShowMessage("이 기술은 PP가 없거나 구애 도구로 잠겨 있어 사용할 수 없습니다.", 800);
                 StateHasChanged();
+                IsBusy = false;
                 return;
             }
 
@@ -777,7 +790,6 @@
 
             BeginActionLog();
             PendingMoveKey = null;
-            IsBusy = true;
             await BeginEffects();
             Menu = BattleMenu.Main;
             Turn++;
@@ -808,20 +820,21 @@
 
             await FinishPlayerAction();
         }
-        catch
+        catch (Exception exception)
         {
-            await RecoverFromActionError();
+            await RecoverFromActionError(exception);
         }
     }
 
     private async Task SwitchTo(int newIndex)
     {
         if (IsBusy) return;
+        IsBusy = true;
+        ActionError = null;
 
         try
         {
             BeginActionLog();
-            IsBusy = true;
             await BeginEffects();
             Menu = BattleMenu.Main;
             Turn++;
@@ -855,9 +868,9 @@
 
             await FinishPlayerAction();
         }
-        catch
+        catch (Exception exception)
         {
-            await RecoverFromActionError();
+            await RecoverFromActionError(exception);
         }
     }
 
@@ -866,10 +879,11 @@
         if (IsBusy || idx < 0 || idx >= PlayerTeam.Count || PlayerTeam[idx].IsFainted)
             return;
 
+        IsBusy = true;
+        ActionError = null;
         try
         {
             BeginActionLog();
-            IsBusy = true;
             await BeginEffects();
             var outgoing = Hero;
             await PlayBattleEvent(BattleEvent.ActorStep(BattleEventPhase.Switch, outgoing, actorIsHero: true));
@@ -896,14 +910,15 @@
 
             await FinishPlayerAction();
         }
-        catch
+        catch (Exception exception)
         {
-            await RecoverFromActionError();
+            await RecoverFromActionError(exception);
         }
     }
 
-    private async Task RecoverFromActionError()
+    private async Task RecoverFromActionError(Exception exception)
     {
+        Logger.LogError(exception, "Battle action failed; returning the circuit to a retryable state.");
         try
         {
             await CancelEffects();
@@ -917,6 +932,7 @@
         PendingMoveKey = null;
         Menu = BattleMenu.Main;
         PromptText = null;
+        ActionError = "배틀 처리 중 문제가 발생했습니다. 현재 상태를 유지했으니 다시 시도해주세요.";
         LogHistory.Add("오류가 발생했습니다. 다시 시도해주세요.");
         if (LogHistory.Count > MaxBattleLogLines) LogHistory.RemoveAt(0);
 
@@ -940,6 +956,7 @@
     {
         await EndEffects();
         IsBusy = false;
+        ActionError = null;
 
         if (!Hero.IsFainted && Hero.RampageMoveKey != null)
         {
@@ -949,5 +966,12 @@
 
         PromptText = "행동을 선택하세요.";
         StateHasChanged();
+    }
+
+    private Task RetryBattleAction()
+    {
+        ActionError = null;
+        PromptText = "행동을 선택하세요.";
+        return InvokeAsync(StateHasChanged);
     }
 }

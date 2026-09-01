@@ -1,9 +1,35 @@
 ﻿@inherits LayoutComponentBase
 
-@Body
+<ErrorBoundary @ref="_errorBoundary">
+    <ChildContent>
+        @Body
+    </ChildContent>
+    <ErrorContent Context="exception">
+        <main class="start-page circuit-recovery" role="alert">
+            <h1>배틀 연결이 잠시 멈췄습니다</h1>
+            <p>현재 화면을 안전하게 복구하지 못했습니다. 다시 시도하거나 페이지를 새로고침해주세요.</p>
+            <div class="recovery-actions">
+                <button type="button" @onclick="RecoverCircuit">다시 시도</button>
+                <button type="button" @onclick="ReloadPage">새로고침</button>
+            </div>
+        </main>
+    </ErrorContent>
+</ErrorBoundary>
 
 <div id="blazor-error-ui">
     오류가 발생했습니다. 페이지를 새로고침하거나 다시 시도해주세요.
     <a href="" class="reload">새로고침</a>
     <a class="dismiss" aria-label="닫기">×</a>
 </div>
+
+@code {
+    private ErrorBoundary? _errorBoundary;
+
+    private void RecoverCircuit() => _errorBoundary?.Recover();
+
+    private void ReloadPage() =>
+        NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+}

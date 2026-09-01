@@ -12,6 +12,8 @@ public class GameState
     private readonly CurrentUserService _currentUser;
     private readonly SkillRatingService _skillRatings;
     private readonly PlayerProgressionStore? _progression;
+    private readonly SemaphoreSlim _persistGate = new(1, 1);
+    private readonly SemaphoreSlim _outcomeGate = new(1, 1);
 
     public GameScreen CurrentScreen { get; private set; } = GameScreen.Start;
     public int CurrentScore { get; private set; }
@@ -65,6 +67,8 @@ public class GameState
         ?? RunMetaCatalog.RiskCovenants.FirstOrDefault();
 
     private bool _runLoaded;
+    private readonly object _loadSync = new();
+    private Task? _loadTask;
     private bool _battleOutcomeProcessed;
     private readonly List<RunRoundPerformance> _roundPerformances = new();
     private readonly List<StolenMoveOption> _battleUsedEnemyMoves = new();
@@ -95,20 +99,31 @@ public class GameState
 
     private readonly List<LegendaryEncounterHistoryEntry> _legendaryEncounterHistory = new();
 
-    public async Task LoadRunForCurrentUser()
+    public Task LoadRunForCurrentUser()
     {
-        if (_runLoaded || !_currentUser.IsLoggedIn) return;
+        if (_runLoaded || !_currentUser.IsLoggedIn) return Task.CompletedTask;
 
-        var (
-            score,
-            highScore,
-            loadouts,
-            legendaryProgressPercent,
-            legendaryEncounterHistory,
-            difficultyAdjustment,
-            roundPerformances,
-            metaState) =
-            await _runStore.Load(_currentUser.Username!);
+        lock (_loadSync)
+        {
+            if (_runLoaded || !_currentUser.IsLoggedIn) return Task.CompletedTask;
+            return _loadTask ??= LoadRunForCurrentUserCore();
+        }
+    }
+
+    private async Task LoadRunForCurrentUserCore()
+    {
+        try
+        {
+            var (
+                score,
+                highScore,
+                loadouts,
+                legendaryProgressPercent,
+                legendaryEncounterHistory,
+                difficultyAdjustment,
+                roundPerformances,
+                metaState) =
+                await _runStore.Load(_currentUser.Username!);
         RunMeta = RunMetaCatalog.Normalize(metaState);
         _legendaryEncounterHistory.Clear();
         _legendaryEncounterHistory.AddRange(legendaryEncounterHistory);
@@ -175,12 +190,23 @@ public class GameState
             await PersistRun();
         }
 
-        _runLoaded = true;
+            _runLoaded = true;
+        }
+        finally
+        {
+            lock (_loadSync)
+            {
+                _loadTask = null;
+            }
+        }
     }
 
     public async Task ReloadRunForCurrentUser()
     {
-        _runLoaded = false;
+        lock (_loadSync)
+        {
+            _runLoaded = false;
+        }
         await LoadRunForCurrentUser();
     }
 
@@ -188,16 +214,31 @@ public class GameState
     private async Task PersistRun()
     {
         if (!_currentUser.IsLoggedIn) return;
-        await _runStore.Save(
-            _currentUser.Username!,
-            CurrentScore,
-            HighScore,
-            PlayerLoadouts,
-            LegendaryProgressPercent,
-            _legendaryEncounterHistory,
-            CurrentRunDifficultyAdjustment,
-            _roundPerformances,
-            RunMeta);
+
+        await _persistGate.WaitAsync();
+        try
+        {
+            // Snapshot before the database await so a later UI event cannot
+            // mutate the JSON payload halfway through a save.
+            var loadouts = PlayerLoadouts.Select(loadout => loadout.Clone()).ToList();
+            var history = _legendaryEncounterHistory.ToList();
+            var performances = _roundPerformances.ToList();
+            var metaState = RunMeta.Clone();
+            await _runStore.Save(
+                _currentUser.Username!,
+                CurrentScore,
+                HighScore,
+                loadouts,
+                LegendaryProgressPercent,
+                history,
+                CurrentRunDifficultyAdjustment,
+                performances,
+                metaState);
+        }
+        finally
+        {
+            _persistGate.Release();
+        }
     }
 
     public void GoTo(GameScreen screen)
@@ -537,6 +578,19 @@ public class GameState
 
     public async Task WinRound(int turns = 0, IEnumerable<Pokemon>? playerTeam = null)
     {
+        await _outcomeGate.WaitAsync();
+        try
+        {
+            await WinRoundCore(turns, playerTeam);
+        }
+        finally
+        {
+            _outcomeGate.Release();
+        }
+    }
+
+    private async Task WinRoundCore(int turns, IEnumerable<Pokemon>? playerTeam)
+    {
         if (_battleOutcomeProcessed) return;
         _battleOutcomeProcessed = true;
         RecordRoundPerformance(turns, playerTeam, cleared: true);
@@ -601,6 +655,19 @@ public class GameState
     }
 
     public async Task LoseBattle(int turns = 0, IEnumerable<Pokemon>? playerTeam = null)
+    {
+        await _outcomeGate.WaitAsync();
+        try
+        {
+            await LoseBattleCore(turns, playerTeam);
+        }
+        finally
+        {
+            _outcomeGate.Release();
+        }
+    }
+
+    private async Task LoseBattleCore(int turns, IEnumerable<Pokemon>? playerTeam)
     {
         if (_battleOutcomeProcessed) return;
         _battleOutcomeProcessed = true;

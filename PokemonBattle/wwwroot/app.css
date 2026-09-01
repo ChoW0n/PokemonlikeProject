@@ -1912,6 +1912,32 @@ button:disabled {
     min-height: 1.9em;
 }
 
+.circuit-recovery {
+    max-width: 680px;
+    margin: 10vh auto;
+    text-align: center;
+}
+
+.circuit-recovery p {
+    color: var(--muted);
+}
+
+.recovery-actions {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.battle-recovery-message {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid rgba(216, 153, 142, .45);
+}
+
 .start-page > button,
 .auth-form button,
 .result-page > button,
