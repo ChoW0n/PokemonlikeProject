@@ -1779,7 +1779,17 @@ button:disabled {
     font-weight: 800;
 }
 
-.dex-entry-button,
+.dex-entry-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0;
+    width: 100%;
+    font: inherit;
+    color: inherit;
+}
+
 .preset-entry {
     width: 100%;
     font: inherit;
@@ -5238,5 +5248,401 @@ p {
     .selection-tray {
         align-items: flex-start;
         flex-direction: column;
+    }
+}
+
+/* ==========================================================================
+   Progress and operations refinement
+   Keep high-density screens scannable without hiding user-provided content.
+   ========================================================================== */
+.mailbox-header {
+    margin-bottom: 22px;
+}
+
+.mailbox-header .intro {
+    max-width: 66ch;
+}
+
+.mailbox-page > .info-panel {
+    margin-bottom: 26px;
+}
+
+.mailbox-section {
+    padding: clamp(16px, 3vw, 22px);
+    border: 1px solid var(--line-soft);
+    background: rgba(17, 10, 13, .72);
+}
+
+.mailbox-section-heading,
+.mailbox-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.mailbox-section-heading {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.mailbox-section-heading h2 {
+    margin-bottom: 0;
+}
+
+.mailbox-unread-summary {
+    flex: 0 0 auto;
+    padding: 6px 10px;
+    border: 1px solid rgba(224, 199, 131, .28);
+    background: rgba(101, 70, 38, .16);
+    color: var(--ash);
+    font-family: var(--font-mono);
+    font-size: .62rem;
+    text-align: right;
+}
+
+.mailbox-unread-summary strong {
+    color: var(--gold-300);
+    font-size: .82rem;
+}
+
+.mailbox-actions {
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.mailbox-action-note {
+    max-width: 52ch;
+    color: var(--muted);
+    font-size: .7rem;
+    line-height: 1.6;
+}
+
+.mailbox-mark-all,
+.mailbox-read-button {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 7px 12px;
+    border: 1px solid rgba(199, 167, 98, .46);
+    border-radius: 0;
+    background: rgba(109, 30, 42, .62);
+    color: var(--accent-bright);
+    font-size: .7rem;
+    font-weight: 800;
+}
+
+.mailbox-mark-all:disabled {
+    color: var(--muted);
+}
+
+.mailbox-message {
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px;
+    border-left: 2px solid transparent;
+}
+
+.mailbox-message.is-unread {
+    border-color: rgba(224, 199, 131, .58);
+    background: rgba(101, 70, 38, .18);
+}
+
+.mailbox-message.is-read {
+    border-color: rgba(199, 167, 98, .18);
+    background: rgba(17, 10, 13, .52);
+}
+
+.mailbox-message-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.mailbox-message-heading {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    margin-bottom: 6px;
+}
+
+.mailbox-message-heading strong {
+    color: var(--parchment);
+    font-size: .84rem;
+}
+
+.mailbox-message-copy p {
+    margin-bottom: 9px;
+    color: var(--ash);
+    font-size: .76rem;
+    line-height: 1.7;
+}
+
+.mailbox-message-date {
+    display: block;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: .6rem;
+}
+
+.mailbox-message-state {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 2px 7px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: .58rem;
+    font-weight: 800;
+    letter-spacing: .03em;
+}
+
+.mailbox-message-state.is-unread {
+    color: var(--gold-300);
+    background: rgba(224, 199, 131, .1);
+}
+
+.mailbox-message-state.is-read {
+    color: var(--muted);
+    background: rgba(255, 255, 255, .03);
+}
+
+.mailbox-empty-state {
+    padding: 22px 12px 10px;
+    color: var(--ash);
+    text-align: center;
+}
+
+.mailbox-empty-state strong {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--parchment);
+    font-size: .82rem;
+}
+
+.mailbox-empty-state p {
+    margin-bottom: 0;
+    color: var(--muted);
+    font-size: .72rem;
+}
+
+.leaderboard-header {
+    margin-bottom: 22px;
+}
+
+.leaderboard-header .intro {
+    max-width: 58ch;
+}
+
+.leaderboard-self {
+    grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(120px, 1fr));
+    margin-bottom: 22px;
+}
+
+.leaderboard-self > div:first-child {
+    min-width: 0;
+}
+
+.leaderboard-self > div:first-child span:last-child {
+    overflow-wrap: anywhere;
+}
+
+.leaderboard-panel {
+    padding: clamp(16px, 3vw, 22px);
+}
+
+.leaderboard-table {
+    min-width: 560px;
+    table-layout: fixed;
+}
+
+.leaderboard-column-rank {
+    width: 76px;
+}
+
+.leaderboard-column-user {
+    width: auto;
+}
+
+.leaderboard-column-rating,
+.leaderboard-column-runs {
+    width: 120px;
+}
+
+.leaderboard-table th,
+.leaderboard-table td {
+    vertical-align: top;
+}
+
+.leaderboard-table th:first-child,
+.leaderboard-table td:first-child,
+.leaderboard-table th:nth-child(n + 3),
+.leaderboard-table td:nth-child(n + 3) {
+    white-space: nowrap;
+}
+
+.leaderboard-table td:nth-child(2) {
+    overflow-wrap: anywhere;
+}
+
+.admin-overview {
+    margin-bottom: var(--sp-4);
+    padding: var(--sp-4);
+    border: 1px solid var(--line-soft);
+    background: var(--panel-ink);
+}
+
+.admin-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-3);
+    padding-bottom: 11px;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.admin-section-heading h2 {
+    margin: 0;
+    color: var(--gold-300);
+    font-size: 1rem;
+}
+
+.admin-overview .admin-metric-grid {
+    margin-bottom: 0;
+}
+
+.admin-analytics-panel {
+    border-top: 2px solid rgba(199, 167, 98, .34);
+}
+
+.admin-user-layout {
+    align-items: stretch;
+}
+
+.admin-directory,
+.admin-detail-panel {
+    border-top: 2px solid rgba(199, 167, 98, .24);
+}
+
+.admin-user-row > span:first-child {
+    min-width: 0;
+}
+
+.admin-user-row strong {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.admin-bar-label {
+    align-items: flex-start;
+}
+
+.admin-bar-label span {
+    min-width: 0;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.admin-detail-panel .admin-tools {
+    border-top: 1px solid var(--line-soft);
+}
+
+.admin-detail-panel .admin-personal-insights {
+    margin-top: 18px;
+}
+
+.admin-audit-table th,
+.admin-audit-table td {
+    vertical-align: top;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.admin-audit-table th:first-child,
+.admin-audit-table td:first-child {
+    white-space: nowrap;
+}
+
+.admin-audit-table th:last-child,
+.admin-audit-table td:last-child {
+    min-width: 280px;
+}
+
+@media (max-width: 720px) {
+    .mailbox-section-heading,
+    .mailbox-actions {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .mailbox-unread-summary {
+        text-align: left;
+    }
+
+    .mailbox-mark-all {
+        width: 100%;
+    }
+
+    .leaderboard-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .leaderboard-back {
+        align-self: flex-start;
+    }
+
+    .leaderboard-self {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .leaderboard-self > div:first-child {
+        grid-column: 1 / -1;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--line-soft);
+    }
+
+    .leaderboard-self-stat {
+        padding-left: 0;
+        border-left: 0;
+    }
+
+    .admin-section-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .admin-detail-panel .admin-personal-insights {
+        margin-top: 14px;
+    }
+}
+
+@media (max-width: 420px) {
+    .mailbox-section,
+    .admin-overview,
+    .leaderboard-panel {
+        padding: 14px;
+    }
+
+    .mailbox-message {
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .mailbox-read-button {
+        width: 100%;
+    }
+
+    .leaderboard-self {
+        grid-template-columns: 1fr;
+    }
+
+    .leaderboard-self > div:first-child {
+        grid-column: auto;
     }
 }
