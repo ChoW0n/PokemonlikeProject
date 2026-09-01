@@ -433,6 +433,7 @@ public static class MoveRuleMetadata
             if (attacker.HasActiveAbility("의욕", defender) && !move.IsStatus && !move.IsSpecial) accuracy *= 0.8;
             if (attacker.HasActiveAbility("복안", defender)) accuracy *= 1.3;
             if (attacker.HasActiveAbility("승리의별", defender)) accuracy *= 1.1;
+            if (attacker.HasActiveHeldItem(defender) && attacker.HeldItem == "광각렌즈") accuracy *= 1.1;
             bool attackerUnaware = attacker.HasActiveAbility("천진", defender);
             if (!attackerUnaware)
                 accuracy *= AccuracyStageMultiplier(attacker.StatStages["accuracy"]);
@@ -461,6 +462,8 @@ public static class MoveRuleMetadata
             {
                 accuracy *= 0.5;
             }
+            if (defender.HasActiveHeldItem(attacker) && defender.HeldItem == "반짝가루")
+                accuracy *= 0.9;
         }
 
         return accuracy;

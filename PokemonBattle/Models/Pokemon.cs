@@ -144,7 +144,9 @@ public class Pokemon
         (HasActiveAbility("라이트메탈", opponent) ? 0.5 : 1.0) * Data.BaseHp;
 
     public bool HasActiveHeldItem(Pokemon? opponent = null) =>
-        HeldItem != "없음" && !HasActiveAbility("서투름", opponent);
+        HeldItem != "없음"
+        && EmbargoTurnsRemaining <= 0
+        && !HasActiveAbility("서투름", opponent);
 
     public bool HasActiveAbility(string ability, Pokemon? opponent = null) =>
         SelectedAbility == ability
@@ -164,6 +166,11 @@ public class Pokemon
         if (HeldItem == "전기구슬" && isPikachu && (stat == "attack" || stat == "special-attack")) return 2.0;
         if (HeldItem == "두꺼운뼈" && isMarowak && stat == "attack") return 2.0;
         if (HeldItem == "이슬의구슬" && isLatiosLatias && (stat == "special-attack" || stat == "special-defense")) return 1.5;
+        if (HeldItem == "메탈파우더" && Data.EnglishName == "ditto"
+            && (stat == "defense" || stat == "special-defense")) return 1.5;
+        if (HeldItem == "돌격조끼" && stat == "special-defense") return 1.5;
+        if (HeldItem == "진화의휘석" && Data.EvolvesToId != null
+            && (stat == "defense" || stat == "special-defense")) return 1.5;
         return 1.0;
     }
 
@@ -379,6 +386,9 @@ public class Pokemon
         if (DisabledMoveKey == moveName) return false;
         if (ImprisonedMoveKeys.Contains(moveName)) return false;
         if (IsChoiceItem && ChoiceLockedMove != null && ChoiceLockedMove != moveName) return false;
+        if (HasActiveHeldItem() && HeldItem == "돌격조끼"
+            && MoveDatabase.All.TryGetValue(moveName, out var moveForItem)
+            && moveForItem.IsStatus) return false;
         if (moveName == "belch" && !HasConsumedBerry) return false;
         if (moveName is "snore" or "dream-eater" && Status != StatusCondition.Sleep) return false;
         if (moveName == "fake-out" && TurnsOnField > 0) return false;
@@ -490,6 +500,8 @@ public class Pokemon
     public bool CanChangeStage(string stat, int delta, bool causedByOpponent = false)
     {
         if (!StatStages.ContainsKey(stat) || delta == 0) return false;
+        if (causedByOpponent && delta < 0 && HasActiveHeldItem() && HeldItem == "클리어아뮬렛")
+            return false;
         if (causedByOpponent && delta < 0 && stat == "accuracy" && SelectedAbility == "날카로운눈")
             return false;
         if (causedByOpponent && delta < 0 && (SelectedAbility is "클리어바디" or "하얀연기")) return false;
@@ -506,6 +518,15 @@ public class Pokemon
         if (SelectedAbility == "심술꾸러기") delta = -delta;
         if (SelectedAbility == "단순") delta *= 2;
         StatStages[stat] = Math.Clamp(StatStages[stat] + delta, -6, 6);
+        if (delta < 0 && HasActiveHeldItem() && HeldItem == "하얀허브"
+            && StatStages.Values.Any(stage => stage < 0))
+        {
+            foreach (string stageKey in StatStages.Keys.ToArray())
+            {
+                if (StatStages[stageKey] < 0) StatStages[stageKey] = 0;
+            }
+            HeldItem = "없음";
+        }
     }
 
     public void AdvanceTurn()
@@ -842,7 +863,12 @@ public class Pokemon
         int finalDamage = (int)(rawDamage * multiplier * dmgMultiplier);
 
         CurrentHp -= finalDamage;
-        if (finalDamage > 0) WasDamagedThisTurn = true;
+        if (finalDamage > 0)
+        {
+            WasDamagedThisTurn = true;
+            if (HeldItem == "풍선" && HasActiveHeldItem(attacker))
+                HeldItem = "없음";
+        }
         if (finalDamage > 0) BreakIllusion();
         if (finalDamage > 0 && RageActive) ChangeStage("attack", 1);
         if (CurrentHp <= 0)

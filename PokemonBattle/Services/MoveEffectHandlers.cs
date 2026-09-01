@@ -108,6 +108,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         var attacker = context.Attacker;
         var defender = context.Defender;
         bool suppressSecondaryEffects = attacker.HasActiveAbility("우격다짐", defender)
+            || (defender.HasActiveHeldItem(attacker) && defender.HeldItem == "방호막")
             || (!move.IsStatus && defender.HasActiveAbility("인분", attacker));
         int chanceMultiplier = attacker.HasActiveAbility("하늘의은총", defender) ? 2 : 1;
 
@@ -147,6 +148,9 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                 }
             }
             else if (defender.Status == StatusCondition.None
+                && !(defender.HasActiveHeldItem(attacker)
+                    && defender.HeldItem == "방진고글"
+                    && context.MoveKey is "poison-powder" or "sleep-powder" or "stun-spore")
                 && !defender.IsImmuneToAilment(move.AilmentName, attacker))
             {
                 string ailment = context.MoveKey == "toxic" ? "toxic" : move.AilmentName;
@@ -339,15 +343,15 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         switch (key)
         {
             case "reflect":
-                attacker.SetReflect(5);
+                attacker.SetReflect(attacker.HasActiveHeldItem(defender) && attacker.HeldItem == "빛의점토" ? 8 : 5);
                 await context.ShowMessage($"{attacker.Data.Name} 주위에 리플렉터가 펼쳐졌다!");
                 break;
             case "light-screen":
-                attacker.SetLightScreen(5);
+                attacker.SetLightScreen(attacker.HasActiveHeldItem(defender) && attacker.HeldItem == "빛의점토" ? 8 : 5);
                 await context.ShowMessage($"{attacker.Data.Name} 주위에 빛의장막이 펼쳐졌다!");
                 break;
             case "aurora-veil":
-                attacker.SetAuroraVeil(5);
+                attacker.SetAuroraVeil(attacker.HasActiveHeldItem(defender) && attacker.HeldItem == "빛의점토" ? 8 : 5);
                 await context.ShowMessage($"{attacker.Data.Name} 주위에 오로라베일이 펼쳐졌다!");
                 break;
         }

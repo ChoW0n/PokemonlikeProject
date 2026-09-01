@@ -18,6 +18,14 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
         if (attacker.HasActiveHeldItem(context.Defender) && attacker.HeldItem == "힘의머리띠" && !move.IsSpecial) context.Power *= 1.1;
         if (attacker.HasActiveHeldItem(context.Defender) && attacker.HeldItem == "구애안경" && move.IsSpecial) context.Power *= 1.5;
         if (attacker.HasActiveHeldItem(context.Defender) && attacker.HeldItem == "생명의구슬") context.Power *= 1.3;
+        if (attacker.HasActiveHeldItem(context.Defender) && attacker.HeldItem == "현명한안경" && move.IsSpecial)
+            context.Power *= 1.1;
+        if (attacker.HasActiveHeldItem(context.Defender)
+            && attacker.HeldItem == "달인의띠"
+            && BattleTypeMultiplier(attackType, context.Defender) > 1.0)
+        {
+            context.Power *= 1.2;
+        }
         if (!abilitySuppressed && attacker.SelectedAbility == "타오르는불꽃" && attacker.FlashFireActive && attackType == PokemonType.Fire)
         {
             context.Power *= 1.5;
@@ -106,13 +114,20 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
     public Task AfterDamageResultAsync(BattleEffectContext context)
     {
         var attacker = context.Attacker;
-        if (!attacker.HasActiveHeldItem(context.Defender) || attacker.HeldItem != "생명의구슬"
-            || attacker.HasActiveAbility("매직가드", context.Defender)
-            || attacker.IsFainted || context.TotalDamage <= 0) return Task.CompletedTask;
-
-        int recoil = Math.Max(1, attacker.MaxHp / 10);
-        attacker.CurrentHp = Math.Max(0, attacker.CurrentHp - recoil);
-        if (attacker.CurrentHp == 0) attacker.MarkFainted();
+        if (attacker.HasActiveHeldItem(context.Defender) && attacker.HeldItem == "생명의구슬"
+            && !attacker.HasActiveAbility("매직가드", context.Defender)
+            && !attacker.IsFainted && context.TotalDamage > 0)
+        {
+            int recoil = Math.Max(1, attacker.MaxHp / 10);
+            attacker.CurrentHp = Math.Max(0, attacker.CurrentHp - recoil);
+            if (attacker.CurrentHp == 0) attacker.MarkFainted();
+        }
+        if (attacker.HasActiveHeldItem(context.Defender) && attacker.HeldItem == "조개껍질방울"
+            && !attacker.IsFainted && context.TotalDamage > 0)
+        {
+            int heal = Math.Max(1, context.TotalDamage / 8);
+            attacker.CurrentHp = Math.Min(attacker.MaxHp, attacker.CurrentHp + heal);
+        }
         return Task.CompletedTask;
     }
 
@@ -120,14 +135,44 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
     {
         var pokemon = context.Pokemon;
         if (pokemon.HeldItem != "먹다남은음식" || pokemon.IsFainted
-            || !pokemon.HasActiveHeldItem(context.Opponent)) return;
-
-        int heal = Math.Max(1, pokemon.MaxHp / 16);
-        int before = pokemon.CurrentHp;
-        pokemon.CurrentHp = Math.Min(pokemon.MaxHp, pokemon.CurrentHp + heal);
-        if (pokemon.CurrentHp > before)
+            || !pokemon.HasActiveHeldItem(context.Opponent))
         {
-            await context.ShowMessage($"{pokemon.Data.Name}은(는) {pokemon.HeldItem} 효과로 HP를 회복했다!", 1100);
+            if (pokemon.IsFainted || !pokemon.HasActiveHeldItem(context.Opponent)) return;
+        }
+
+        if (pokemon.HeldItem == "먹다남은음식")
+        {
+            int heal = Math.Max(1, pokemon.MaxHp / 16);
+            int before = pokemon.CurrentHp;
+            pokemon.CurrentHp = Math.Min(pokemon.MaxHp, pokemon.CurrentHp + heal);
+            if (pokemon.CurrentHp > before)
+                await context.ShowMessage($"{pokemon.Data.Name}은(는) {pokemon.HeldItem} 효과로 HP를 회복했다!", 1100);
+        }
+        else if (pokemon.HeldItem == "검은진흙")
+        {
+            if (pokemon.HasType(PokemonType.Poison))
+            {
+                int before = pokemon.CurrentHp;
+                pokemon.CurrentHp = Math.Min(pokemon.MaxHp, pokemon.CurrentHp + Math.Max(1, pokemon.MaxHp / 16));
+                if (pokemon.CurrentHp > before)
+                    await context.ShowMessage($"{pokemon.Data.Name}은(는) 검은진흙으로 HP를 회복했다!", 1100);
+            }
+            else if (!pokemon.HasActiveAbility("매직가드", context.Opponent))
+            {
+                await DamageAsync(context, Math.Max(1, pokemon.MaxHp / 8),
+                    $"{pokemon.Data.Name}은(는) 검은진흙 때문에 데미지를 입었다!");
+            }
+        }
+
+        if (pokemon.IsFainted || !pokemon.HasActiveHeldItem(context.Opponent)) return;
+        if (pokemon.HeldItem is "화염구슬" or "맹독구슬"
+            && pokemon.Status == StatusCondition.None)
+        {
+            string ailment = pokemon.HeldItem == "화염구슬" ? "burn" : "toxic";
+            pokemon.ApplyAilment(ailment, context.Random, context.Opponent);
+            if (pokemon.Status != StatusCondition.None)
+                await context.ShowMessage(
+                    $"{pokemon.Data.Name}은(는) {pokemon.HeldItem} 때문에 상태 이상이 되었다!", 1100);
         }
     }
 
@@ -143,6 +188,16 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
         "자석" => PokemonType.Electric,
         _ => null
     };
+
+    private static async Task DamageAsync(
+        BattleEndOfTurnContext context,
+        int damage,
+        string message)
+    {
+        context.Pokemon.CurrentHp = Math.Max(0, context.Pokemon.CurrentHp - damage);
+        if (context.Pokemon.CurrentHp == 0) context.Pokemon.MarkFainted();
+        await context.ShowMessage(message, 1100);
+    }
 
     private static readonly HashSet<string> PunchMoves = new()
     {
@@ -351,7 +406,8 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
 
         if (pokemon.IsFainted
             || pokemon.HasActiveAbility("매직가드", context.Opponent)
-            || pokemon.HasActiveAbility("방진", context.Opponent)) return;
+            || pokemon.HasActiveAbility("방진", context.Opponent)
+            || (pokemon.HasActiveHeldItem(context.Opponent) && pokemon.HeldItem == "방진고글")) return;
         bool sandDamage = !weatherSuppressed
             && BattleWeather.Current == "모래바람"
             && !pokemon.HasType(PokemonType.Rock)
@@ -423,6 +479,16 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
     {
         if (!context.MakesContact || context.LastHitDamage <= 0 || context.Attacker.IsFainted) return;
 
+        if (context.Defender.HasActiveHeldItem(context.Attacker)
+            && context.Defender.HeldItem == "울퉁불퉁멧"
+            && !context.Attacker.HasActiveAbility("매직가드", context.Defender))
+        {
+            int damage = Math.Max(1, context.Attacker.MaxHp / 6);
+            context.Attacker.CurrentHp = Math.Max(0, context.Attacker.CurrentHp - damage);
+            if (context.Attacker.CurrentHp == 0) context.Attacker.MarkFainted();
+            await context.ShowMessage($"{context.Attacker.Data.Name}은(는) 울퉁불퉁멧에 상처를 입었다!");
+        }
+
         int? reflectedDamage = context.Defender.TryReflectDamage(
             context.MakesContact, context.Attacker);
         if (reflectedDamage != null)
@@ -449,6 +515,17 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
         }
 
         if (context.Defender.IsFainted || context.Attacker.IsFainted) return;
+
+        if (context.Defender.HasActiveHeldItem(context.Attacker)
+            && context.Defender.HeldItem == "약점보험"
+            && context.Defender.LastMultiplier >= 2.0)
+        {
+            context.Defender.HeldItem = "없음";
+            context.Defender.ChangeStage("attack", 2);
+            context.Defender.ChangeStage("special-attack", 2);
+            await context.ShowMessage(
+                $"{context.Defender.Data.Name}의 약점보험으로 공격과 특수공격이 크게 올랐다!");
+        }
 
         if (context.Defender.HasActiveAbility("나쁜손버릇", context.Attacker)
             && context.Defender.HeldItem == "없음"

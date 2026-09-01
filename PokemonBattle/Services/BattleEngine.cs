@@ -575,7 +575,8 @@ public sealed class BattleEngine
 
         PokemonType attackType = MoveRuleMetadata.ResolveMoveType(
             moveKey, move, attacker, defender);
-        bool makesContact = MoveRuleMetadata.MakesContact(moveKey, move);
+        bool makesContact = MoveRuleMetadata.MakesContact(moveKey, move)
+            && !(attacker.HasActiveHeldItem(defender) && attacker.HeldItem == "보호패드");
         string effectKind = TypeColors.GetEffectKind(attackType, move.IsStatus);
         string presentationKey = MovePresentationCatalog.Resolve(moveKey, move);
         await emit(BattleEvent.MoveStep(
@@ -926,7 +927,8 @@ public sealed class BattleEngine
         int stage = 0;
         if (MoveRuleMetadata.HasHighCriticalRate(moveKey)) stage++;
         if (attacker.SelectedAbility == "대운") stage++;
-        if (attacker.HeldItem == "대파") stage += 2;
+        if (attacker.HasActiveHeldItem() && attacker.HeldItem == "대파") stage += 2;
+        if (attacker.HasActiveHeldItem() && attacker.HeldItem == "예리한손톱") stage++;
         return Math.Min(stage, 3);
     }
 
