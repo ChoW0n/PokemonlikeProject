@@ -12,14 +12,6 @@ public sealed class BattleEngine
     private readonly IReadOnlyList<IBattleEffectHandler> effectHandlers;
     private readonly BattleSideState heroSide = new();
     private readonly BattleSideState enemySide = new();
-    private static readonly HashSet<string> MegaEligibleNames = new()
-    {
-        "이상해꽃", "리자몽", "거북왕", "후딘", "팬텀", "캥카", "갸라도스",
-        "프테라", "뮤츠", "전룡", "마릴리", "번치코", "가디안", "입치트",
-        "보스로라", "썬더볼트", "다크펫", "폭타", "얼음귀신", "보만다",
-        "메타그로스", "라티아스", "라티오스", "레쿠쟈", "한카리아스",
-        "루카리오", "눈설왕", "엘레이드", "다부니", "디안시"
-    };
     public RunMetaState? ActiveRunMeta { get; private set; }
 
     public BattleEngine(IEnumerable<IBattleEffectHandler> handlers)
@@ -42,54 +34,6 @@ public sealed class BattleEngine
 
     public void ConfigureRunMeta(RunMetaState? runMeta) =>
         ActiveRunMeta = runMeta;
-
-    public bool CanActivateGimmick(
-        Pokemon pokemon,
-        BattleGimmickKind kind,
-        bool isHeroSide,
-        PokemonType? teraType = null)
-    {
-        if (kind == BattleGimmickKind.None
-            || pokemon.IsFainted
-            || pokemon.ActiveGimmick != BattleGimmickKind.None
-            || (kind == BattleGimmickKind.Terastal && teraType == null)
-            || (isHeroSide ? heroSide : enemySide).GimmickUsed)
-            return false;
-
-        if (kind == BattleGimmickKind.MegaEvolution
-            && !MegaEligibleNames.Contains(pokemon.Data.Name)
-            && !pokemon.HeldItem.Contains("나이트", StringComparison.Ordinal))
-            return false;
-        if (kind == BattleGimmickKind.Gigantamax
-            && !pokemon.Data.EnglishName.EndsWith("-gmax", StringComparison.OrdinalIgnoreCase))
-            return false;
-        return true;
-    }
-
-    public IReadOnlyList<string> ActivateGimmick(
-        Pokemon pokemon,
-        BattleGimmickKind kind,
-        bool isHeroSide,
-        PokemonType? teraType = null)
-    {
-        if (!CanActivateGimmick(pokemon, kind, isHeroSide, teraType))
-            return new[] { $"{pokemon.Data.Name}은(는) 지금 기믹을 사용할 수 없다!" };
-
-        var side = isHeroSide ? heroSide : enemySide;
-        if (!side.TryUseGimmick()
-            || !pokemon.ActivateGimmick(kind, teraType ?? pokemon.CurrentType1))
-            return new[] { "이 전투에서는 이미 기믹을 사용했다!" };
-
-        string gimmickName = kind switch
-        {
-            BattleGimmickKind.MegaEvolution => "메가진화",
-            BattleGimmickKind.Dynamax => "다이맥스",
-            BattleGimmickKind.Gigantamax => "거다이맥스",
-            BattleGimmickKind.Terastal => $"{pokemon.TerastalType} 테라스탈",
-            _ => "기믹"
-        };
-        return new[] { $"{pokemon.Data.Name}이(가) {gimmickName}했다!" };
-    }
 
     public bool CanSwitch(Pokemon active, Pokemon opponent)
     {
@@ -275,11 +219,11 @@ public sealed class BattleEngine
         if (entrant.HasActiveAbility("위협", opponent))
         {
             int before = opponent.StatStages["attack"];
-            opponent.ChangeStage("attack", -1, causedByOpponent: true);
+            opponent.ChangeStage("attack", -1, causedByOpponent: true, opponent: entrant);
             if (opponent.StatStages["attack"] < before)
             {
                 messages.Add($"{entrant.Data.Name}의 위협으로 {opponent.Data.Name}의 공격이 떨어졌다!");
-                string? reaction = opponent.TriggerStatDropAbility();
+                string? reaction = opponent.TriggerStatDropAbility(entrant);
                 if (reaction != null) messages.Add(reaction);
             }
             else
@@ -402,8 +346,6 @@ public sealed class BattleEngine
                 pokemon, emit, opponent, rng, ActiveRunMeta);
             foreach (var handler in effectHandlers) await handler.EndOfTurnAsync(context);
             pokemon.AdvanceTurn();
-            if (pokemon.AdvanceGimmickTurn())
-                await emit(BattleEvent.TurnEnd($"{pokemon.Data.Name}의 기믹 효과가 끝났다!", 900));
         }
 
         if (BattleWeather.AdvanceTurn())
@@ -806,11 +748,15 @@ public sealed class BattleEngine
                     case ProtectionEffect.KingsShield:
                     {
                         int before = attacker.StatStages["attack"];
-                        attacker.ChangeStage("attack", -2, causedByOpponent: true);
+                        attacker.ChangeStage(
+                            "attack",
+                            -2,
+                            causedByOpponent: true,
+                            opponent: defender);
                         if (attacker.StatStages["attack"] < before)
                         {
                             await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 공격이 크게 떨어졌다!"));
-                            string? reaction = attacker.TriggerStatDropAbility();
+                        string? reaction = attacker.TriggerStatDropAbility(defender);
                             if (reaction != null) await emit(BattleEvent.MessageLine(reaction));
                         }
                         break;
@@ -818,7 +764,11 @@ public sealed class BattleEngine
                     case ProtectionEffect.Obstruct:
                     {
                         int before = attacker.StatStages["defense"];
-                        attacker.ChangeStage("defense", -2, causedByOpponent: true);
+                        attacker.ChangeStage(
+                            "defense",
+                            -2,
+                            causedByOpponent: true,
+                            opponent: defender);
                         if (attacker.StatStages["defense"] < before)
                             await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 방어가 크게 떨어졌다!"));
                         break;
@@ -926,7 +876,10 @@ public sealed class BattleEngine
         {
             int attackStat = GetAttackStat(attacker, defender, moveKey, move);
             int defenseStat = GetDefenseStat(attacker, defender, moveKey, move);
-            double power = MoveRuleMetadata.EffectivePower(moveKey, move, attacker, defender);
+            bool movedFirst = attackerMovedFirst
+                ?? EffectiveSpeed(attacker, defender) >= EffectiveSpeed(defender, attacker);
+            double power = MoveRuleMetadata.EffectivePower(
+                moveKey, move, attacker, defender, movedFirst);
             bool stab = attacker.HasType(attackType);
             if (stab) power *= 1.5;
             if (attacker.ChargeBoostActive && attackType == PokemonType.Electric)
@@ -977,7 +930,7 @@ public sealed class BattleEngine
                 context.LastHitDamage = hpBefore - defender.CurrentHp;
                 context.TotalDamage += context.LastHitDamage;
                 context.ActualHits++;
-                string? criticalReaction = defender.TriggerCriticalHitAbility();
+                string? criticalReaction = defender.TriggerCriticalHitAbility(attacker);
                 if (criticalReaction != null) await emit(BattleEvent.MessageLine(criticalReaction));
                 await emit(BattleEvent.MoveStep(
                     BattleEventPhase.Impact,
@@ -1108,7 +1061,11 @@ public sealed class BattleEngine
         if (!entrant.IsFainted && side.StickyWeb)
         {
             int before = entrant.StatStages["speed"];
-            entrant.ChangeStage("speed", -1, causedByOpponent: true);
+            entrant.ChangeStage(
+                "speed",
+                -1,
+                causedByOpponent: true,
+                opponent: opponent);
             if (entrant.StatStages["speed"] < before)
                 messages.Add($"{entrant.Data.Name}은(는) 끈적끈적네트에 걸려 스피드가 떨어졌다!");
         }

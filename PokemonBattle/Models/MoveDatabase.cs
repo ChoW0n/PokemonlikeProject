@@ -59,7 +59,6 @@ public static class MoveDatabase
         All["skull-bash"] = new Move("로켓박치기", 130, PokemonType.Normal, 10, 100, false, 0, false, false, "none", 100, 0, new List<StatChangeEntry>(), 0, "1턴째에 머리를 움츠려 방어를 올린다. 2턴째에 상대를 공격한다.", 0, 0, 1, 1);
         All["bubble"] = new Move("거품", 40, PokemonType.Water, 30, 100, false, 0, false, true, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "speed", Change = -1, TargetsSelf = false } }, 10, "매우 많은 거품을 상대에게 내뿜어 공격한다. 상대의 스피드를 떨어뜨릴 때가 있다.", 0, 0, 1, 1);
         All["protect"] = new Move("방어", 0, PokemonType.Normal, 10, 100, true, 4, true, false, "protect", 100, 0, new List<StatChangeEntry>(), 0, "상대의 공격을 전혀 받지 않는다. 연속으로 쓰면 실패하기 쉽다.", 0, 0, 1, 1);
-        All["detect"] = new Move("판별", 0, PokemonType.Fighting, 5, 100, true, 4, true, false, "protect", 100, 0, new List<StatChangeEntry>(), 0, "상대의 공격을 전혀 받지 않는다. 연속으로 쓰면 실패하기 쉽다.", 0, 0, 1, 1);
         All["endure"] = new Move("버티기", 0, PokemonType.Normal, 10, 100, true, 4, true, false, "protect", 100, 0, new List<StatChangeEntry>(), 0, "이번 턴에 쓰러질 공격을 받아도 HP를 1 남기고 버틴다.", 0, 0, 1, 1);
         All["substitute"] = new Move("대타출동", 0, PokemonType.Normal, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "최대 HP의 4분의 1을 사용해 자신의 대타를 만든다.", 0, 0, 1, 1);
         All["trick-room"] = new Move("트릭룸", 0, PokemonType.Psychic, 5, 100, true, -7, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "5턴 동안 느린 포켓몬부터 움직인다.", 0, 0, 1, 1);

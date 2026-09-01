@@ -7,6 +7,14 @@ namespace PokemonBattle.Tests;
 public sealed class AbilityRulesRegressionTests
 {
     [Fact]
+    public void Ability_catalog_has_185_unique_runtime_implemented_entries()
+    {
+        Assert.Equal(185, AbilityDatabase.All.Count);
+        Assert.All(AbilityDatabase.All.Keys, ability =>
+            Assert.True(AbilityDatabase.IsImplemented(ability), $"미구현 특성: {ability}"));
+    }
+
+    [Fact]
     public async Task Critical_hit_rules_apply_sniper_anger_point_and_critical_immunity()
     {
         const string moveKey = "frost-breath";
@@ -973,6 +981,23 @@ public sealed class AbilityRulesRegressionTests
         Assert.Equal(hpBefore - Math.Max(1, aftermathAttacker.MaxHp / 4), aftermathAttacker.CurrentHp);
         Assert.Contains(events, battleEvent =>
             battleEvent.Message?.Contains("유폭", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task Mold_breaker_suppresses_contact_reactions_and_magic_guard_blocks_reflected_damage()
+    {
+        var moldBreaker = CreatePokemon(25, "bite", ability: "틀깨기");
+        var justified = CreatePokemon(132, "tackle", ability: "정의의마음");
+        await CreateFullEngine().TakeTurnAsync(
+            moldBreaker, justified, "bite", true, _ => Task.CompletedTask);
+        Assert.Equal(0, justified.StatStages["attack"]);
+
+        var magicGuard = CreatePokemon(132, "tackle", ability: "매직가드");
+        var roughSkin = CreatePokemon(132, "tackle", ability: "까칠한피부");
+        int hpBefore = magicGuard.CurrentHp;
+        await CreateFullEngine().TakeTurnAsync(
+            magicGuard, roughSkin, "tackle", true, _ => Task.CompletedTask);
+        Assert.Equal(hpBefore, magicGuard.CurrentHp);
     }
 
     [Fact]

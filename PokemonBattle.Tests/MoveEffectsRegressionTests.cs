@@ -7,6 +7,53 @@ namespace PokemonBattle.Tests;
 public sealed class MoveEffectsRegressionTests
 {
     [Fact]
+    public void Move_catalog_has_unique_entries_and_every_entry_is_classified()
+    {
+        Assert.Equal(522, MoveDatabase.All.Count);
+        Assert.All(MoveDatabase.All, entry =>
+            Assert.Contains(
+                MoveRuleMetadata.GetRule(entry.Key, entry.Value).Kind,
+                Enum.GetValues<MoveRuleKind>()));
+    }
+
+    [Fact]
+    public void Hex_doubles_only_against_a_real_status_condition_not_confusion()
+    {
+        var attacker = CreatePokemon(94, "hex");
+        var healthy = CreatePokemon(1, "tackle");
+        var confused = CreatePokemon(1, "tackle");
+        confused.ApplyConfusion(new Random(1234));
+        var burned = CreatePokemon(1, "tackle");
+        burned.ApplyAilment("burn");
+
+        double basePower = MoveRuleMetadata.EffectivePower(
+            "hex", MoveDatabase.All["hex"], attacker, healthy);
+        double confusedPower = MoveRuleMetadata.EffectivePower(
+            "hex", MoveDatabase.All["hex"], attacker, confused);
+        double burnedPower = MoveRuleMetadata.EffectivePower(
+            "hex", MoveDatabase.All["hex"], attacker, burned);
+
+        Assert.Equal(basePower, confusedPower);
+        Assert.Equal(basePower * 2, burnedPower);
+    }
+
+    [Fact]
+    public void Payback_doubles_when_its_user_moves_after_the_target()
+    {
+        var attacker = CreatePokemon(19, "payback");
+        var defender = CreatePokemon(1, "tackle");
+        var move = MoveDatabase.All["payback"];
+
+        double firstPower = MoveRuleMetadata.EffectivePower(
+            "payback", move, attacker, defender, attackerMovedFirst: true);
+        double secondPower = MoveRuleMetadata.EffectivePower(
+            "payback", move, attacker, defender, attackerMovedFirst: false);
+
+        Assert.Equal(move.Power, firstPower);
+        Assert.Equal(move.Power * 2, secondPower);
+    }
+
+    [Fact]
     public void Every_catalog_move_has_an_explicit_runtime_rule()
     {
         Assert.True(MoveDatabase.All.Count >= 490);
@@ -243,20 +290,17 @@ public sealed class MoveEffectsRegressionTests
     }
 
     [Fact]
-    public void Dynamax_is_one_use_per_side_and_resets_on_switch_out()
+    public async Task Memento_lowers_both_offensive_stats_and_faints_its_user()
     {
-        var pokemon = CreatePokemon(25, "tackle");
+        var user = CreatePokemon(25, "memento");
+        var target = CreatePokemon(1, "tackle");
         var engine = CreateEngine();
-        int baseHp = pokemon.MaxHp;
 
-        Assert.True(engine.CanActivateGimmick(pokemon, BattleGimmickKind.Dynamax, true));
-        Assert.NotEmpty(engine.ActivateGimmick(pokemon, BattleGimmickKind.Dynamax, true));
-        Assert.Equal(baseHp * 2, pokemon.MaxHp);
-        Assert.False(engine.CanActivateGimmick(pokemon, BattleGimmickKind.Dynamax, true));
+        await engine.TakeTurnAsync(user, target, "memento", true, _ => Task.CompletedTask);
 
-        pokemon.ResetOnSwitchOut();
-        Assert.Equal(baseHp, pokemon.MaxHp);
-        Assert.Equal(BattleGimmickKind.None, pokemon.ActiveGimmick);
+        Assert.True(user.IsFainted);
+        Assert.Equal(-2, target.StatStages["attack"]);
+        Assert.Equal(-2, target.StatStages["special-attack"]);
     }
 
     [Fact]
