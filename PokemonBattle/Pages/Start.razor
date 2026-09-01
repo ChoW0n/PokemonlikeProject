@@ -29,6 +29,7 @@
             <span aria-label="@($"{State.UnreadMailboxCount}개 읽지 않은 메시지")"> (@State.UnreadMailboxCount)</span>
         }
     </button>
+    <button type="button" class="secondary-action" @onclick="OpenLeaderboard">유저 랭킹</button>
     <button type="button" @onclick="OpenCollection">획득한 포켓몬 전체 보기</button>
     <button type="button" class="secondary-action" @onclick="SignOut">로그아웃</button>
 </main>
@@ -60,6 +61,7 @@
 
     private void OpenAdminConsole() => Nav.NavigateTo("/admin");
     private void OpenMailbox() => Nav.NavigateTo("/mailbox");
+    private void OpenLeaderboard() => Nav.NavigateTo("/leaderboard");
     private void OpenCollection() => Nav.NavigateTo("/collection");
 
     private void SignOut()

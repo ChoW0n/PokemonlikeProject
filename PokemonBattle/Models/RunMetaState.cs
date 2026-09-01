@@ -14,6 +14,8 @@ public sealed class RunMetaState
     public bool RiskCovenantDecisionMade { get; set; }
     public bool RiskCovenantAccepted { get; set; }
     public int BonusLegacyClaims { get; set; }
+    public int BonusTechnicalMachineRewards { get; set; }
+    public int MaxHpPenaltyPercent { get; set; }
 
     public List<StolenMoveRecord> StolenMoves { get; set; } = new();
     public List<StolenMoveOption> PendingStolenMoveChoices { get; set; } = new();
@@ -32,6 +34,8 @@ public sealed class RunMetaState
             RiskCovenantDecisionMade = RiskCovenantDecisionMade,
             RiskCovenantAccepted = RiskCovenantAccepted,
             BonusLegacyClaims = BonusLegacyClaims,
+            BonusTechnicalMachineRewards = BonusTechnicalMachineRewards,
+            MaxHpPenaltyPercent = MaxHpPenaltyPercent,
             StolenMoves = StolenMoves.Select(move => move.Clone()).ToList(),
             PendingStolenMoveChoices = PendingStolenMoveChoices
                 .Select(option => option.Clone())
@@ -75,7 +79,11 @@ public enum RunLegacyEffect
     FirstStrikePower,
     AfflictedTargetPower,
     HighHpDefense,
-    EndTurnRecovery
+    EndTurnRecovery,
+    CriticalRate,
+    LowHpOffense,
+    WeatherPower,
+    StatusPenaltyResistance
 }
 
 public sealed record BattlefieldImprintDefinition(
@@ -91,24 +99,39 @@ public sealed record RiskCovenantDefinition(
     string Description,
     string RewardDescription,
     int EnemyLevelBonus,
-    int BonusLegacyClaims);
+    int BonusLegacyClaims,
+    int BonusTechnicalMachineRewards,
+    int MaxHpPenaltyPercent,
+    bool GrantsImmediateLegacy);
 
 public static class RunMetaCatalog
 {
     public static readonly IReadOnlyList<RunLegacyDefinition> Legacies =
     [
         new("first-strike", "선혈의 선봉",
-            "선공으로 사용하는 공격 기술의 위력이 20% 증가합니다.",
+            "선공으로 사용하는 공격 기술의 위력이 25% 증가합니다.",
             RunLegacyEffect.FirstStrikePower),
         new("affliction", "상처의 공명",
-            "상태 이상에 걸린 상대를 공격할 때 위력이 20% 증가합니다.",
+            "상태 이상에 걸린 상대를 공격할 때 위력이 25% 증가합니다.",
             RunLegacyEffect.AfflictedTargetPower),
         new("iron-vitality", "철의 생명력",
-            "HP가 75% 이상일 때 받는 공격 피해가 20% 감소합니다.",
+            "HP가 75% 이상일 때 받는 공격 피해가 25% 감소합니다.",
             RunLegacyEffect.HighHpDefense),
         new("last-breath", "마지막 불씨",
-            "턴 종료 시 HP를 1/16 회복합니다.",
-            RunLegacyEffect.EndTurnRecovery)
+            "턴 종료 시 HP를 1/12 회복합니다.",
+            RunLegacyEffect.EndTurnRecovery),
+        new("hunters-eye", "사냥꾼의 눈",
+            "공격 기술의 급소율이 1단계 증가합니다.",
+            RunLegacyEffect.CriticalRate),
+        new("judges-scale", "심판의 저울",
+            "자신의 HP가 25% 이하일 때 공격 기술의 위력이 20% 증가합니다.",
+            RunLegacyEffect.LowHpOffense),
+        new("calm-before-storm", "폭풍전야",
+            "날씨 효과가 있을 때 공격 기술의 위력이 10% 증가합니다.",
+            RunLegacyEffect.WeatherPower),
+        new("chain-breaker", "사슬을 끊는 자",
+            "화상과 마비로 인한 공격·스피드 감소를 절반만 적용받습니다.",
+            RunLegacyEffect.StatusPenaltyResistance)
     ];
 
     public static readonly IReadOnlyList<BattlefieldImprintDefinition> BattlefieldImprints =
@@ -132,7 +155,15 @@ public static class RunMetaCatalog
         new("blood-debt", "피의 빚",
             "이번 스테이지의 상대 레벨이 3 상승합니다.",
             "다음 승리에서 관록의 유산을 1개 더 선택할 수 있습니다.",
-            3, 1)
+            3, 1, 0, 0, false),
+        new("dark-pact", "어둠의 서약",
+            "이번 스테이지에서 상대 특성이 활성화되어 있으면 공격 위력이 15% 증가합니다.",
+            "다음 승리 시 기술머신을 1개 추가로 획득합니다.",
+            0, 0, 1, 0, false),
+        new("rampage-curse", "폭주의 저주",
+            "이번 런 동안 아군의 최대 HP가 10% 감소합니다.",
+            "미보유 관록의 유산을 즉시 1개 획득합니다.",
+            0, 0, 0, 10, true)
     ];
 
     private static readonly HashSet<string> ExcludedStolenMoves = new(StringComparer.Ordinal)
@@ -155,9 +186,14 @@ public static class RunMetaCatalog
     public static RiskCovenantDefinition? Covenant(string? id) =>
         RiskCovenants.FirstOrDefault(covenant => covenant.Id == id);
 
+    public static int ScheduledLegacyClaimsForWin(int totalWins) =>
+        totalWins > 0 && totalWins % 2 == 0 ? 1 : 0;
+
     public static bool IsStolenMoveEligible(string moveKey, int sourcePokemonId)
     {
-        return IsStolenMoveKeyEligible(moveKey)
+        return PokemonDatabase.All.TryGetValue(sourcePokemonId, out var source)
+            && source.LearnableMoveNames.Contains(moveKey, StringComparer.Ordinal)
+            && IsStolenMoveKeyEligible(moveKey)
             && !EnemyTeamProvider.IsLegendary(sourcePokemonId);
     }
 
@@ -165,6 +201,29 @@ public static class RunMetaCatalog
         MoveDatabase.All.TryGetValue(moveKey, out var move)
         && !ExcludedStolenMoves.Contains(moveKey)
         && !move.IsStatus;
+
+    public static bool TryApplyStolenMove(
+        PokemonLoadout loadout,
+        string moveKey,
+        string? replaceMoveKey = null)
+    {
+        if (loadout.ChosenMoveNames.Contains(moveKey)) return false;
+
+        if (loadout.ChosenMoveNames.Count >= 4)
+        {
+            if (replaceMoveKey == null) return false;
+
+            int replacementIndex = loadout.ChosenMoveNames.IndexOf(replaceMoveKey);
+            if (replacementIndex < 0) return false;
+
+            loadout.ChosenMoveNames[replacementIndex] = moveKey;
+            return true;
+        }
+
+        if (replaceMoveKey != null) return false;
+        loadout.ChosenMoveNames.Add(moveKey);
+        return true;
+    }
 
     public static RunMetaState Normalize(RunMetaState? state)
     {
@@ -178,12 +237,14 @@ public static class RunMetaCatalog
             .Distinct(StringComparer.Ordinal)
             .Take(3)
             .ToList();
-        state.LegacyClaimsRemaining = Math.Clamp(state.LegacyClaimsRemaining, 0, 4);
+        state.LegacyClaimsRemaining = Math.Clamp(state.LegacyClaimsRemaining, 0, Legacies.Count);
         state.BattlefieldImprintId = Battlefield(state.BattlefieldImprintId)?.Id;
         state.BattlefieldImprintStage = Math.Max(0, state.BattlefieldImprintStage);
         state.RiskCovenantId = Covenant(state.RiskCovenantId)?.Id;
         state.RiskCovenantStage = Math.Max(0, state.RiskCovenantStage);
         state.BonusLegacyClaims = Math.Clamp(state.BonusLegacyClaims, 0, 2);
+        state.BonusTechnicalMachineRewards = Math.Clamp(state.BonusTechnicalMachineRewards, 0, 2);
+        state.MaxHpPenaltyPercent = Math.Clamp(state.MaxHpPenaltyPercent, 0, 90);
         state.StolenMoves = state.StolenMoves
             .Where(move => PokemonDatabase.All.ContainsKey(move.PokemonId)
                 && IsStolenMoveKeyEligible(move.MoveKey))

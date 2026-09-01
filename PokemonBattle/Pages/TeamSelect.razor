@@ -64,7 +64,9 @@
                 </div>
                 @if (TotalMatchCount > FilteredPokemon.Count)
                 {
-                    <p class="config-label">@FilteredPokemon.Count / @TotalMatchCount 표시 중 (검색어를 좁혀보세요)</p>
+                    <button type="button" class="load-more-button" @onclick="ShowMorePokemon">
+                        포켓몬 더 보기 (@FilteredPokemon.Count / @TotalMatchCount)
+                    </button>
                 }
 
                 @if (TeamLoadouts.Count > 0)
@@ -156,7 +158,8 @@
                              aria-label="@($"{move.Name}, {(move.IsStatus ? "변화기" : "공격기")}{(DraftMoves.Contains(moveKey) ? ", 선택됨" : "")}")"
                              aria-pressed="@(DraftMoves.Contains(moveKey) ? "true" : "false")"
                              aria-expanded="@(ViewingMoveKey == moveKey ? "true" : "false")"
-                             @onclick="() => ViewOrToggleMove(moveKey)">
+                             @onclick="() => ViewOrToggleMove(moveKey)"
+                             @ondblclick="() => ToggleMove(moveKey)">
                             <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
                              <span class="dex-name">@move.Name @(move.Priority > 0 ? "우선" : "") @(IsTechnicalMachineMove(picked, moveKey) ? "· TM" : "") @(IsRunStolenMove(picked, moveKey) ? "· 강탈" : "")</span>
                             <span class="dex-type">@(move.IsStatus ? "변화기" : "공격기")</span>
@@ -187,7 +190,8 @@
                              aria-label="@($"{ability}{(DraftAbility == ability ? ", 선택됨" : "")}")"
                              aria-pressed="@(DraftAbility == ability ? "true" : "false")"
                              aria-expanded="@(ViewingAbility == ability ? "true" : "false")"
-                             @onclick="() => ViewingAbility = ability">
+                              @onclick="() => ViewOrToggleAbility(ability)"
+                              @ondblclick="() => ToggleAbility(ability)">
                             <span class="dex-name">@ability</span>
                             <span class="dex-type">@(AbilityDatabase.IsImplemented(ability)
                                 ? $"전투 적용 · {AbilityDatabase.GetImplementationGroup(ability)}"
@@ -219,7 +223,8 @@
                              aria-label="@($"{item.Name}{(DraftItem == item.Name ? ", 선택됨" : "")}")"
                              aria-pressed="@(DraftItem == item.Name ? "true" : "false")"
                              aria-expanded="@(ViewingItemName == item.Name ? "true" : "false")"
-                             @onclick="() => ViewingItemName = item.Name">
+                              @onclick="() => ViewOrToggleItem(item.Name)"
+                              @ondblclick="() => ToggleItem(item.Name)">
                             @if (item.IconUrl != null)
                             {
                                 <img src="@item.IconUrl" alt="@item.Name" class="item-icon" />
@@ -263,6 +268,7 @@
     private string SearchText = "";
     private CancellationTokenSource? _searchDebounce;
     private bool ShowLocked = false;
+    private int VisiblePokemonCount = 60;
 
     private string ItemSearchText = "";
     private string PresetName = "";
@@ -311,18 +317,19 @@
         await RefreshPresetNames();
     }
 
-    private int TotalMatchCount =>
-        PokemonDatabase.All.Count(p =>
-            (SearchText == "" || p.Value.Name.Contains(SearchText)) &&
-            (ShowLocked || UnlockedIds.Contains(p.Key)));
-
-    private List<KeyValuePair<int, PokemonData>> FilteredPokemon =>
+    private List<KeyValuePair<int, PokemonData>> MatchingPokemon =>
         PokemonDatabase.All
-            .Where(p => SearchText == "" || p.Value.Name.Contains(SearchText))
+            .Where(p => SearchText == "" || p.Value.Name.Contains(SearchText, StringComparison.CurrentCultureIgnoreCase)
+                || p.Value.EnglishName.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+                || p.Key.ToString() == SearchText.Trim())
             .Where(p => ShowLocked || UnlockedIds.Contains(p.Key))
             .OrderBy(p => p.Key)
-            .Take(60)
             .ToList();
+
+    private List<KeyValuePair<int, PokemonData>> FilteredPokemon =>
+        MatchingPokemon.Take(VisiblePokemonCount).ToList();
+
+    private int TotalMatchCount => MatchingPokemon.Count;
 
     private List<Item> FilteredItems(string pokemonName)
     {
@@ -345,6 +352,7 @@
         {
             await Task.Delay(250, cts.Token);
             SearchText = RawSearchText;
+            VisiblePokemonCount = 60;
             StateHasChanged();
         }
         catch (TaskCanceledException)
@@ -356,6 +364,9 @@
     {
         ItemSearchText = e.Value?.ToString() ?? "";
     }
+
+    private void ShowMorePokemon() =>
+        VisiblePokemonCount = Math.Min(VisiblePokemonCount + 60, TotalMatchCount);
 
     private void OnPresetNameChanged(ChangeEventArgs e)
     {
@@ -390,6 +401,28 @@
     private void ViewOrToggleMove(string moveKey)
     {
         ViewingMoveKey = moveKey;
+    }
+
+    private void ViewOrToggleAbility(string ability)
+    {
+        ViewingAbility = ability;
+    }
+
+    private void ViewOrToggleItem(string itemName)
+    {
+        ViewingItemName = itemName;
+    }
+
+    private void ToggleAbility(string ability)
+    {
+        DraftAbility = DraftAbility == ability ? "" : ability;
+        ViewingAbility = ability;
+    }
+
+    private void ToggleItem(string itemName)
+    {
+        DraftItem = DraftItem == itemName ? TeamLoadoutRules.NoItem : itemName;
+        ViewingItemName = itemName;
     }
 
     private void ToggleMove(string moveKey)

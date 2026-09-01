@@ -13,6 +13,9 @@ public class PokemonData
     public int BaseSpDef;
     public int BaseSpd;
     public string[] MoveNames;
+    // PokeAPI 기준으로 이 종이 실제 습득할 수 있는 기술 전체.
+    // MoveNames에는 현재 게임에서 구현된 기술만 들어갈 수 있으므로 강탈 검증은 이 목록을 사용한다.
+    public string[] LearnableMoveNames;
     public string[] AbilityNames;
     public string ImageUrl;
     public string BackImageUrl;
@@ -21,7 +24,7 @@ public class PokemonData
     public int HeightDecimeters { get; internal set; } = 10;
     public double HeightMeters => HeightDecimeters / 10.0;
 
-    public PokemonData(string name, string englishName, PokemonType type1, PokemonType? type2, int hp, int atk, int def, int spAtk, int spDef, int spd, string[] moveNames, string[] abilityNames, string imageUrl, string backImageUrl, int? evolvesToId, int evolveLevel)
+    public PokemonData(string name, string englishName, PokemonType type1, PokemonType? type2, int hp, int atk, int def, int spAtk, int spDef, int spd, string[] moveNames, string[] abilityNames, string imageUrl, string backImageUrl, int? evolvesToId, int evolveLevel, string[]? learnableMoveNames = null)
     {
         Name = name;
         EnglishName = englishName;
@@ -34,6 +37,7 @@ public class PokemonData
         BaseSpDef = spDef;
         BaseSpd = spd;
         MoveNames = moveNames;
+        LearnableMoveNames = learnableMoveNames ?? moveNames;
         AbilityNames = abilityNames;
         ImageUrl = imageUrl;
         BackImageUrl = backImageUrl;

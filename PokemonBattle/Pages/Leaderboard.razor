@@ -1,0 +1,127 @@
+@page "/leaderboard"
+@using PokemonBattle.Services
+@inject CurrentUserService CurrentUser
+@inject LeaderboardService LeaderboardData
+@inject NavigationManager Nav
+
+<PageTitle>유저 랭킹</PageTitle>
+
+<main class="leaderboard-page">
+    @if (!CurrentUser.IsLoggedIn)
+    {
+        <section class="leaderboard-empty">
+            <h1>유저 랭킹</h1>
+            <p>로그인한 사용자만 랭킹을 볼 수 있습니다.</p>
+            <button type="button" @onclick="GoLogin">로그인 화면으로 이동</button>
+        </section>
+    }
+    else if (Snapshot == null)
+    {
+        <section class="leaderboard-empty">
+            <p>랭킹 데이터를 불러오는 중...</p>
+        </section>
+    }
+    else
+    {
+        <header class="leaderboard-header">
+            <div>
+                <p class="eyebrow">SKILL RATING / RANKING</p>
+                <h1>유저 랭킹</h1>
+                <p>완료한 런을 바탕으로 누적된 실력 평점 순위입니다.</p>
+            </div>
+            <button type="button" class="leaderboard-back" @onclick="GoHome">게임으로</button>
+        </header>
+
+        @if (Snapshot.CurrentUser is { } me)
+        {
+            <section class="leaderboard-self" aria-label="내 랭킹">
+                <div>
+                    <span class="leaderboard-kicker">MY POSITION</span>
+                    <strong>@($"{me.Rank}위")</strong>
+                    <span>@me.Username</span>
+                </div>
+                <div class="leaderboard-self-stat">
+                    <span>레이팅</span>
+                    <strong>@me.Rating.ToString("0")</strong>
+                </div>
+                <div class="leaderboard-self-stat">
+                    <span>완료 런</span>
+                    <strong>@($"{me.CompletedRuns}회")</strong>
+                </div>
+            </section>
+        }
+        else
+        {
+            <p class="leaderboard-note">현재 계정은 관리자 계정이라 일반 유저 랭킹에서 제외됩니다.</p>
+        }
+
+        <section class="leaderboard-panel" aria-labelledby="leaderboard-title">
+            <div class="leaderboard-panel-heading">
+                <div>
+                    <p class="eyebrow">TOP RANKERS</p>
+                    <h2 id="leaderboard-title">상위 랭커</h2>
+                </div>
+                <span class="leaderboard-count">@($"{Snapshot.Entries.Count}명")</span>
+            </div>
+
+            @if (Snapshot.Entries.Count == 0)
+            {
+                <p class="leaderboard-note">아직 등록된 일반 유저가 없습니다.</p>
+            }
+            else
+            {
+                <div class="leaderboard-table-wrap">
+                    <table class="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th>순위</th>
+                                <th>유저</th>
+                                <th>레이팅</th>
+                                <th>완료 런</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in Snapshot.Entries.Take(20))
+                            {
+                                <tr class="@(entry.IsCurrentUser ? "is-current" : "")">
+                                    <td><strong class="leaderboard-rank">@entry.Rank</strong></td>
+                                    <td>
+                                        <strong>@entry.Username</strong>
+                                        @if (entry.IsCurrentUser)
+                                        {
+                                            <span class="leaderboard-you">나</span>
+                                        }
+                                    </td>
+                                    <td class="leaderboard-rating">@entry.Rating.ToString("0")</td>
+                                    <td>@($"{entry.CompletedRuns}회")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                @if (Snapshot.Entries.Count > 20 && Snapshot.CurrentUser is not null && Snapshot.CurrentUser.Rank > 20)
+                {
+                    <p class="leaderboard-note">상위 20명 외에 내 순위는 위의 내 랭킹 카드에서 확인할 수 있습니다.</p>
+                }
+            }
+        </section>
+    }
+</main>
+
+@code {
+    private LeaderboardSnapshot? Snapshot;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CurrentUser.IsLoggedIn)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        Snapshot = await LeaderboardData.LoadAsync();
+    }
+
+    private void GoLogin() => Nav.NavigateTo("/login");
+    private void GoHome() => Nav.NavigateTo("/");
+}

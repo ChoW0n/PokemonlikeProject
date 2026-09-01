@@ -35,6 +35,7 @@ public sealed class AdminDashboardService
         var runs = await _db.PlayerRuns.AsNoTracking().ToListAsync();
         var presets = await _db.UserPresets.AsNoTracking().ToListAsync();
         var unlocks = await _db.UnlockedPokemons.AsNoTracking().ToListAsync();
+        var progressions = await _db.PlayerProgressions.AsNoTracking().ToListAsync();
         var auditLogs = await _db.AdminAuditLogs
             .AsNoTracking()
             .OrderByDescending(log => log.CreatedAtUtc)
@@ -122,6 +123,8 @@ public sealed class AdminDashboardService
                 history.Count);
         }).ToList();
 
+        var analytics = BuildAnalytics(users, progressions, runs);
+
         return new AdminDashboardSnapshot(
             DateTimeOffset.UtcNow,
             users.Count,
@@ -133,7 +136,166 @@ public sealed class AdminDashboardService
             MoveDatabase.All.Count,
             userRows,
             issues,
-            auditLogs);
+            auditLogs,
+            analytics);
+    }
+
+    private static AdminAnalyticsSnapshot BuildAnalytics(
+        IReadOnlyList<UserAccount> users,
+        IReadOnlyList<PlayerProgression> progressions,
+        IReadOnlyList<PlayerRun> runs)
+    {
+        var normalUsernames = users
+            .Where(user => !user.IsAdmin)
+            .Select(user => user.Username)
+            .ToHashSet(StringComparer.Ordinal);
+        var pokemonUsers = new Dictionary<int, HashSet<string>>();
+        var moveCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var abilityCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        int usersWithTeams = 0;
+
+        foreach (var progression in progressions.Where(item => normalUsernames.Contains(item.Username)))
+        {
+            var loadouts = DeserializeList<PokemonLoadout>(progression.LatestLoadoutsJson);
+            if (loadouts.Count > 0) usersWithTeams++;
+
+            foreach (var loadout in loadouts)
+            {
+                if (!pokemonUsers.TryGetValue(loadout.PokemonId, out var owners))
+                {
+                    owners = new HashSet<string>(StringComparer.Ordinal);
+                    pokemonUsers[loadout.PokemonId] = owners;
+                }
+                owners.Add(progression.Username);
+
+                if (!string.IsNullOrWhiteSpace(loadout.ChosenAbility))
+                {
+                    Increment(abilityCounts, loadout.ChosenAbility);
+                }
+            }
+
+            var preferences = Deserialize<MovePreferenceProfile>(progression.MovePreferencesJson);
+            if (preferences != null)
+            {
+                foreach (var pair in preferences.MoveCounts)
+                {
+                    moveCounts[pair.Key] = moveCounts.TryGetValue(pair.Key, out var current)
+                        ? current + Math.Max(0, pair.Value)
+                        : Math.Max(0, pair.Value);
+                }
+            }
+        }
+
+        var latestRuns = runs
+            .Where(run => normalUsernames.Contains(run.Username))
+            .GroupBy(run => run.Username)
+            .Select(group => group.OrderByDescending(run => run.Id).First());
+        var winRateBuckets = new[] { 0, 0, 0, 0, 0 };
+        int usersWithRoundData = 0;
+        foreach (var run in latestRuns)
+        {
+            var performances = DeserializeList<RunRoundPerformance>(run.RoundPerformancesJson);
+            if (performances.Count == 0) continue;
+
+            usersWithRoundData++;
+            double winRate = performances.Count(performance => performance.Cleared)
+                * 100d / performances.Count;
+            int bucket = winRate >= 76 ? 4
+                : winRate >= 51 ? 3
+                : winRate >= 26 ? 2
+                : winRate > 0 ? 1
+                : 0;
+            winRateBuckets[bucket]++;
+        }
+
+        var pokemonBars = pokemonUsers
+            .Select(pair => new
+            {
+                Label = PokemonDatabase.All.TryGetValue(pair.Key, out var data)
+                    ? data.Name
+                    : $"#{pair.Key}",
+                Count = pair.Value.Count
+            })
+            .OrderByDescending(item => item.Count)
+            .ThenBy(item => item.Label)
+            .Take(8)
+            .ToList();
+        int teamDenominator = Math.Max(1, usersWithTeams);
+
+        return new AdminAnalyticsSnapshot(
+            BuildBars(
+                pokemonBars.Select(item => (item.Label, item.Count)),
+                item => item.Count * 100d / teamDenominator),
+            BuildBars(
+                moveCounts
+                    .OrderByDescending(pair => pair.Value)
+                    .ThenBy(pair => pair.Key)
+                    .Take(8)
+                    .Select(pair => (MoveDatabase.All.TryGetValue(pair.Key, out var data)
+                        ? data.Name
+                        : pair.Key, pair.Value)),
+                item => item.Count * 100d / Math.Max(1, moveCounts.Values.Sum())),
+            BuildBars(
+                abilityCounts
+                    .OrderByDescending(pair => pair.Value)
+                    .ThenBy(pair => pair.Key)
+                    .Take(8)
+                    .Select(pair => (pair.Key, pair.Value)),
+                item => item.Count * 100d / Math.Max(1, abilityCounts.Values.Sum())),
+            new[]
+            {
+                new AdminAnalyticsBar("0%", winRateBuckets[0], Share(winRateBuckets[0], usersWithRoundData), Fill(winRateBuckets[0], winRateBuckets)),
+                new AdminAnalyticsBar("1–25%", winRateBuckets[1], Share(winRateBuckets[1], usersWithRoundData), Fill(winRateBuckets[1], winRateBuckets)),
+                new AdminAnalyticsBar("26–50%", winRateBuckets[2], Share(winRateBuckets[2], usersWithRoundData), Fill(winRateBuckets[2], winRateBuckets)),
+                new AdminAnalyticsBar("51–75%", winRateBuckets[3], Share(winRateBuckets[3], usersWithRoundData), Fill(winRateBuckets[3], winRateBuckets)),
+                new AdminAnalyticsBar("76–100%", winRateBuckets[4], Share(winRateBuckets[4], usersWithRoundData), Fill(winRateBuckets[4], winRateBuckets))
+            },
+            usersWithTeams,
+            usersWithRoundData);
+    }
+
+    private static IReadOnlyList<AdminAnalyticsBar> BuildBars(
+        IEnumerable<(string Label, int Count)> values,
+        Func<(string Label, int Count), double> share)
+    {
+        var materialized = values.ToList();
+        int max = materialized.Count == 0 ? 1 : materialized.Max(item => item.Count);
+        return materialized
+            .Select(item => new AdminAnalyticsBar(
+                item.Label,
+                item.Count,
+                share(item),
+                item.Count * 100d / max))
+            .ToList();
+    }
+
+    private static double Share(int count, int total) =>
+        total == 0 ? 0 : count * 100d / total;
+
+    private static double Fill(int count, IReadOnlyList<int> values)
+    {
+        int max = values.Count == 0 ? 1 : Math.Max(1, values.Max());
+        return count * 100d / max;
+    }
+
+    private static void Increment(Dictionary<string, int> counts, string key)
+    {
+        counts[key] = counts.TryGetValue(key, out var current) ? current + 1 : 1;
+    }
+
+    private static List<T> DeserializeList<T>(string json) =>
+        Deserialize<List<T>>(json) ?? new List<T>();
+
+    private static T? Deserialize<T>(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<T>(json, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return default;
+        }
     }
 
     public async Task<AdminUserDetails?> LoadUserDetailsAsync(string username)
@@ -427,7 +589,22 @@ public sealed record AdminDashboardSnapshot(
     int KnownMoveCount,
     IReadOnlyList<AdminUserSnapshot> Users,
     IReadOnlyList<string> IntegrityIssues,
-    IReadOnlyList<AdminAuditLogSnapshot> AuditLogs);
+    IReadOnlyList<AdminAuditLogSnapshot> AuditLogs,
+    AdminAnalyticsSnapshot Analytics);
+
+public sealed record AdminAnalyticsSnapshot(
+    IReadOnlyList<AdminAnalyticsBar> PokemonPopularity,
+    IReadOnlyList<AdminAnalyticsBar> MovePopularity,
+    IReadOnlyList<AdminAnalyticsBar> AbilityPopularity,
+    IReadOnlyList<AdminAnalyticsBar> WinRateDistribution,
+    int UsersWithTeams,
+    int UsersWithRoundData);
+
+public sealed record AdminAnalyticsBar(
+    string Label,
+    int Count,
+    double SharePercent,
+    double FillPercent);
 
 public sealed record AdminUserSnapshot(
     string Username,

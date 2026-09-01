@@ -139,6 +139,23 @@ public sealed class PlayerProgressionStore
         return true;
     }
 
+    public async Task<int> MarkAllMessagesReadAsync(string username)
+    {
+        var messages = await _db.MailboxMessages
+            .Where(message => message.Username == username && !message.IsRead)
+            .ToListAsync();
+        foreach (var message in messages)
+        {
+            message.IsRead = true;
+        }
+
+        if (messages.Count > 0)
+        {
+            await _db.SaveChangesAsync();
+        }
+        return messages.Count;
+    }
+
     public async Task<bool> TryConsumeTechnicalMachineAsync(string username, string moveKey)
     {
         if (!MoveDatabase.All.ContainsKey(moveKey)) return false;
@@ -151,6 +168,21 @@ public sealed class PlayerProgressionStore
         machine.Quantity--;
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<string?> GrantTechnicalMachineRewardAsync(
+        string username,
+        IEnumerable<PokemonLoadout> latestLoadouts)
+    {
+        var profile = await GetOrCreateAsync(username);
+        profile.LatestLoadoutsJson = SerializeLoadouts(latestLoadouts);
+        string rewardMoveKey = PickRewardMove(profile);
+        AddTechnicalMachine(username, rewardMoveKey);
+        profile.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return MoveDatabase.All.TryGetValue(rewardMoveKey, out var move)
+            ? move.Name
+            : rewardMoveKey;
     }
 
     private async Task<PlayerProgression> GetOrCreateAsync(string username)

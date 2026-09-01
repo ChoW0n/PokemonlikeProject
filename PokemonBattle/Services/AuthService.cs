@@ -18,6 +18,10 @@ public class AuthService
         {
             return (false, "아이디와 비밀번호를 입력해주세요.");
         }
+        if (password.Length < 6)
+        {
+            return (false, "비밀번호는 6자 이상 입력해주세요.");
+        }
 
         bool exists = await _db.Users.AnyAsync(u => u.Username == username);
         if (exists) return (false, "이미 사용 중인 아이디입니다.");
