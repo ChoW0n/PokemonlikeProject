@@ -18,6 +18,8 @@ public class PokemonData
     public string BackImageUrl;
     public int? EvolvesToId;
     public int EvolveLevel;
+    public int HeightDecimeters { get; internal set; } = 10;
+    public double HeightMeters => HeightDecimeters / 10.0;
 
     public PokemonData(string name, string englishName, PokemonType type1, PokemonType? type2, int hp, int atk, int def, int spAtk, int spDef, int spd, string[] moveNames, string[] abilityNames, string imageUrl, string backImageUrl, int? evolvesToId, int evolveLevel)
     {
