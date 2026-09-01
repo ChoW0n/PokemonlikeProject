@@ -174,7 +174,9 @@
                              aria-pressed="@(PendingMoveKey == moveKey ? "true" : "false")"
                              aria-label="@($"{move.Name}, PP {ppLoop}/{move.MaxPP}{(PendingMoveKey == moveKey ? ", 선택됨" : "")}{(Hero.CanUseMove(moveKey) ? "" : ", 사용할 수 없음")}")"
                              aria-describedby="@(PendingMoveKey == moveKey ? "selected-move-details" : null)"
-                             @onclick="() => TapMove(moveKey)">
+                             @onclick="() => TapMove(moveKey)"
+                             @ondblclick="() => UseMove(moveKey)"
+                             @ondblclick:preventDefault>
                         <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
                         <span class="move-type-label">@TypeKor(move.Type)</span>
                         <span class="move-name-text">@move.Name @(move.Priority > 0 ? "우선" : "") @(Hero.ChoiceLockedMove != null && Hero.ChoiceLockedMove != moveKey ? "고정" : "")</span>
@@ -187,7 +189,9 @@
                             class="move-name-button"
                             disabled="@IsBusy"
                             aria-label="몸부림, 사용 가능한 기술 없음"
-                            @onclick="() => UseMove(null)">
+                            @onclick="() => UseMove(null)"
+                            @ondblclick="() => UseMove(null)"
+                            @ondblclick:preventDefault>
                         <span class="type-dot" style="background:@TypeColors.GetHex(PokemonType.Normal)"></span>
                         <span class="move-type-label">노말</span>
                         <span class="move-name-text">몸부림</span>

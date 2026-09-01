@@ -225,7 +225,10 @@
                              aria-pressed="@(DraftMoves.Contains(moveKey) ? "true" : "false")"
                              aria-expanded="@(ViewingMoveKey == moveKey ? "true" : "false")"
                              aria-controls="@(ViewingMoveKey == moveKey ? "selected-move-info" : null)"
-                             @onclick="() => ViewOrToggleMove(moveKey)">
+                             title="클릭하면 기술을 선택하고 상세 정보를 표시합니다."
+                             @onclick="() => SelectMoveFromCard(moveKey)"
+                             @ondblclick="() => SelectMoveFromCard(moveKey)"
+                             @ondblclick:preventDefault>
                             <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
                              <span class="dex-name">@move.Name @(move.Priority > 0 ? "우선" : "") @(IsTechnicalMachineMove(picked, moveKey) ? "· TM" : "") @(IsRunStolenMove(picked, moveKey) ? "· 강탈" : "")</span>
                              <span class="card-state @(DraftMoves.Contains(moveKey) ? "is-selected" : "")">@(DraftMoves.Contains(moveKey) ? "선택됨" : ViewingMoveKey == moveKey ? "상세 확인 중" : "선택하기")</span>
@@ -258,7 +261,10 @@
                              aria-pressed="@(DraftAbility == ability ? "true" : "false")"
                              aria-expanded="@(ViewingAbility == ability ? "true" : "false")"
                              aria-controls="@(ViewingAbility == ability ? "selected-ability-info" : null)"
-                             @onclick="() => ViewingAbility = ability">
+                             title="클릭하면 특성을 장착하고 상세 정보를 표시합니다."
+                             @onclick="() => SelectAbilityFromCard(ability)"
+                             @ondblclick="() => SelectAbilityFromCard(ability)"
+                             @ondblclick:preventDefault>
                             <span class="dex-name">@ability</span>
                               <span class="card-state @(DraftAbility == ability ? "is-selected" : "")">@(DraftAbility == ability ? "선택됨" : ViewingAbility == ability ? "상세 확인 중" : "상세 보기")</span>
                             <span class="dex-type">@(AbilityDatabase.IsImplemented(ability)
@@ -299,7 +305,10 @@
                                  aria-pressed="@(DraftItem == item.Name ? "true" : "false")"
                                  aria-expanded="@(ViewingItemName == item.Name ? "true" : "false")"
                                  aria-controls="@(ViewingItemName == item.Name ? "selected-item-info" : null)"
-                                 @onclick="() => ViewingItemName = item.Name">
+                                 title="클릭하면 도구를 장착하고 상세 정보를 표시합니다."
+                                 @onclick="() => SelectItemFromCard(item.Name)"
+                                 @ondblclick="() => SelectItemFromCard(item.Name)"
+                                 @ondblclick:preventDefault>
                                 @if (item.IconUrl != null)
                                 {
                                     <img src="@item.IconUrl" alt="@item.Name" class="item-icon" />
@@ -506,9 +515,25 @@
         DraftLevel = existing?.Level ?? State.CurrentRunLevel;
     }
 
-    private void ViewOrToggleMove(string moveKey)
+    private void SelectMoveFromCard(string moveKey)
     {
         ViewingMoveKey = moveKey;
+        if (!DraftMoves.Contains(moveKey) && DraftMoves.Count < 4)
+        {
+            DraftMoves.Add(moveKey);
+        }
+    }
+
+    private void SelectAbilityFromCard(string ability)
+    {
+        ViewingAbility = ability;
+        DraftAbility = ability;
+    }
+
+    private void SelectItemFromCard(string itemName)
+    {
+        ViewingItemName = itemName;
+        DraftItem = itemName;
     }
 
     private void ToggleMove(string moveKey)
