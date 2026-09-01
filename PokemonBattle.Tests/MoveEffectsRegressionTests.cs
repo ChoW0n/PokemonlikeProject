@@ -142,6 +142,37 @@ public sealed class MoveEffectsRegressionTests
     }
 
     [Fact]
+    public async Task Close_combat_lowers_the_attacker_defenses_not_the_defender()
+    {
+        var attacker = CreatePokemon(25, "close-combat");
+        var defender = CreatePokemon(1, "tackle", level: 100);
+        var engine = CreateEngine(new FixedRandom(0));
+
+        await engine.TakeTurnAsync(attacker, defender, "close-combat", true, _ => Task.CompletedTask);
+
+        Assert.Equal(-1, attacker.StatStages["defense"]);
+        Assert.Equal(-1, attacker.StatStages["special-defense"]);
+        Assert.Equal(0, defender.StatStages["defense"]);
+        Assert.Equal(0, defender.StatStages["special-defense"]);
+    }
+
+    [Fact]
+    public void Self_stat_change_moves_mark_every_stat_change_as_self_targeted()
+    {
+        string[] selfStatChangeMoves =
+        {
+            "close-combat", "superpower", "leaf-storm", "hammer-arm", "overheat",
+            "dragon-ascent", "psycho-boost", "v-create"
+        };
+
+        foreach (string moveKey in selfStatChangeMoves)
+        {
+            Assert.NotEmpty(MoveDatabase.All[moveKey].StatChanges);
+            Assert.All(MoveDatabase.All[moveKey].StatChanges, change => Assert.True(change.TargetsSelf));
+        }
+    }
+
+    [Fact]
     public async Task Switching_moves_report_the_correct_side_to_switch()
     {
         var attacker = CreatePokemon(25, "u-turn");
