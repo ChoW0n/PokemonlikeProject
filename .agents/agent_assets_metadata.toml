@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "mOrP4GRD-GbnHTW2PRLg1"
+uri = "file://.agents/outputs/development-db-export.sql"
+type = "unspecified"
+title = "개발 DB 전체 데이터 INSERT SQL"
+description = "요청한 8개 테이블의 전체 로우를 컬럼명과 실제 값으로 생성한 PostgreSQL INSERT 문입니다."
+logical_id = "dd1c1627-8269-47dc-9308-1a096ecd4996"
+content_hash = "sha256:60fd3f766450e154a5f0e9a368abd35b22345f7e45d903d249a553f08cdde2c8"
+size = 159738
+mtime_ms = 1788273906760
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:7f38b434-fb48-49e8-bfe1-a6131a03e62d/dd1c1627-8269-47dc-9308-1a096ecd4996/f6cd4a21-489e-4a3b-a3ae-198e7effb80e"
+storage_version_token = "1788273908123100"
+content_type = "application/octet-stream"
