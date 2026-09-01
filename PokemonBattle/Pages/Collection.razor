@@ -1,11 +1,9 @@
 @page "/collection"
 @using PokemonBattle.Models
 @using PokemonBattle.Services
-@using Microsoft.JSInterop
 @inject CurrentUserService CurrentUser
 @inject UnlockService Unlocks
 @inject NavigationManager Nav
-@inject IJSRuntime JS
 
 <PageTitle>획득한 포켓몬</PageTitle>
 
@@ -80,5 +78,5 @@
             .ToList();
     }
 
-    private async Task GoBack() => await JS.InvokeVoidAsync("history.back");
+    private void GoBack() => Nav.NavigateTo("/");
 }

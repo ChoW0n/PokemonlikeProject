@@ -14,3 +14,4 @@
 - [Skill rating persistence](skill-rating-persistence.md) — account rating is separate from the run; active-run difficulty is persisted and fixed until reset.
 - [Trace ability lifecycle](trace-ability-lifecycle.md) — copied abilities are temporary and restore on switch-out.
 - [Enemy team scaling](enemy-team-scaling.md) — opponent team size follows the current run round; unlock count only expands the selection pool.
+- [Deployment UBB suspension](deployment-ubb-suspension.md) — successful builds can still be suspended by a usage-based billing hold.

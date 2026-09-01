@@ -30,6 +30,7 @@
         }
     </button>
     <button type="button" @onclick="OpenCollection">획득한 포켓몬 전체 보기</button>
+    <button type="button" class="secondary-action" @onclick="SignOut">로그아웃</button>
 </main>
 
 @code {
@@ -60,4 +61,10 @@
     private void OpenAdminConsole() => Nav.NavigateTo("/admin");
     private void OpenMailbox() => Nav.NavigateTo("/mailbox");
     private void OpenCollection() => Nav.NavigateTo("/collection");
+
+    private void SignOut()
+    {
+        CurrentUser.SignOut();
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
 }

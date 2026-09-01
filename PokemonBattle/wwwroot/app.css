@@ -52,6 +52,39 @@ button { font: inherit; }
     margin-bottom: var(--sp-5);
 }
 
+.battle-title-row,
+.preview-title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+}
+
+.battle-title-row h1,
+.preview-title-row h1 {
+    margin-bottom: 0;
+}
+
+.rival-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 4px 10px;
+    border: 1px solid rgba(255, 210, 63, 0.55);
+    border-radius: 999px;
+    background: rgba(255, 210, 63, 0.12);
+    color: #ffe28a;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.secondary-action {
+    border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.06);
+    color: #cbd3ef;
+}
+
 .eyebrow {
     margin: 0 0 var(--sp-1);
     color: #7fd996;

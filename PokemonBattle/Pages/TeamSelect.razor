@@ -281,7 +281,7 @@
     private string? ViewingAbility;
     private string? ViewingItemName;
 
-    private bool CanStart => TeamLoadouts.Count > 0 && TeamLoadouts.Count == Math.Min(UnlockedIds.Count, 6);
+    private bool CanStart => TeamLoadouts.Count is >= 1 and <= 6;
 
     protected override async Task OnInitializedAsync()
     {
