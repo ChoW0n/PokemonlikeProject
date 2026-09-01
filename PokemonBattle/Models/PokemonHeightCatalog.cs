@@ -47,7 +47,8 @@ public static class PokemonHeightCatalog
     }
 
     public static int GetDecimeters(int pokemonId) =>
-        pokemonId is >= 1 and <= 721
+        pokemonId is >= 1
+            && pokemonId <= OfficialHeightDecimeters.Length
             ? OfficialHeightDecimeters[pokemonId - 1]
             : 10;
 }

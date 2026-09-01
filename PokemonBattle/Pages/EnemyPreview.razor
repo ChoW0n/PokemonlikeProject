@@ -9,7 +9,13 @@
 <PageTitle>상대 라인업</PageTitle>
 
 <main class="preview-page">
-    <h1>상대 포켓몬 라인업</h1>
+    <div class="preview-title-row">
+        <h1>상대 포켓몬 라인업</h1>
+        @if (State.IsRivalBattle)
+        {
+            <span class="rival-badge" aria-label="라이벌전">⚔ 라이벌전</span>
+        }
+    </div>
     <p>클릭하면 스탯과 기술을 확인할 수 있습니다. (현재 라운드: @(State.CurrentScore + 1))</p>
     <p class="config-label">
         전설 출현 진행도: @State.LegendaryProgressPercent%
