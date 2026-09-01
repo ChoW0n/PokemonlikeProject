@@ -63,9 +63,12 @@ Unity 없이 순수 C#/.NET 8 Blazor Server로 만든 싱글플레이 포켓몬 
 
 - `dotnet build PokemonBattle/PokemonBattle.csproj --no-restore` 성공
 - `dotnet test PokemonBattle.Tests/PokemonBattle.Tests.csproj --no-restore` 성공
+- `git diff --check` 성공
 - 현재 회귀 테스트 총 142개 통과, 경고 0개
-- Replit 워크플로 `artifacts/pokemon-battle: web` 정상 실행
-- 앱 로그에서 `http://0.0.0.0:3000` 리스닝과 정상 시작 확인
+- 운영 사이트는 Render 공개 URL `https://pokemonlikeproject.onrender.com/`를 기준으로 확인한다.
+- `https://pokemonlikeproject.onrender.com/healthz`가 `{"status":"ok"}`를 반환하는지 확인한다.
+- Render 서비스 로그에서 애플리케이션이 정상 기동하고 Supabase Postgres 연결 오류가 없는지 확인한다.
+- 실제 운영 데이터 확인이 필요할 때는 Supabase 운영 DB를 읽기 전용으로만 조회한다.
 
 ## 다음 에이전트가 따라야 할 제안
 
@@ -73,7 +76,7 @@ Unity 없이 순수 C#/.NET 8 Blazor Server로 만든 싱글플레이 포켓몬 
 2. 새 전투 규칙은 `MoveRuleMetadata`와 효과 핸들러를 우선 활용하고, `Battle.razor`에는 표시·입력만 추가하세요.
 3. 새 기술이나 특성을 연결할 때는 기술 데이터 설명만 추가하지 말고 실행 경로와 결정적 회귀 테스트를 함께 추가하세요.
 4. 날씨·필드 상태를 만지는 모든 테스트는 `Reset()`을 호출하고 테스트 간 공유 상태가 섞이지 않게 유지하세요.
-5. 서버 코드 변경 후에는 기존 워크플로를 재시작하고 `/healthz`, 빌드, 전체 테스트를 다시 확인하세요.
+5. 서버 코드 변경 후에는 로컬 빌드·전체 테스트를 다시 확인하고, Render 공개 URL·`/healthz`·Render 로그·Supabase Postgres 연결 상태를 운영 검증 기준으로 확인하세요.
 6. 작업 완료 시 이 문서의 `현재 변경 파일`·`검증된 상태`를 최신 사실에 맞게 갱신하세요.
 7. Claude 앱/웹에서 작업했다면 변경 후 새 번들을 생성해 다음 대화에 전달하세요.
 
