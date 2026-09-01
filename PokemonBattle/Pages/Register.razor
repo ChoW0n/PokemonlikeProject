@@ -12,7 +12,9 @@
         <p class="intro">새 계정을 만들고 나만의 배틀 기록을 저장하세요.</p>
     </header>
 
-    <p class="form-message" role="status" aria-live="polite">@Message</p>
+    <p class="form-message @(MessageIsError ? "is-error" : "is-success")"
+       role="@(MessageIsError ? "alert" : "status")"
+       aria-live="@(MessageIsError ? "assertive" : "polite")">@Message</p>
 
     <form class="auth-form" @onsubmit="DoRegister" @onsubmit:preventDefault>
         <div class="form-field">
@@ -33,6 +35,7 @@
     private string Username = "";
     private string Password = "";
     private string Message = "";
+    private bool MessageIsError;
     private bool IsSubmitting;
 
     private async Task DoRegister()
@@ -41,11 +44,13 @@
         if (string.IsNullOrWhiteSpace(Username))
         {
             Message = "아이디를 입력해주세요.";
+            MessageIsError = true;
             return;
         }
         if (Password.Length < 6)
         {
             Message = "비밀번호는 6자 이상 입력해주세요.";
+            MessageIsError = true;
             return;
         }
 
@@ -54,6 +59,7 @@
         {
             var (success, message) = await Auth.Register(Username, Password);
             Message = message;
+            MessageIsError = !success;
             if (success)
             {
                 Nav.NavigateTo("/login");
@@ -62,6 +68,7 @@
         catch
         {
             Message = "회원가입 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.";
+            MessageIsError = true;
         }
         finally
         {

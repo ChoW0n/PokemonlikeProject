@@ -31,7 +31,7 @@
 
     <section class="arena-stage" aria-label="배틀 상태" aria-describedby="battle-state-summary">
         <p id="battle-state-summary" class="visually-hidden">상대와 내 포켓몬의 이름, 레벨, 타입, 현재 HP와 상태 이상을 표시합니다.</p>
-        <div class="arena-meta" aria-label="현재 전장 정보">
+        <div class="arena-meta" role="group" aria-label="현재 전장 정보">
             <span class="arena-meta-label">LIVE ARENA</span>
             <span>날씨 · @BattleWeather.Current</span>
             <span>필드 · @BattleField.Current</span>
@@ -119,7 +119,7 @@
             int idx = i;
             var member = PlayerTeam[idx];
             <div class="order-slot @(idx == PlayerTeamIndex ? "is-active" : "") @(member.IsFainted ? "is-fainted" : "")" role="listitem" aria-label="@($"{idx + 1}번 {member.Data.Name}{(idx == PlayerTeamIndex ? ", 현재 출전 중" : "")}{(member.IsFainted ? ", 기절" : "")}")">
-                <img src="@member.Data.EffectiveImageUrl" alt="@member.Data.Name" />
+                <img src="@member.Data.EffectiveImageUrl" alt="" />
             </div>
         }
     </div>
@@ -128,7 +128,7 @@
         <div class="panel-heading">
             <p class="eyebrow command-eyebrow">TURN @Turn</p>
             <h2 id="command-heading">@MenuTitle</h2>
-            <p class="command-state @(IsBusy ? "is-busy" : "")" role="status">
+            <p class="command-state @(IsBusy ? "is-busy" : "")" role="status" aria-live="polite" aria-atomic="true">
                 @(IsBusy
                     ? "전투 처리 중 · 잠시 기다려 주세요."
                     : Menu switch
@@ -172,7 +172,8 @@
                             class="move-name-button @(PendingMoveKey == moveKey ? "is-pending" : "") @(!Hero.CanUseMove(moveKey) ? "is-unavailable" : "")"
                             disabled="@(IsBusy || !Hero.CanUseMove(moveKey))"
                              aria-pressed="@(PendingMoveKey == moveKey ? "true" : "false")"
-                             aria-label="@($"{move.Name}, PP {ppLoop}/{move.MaxPP}{(Hero.CanUseMove(moveKey) ? "" : ", 사용할 수 없음")}")"
+                             aria-label="@($"{move.Name}, PP {ppLoop}/{move.MaxPP}{(PendingMoveKey == moveKey ? ", 선택됨" : "")}{(Hero.CanUseMove(moveKey) ? "" : ", 사용할 수 없음")}")"
+                             aria-describedby="@(PendingMoveKey == moveKey ? "selected-move-details" : null)"
                              @onclick="() => TapMove(moveKey)">
                         <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
                         <span class="move-type-label">@TypeKor(move.Type)</span>
@@ -200,11 +201,11 @@
                 var pmove = MoveDatabase.All[PendingMoveKey];
                     double pmult = pmove.IsStatus ? 1.0 : Rules.PreviewMultiplier(pmove, Enemy, Hero);
                 int pp = Hero.CurrentPP[PendingMoveKey];
-                <div id="selected-move-details" class="move-detail-panel" role="region" aria-label="@($"{pmove.Name} 상세 정보")">
+                <div id="selected-move-details" class="move-detail-panel" role="region" aria-labelledby="selected-move-heading">
                     <div class="move-detail-heading">
                         <div>
                             <span class="move-detail-kicker">SELECTED MOVE</span>
-                            <h3>@pmove.Name</h3>
+                             <h3 id="selected-move-heading">@pmove.Name 상세 정보</h3>
                         </div>
                         <span class="move-type-badge" style="border-color:@TypeColors.GetHex(pmove.Type); color:@TypeColors.GetHex(pmove.Type)">@TypeKor(pmove.Type)</span>
                     </div>
@@ -247,7 +248,7 @@
             {
                 <p class="move-detail-effect command-warning" role="alert">@($"{Enemy.Data.Name}의 {Enemy.SelectedAbility} 때문에 교체할 수 없습니다.")</p>
             }
-            <div class="move-grid">
+            <div class="move-grid" role="group" aria-label="교체 가능한 포켓몬">
                 @for (int i = 0; i < PlayerTeam.Count; i++)
                 {
                     int idx = i;
@@ -275,7 +276,7 @@
                 <strong>강제 교체</strong>
                 <span>전투를 계속하려면 쓰러지지 않은 포켓몬을 선택하세요.</span>
             </div>
-            <div class="move-grid">
+            <div class="move-grid" role="group" aria-label="강제 교체 가능한 포켓몬">
                 @for (int i = 0; i < PlayerTeam.Count; i++)
                 {
                     int idx = i;
@@ -296,7 +297,7 @@
             </div>
         }
 
-        <div class="battle-log-panel" role="log" aria-live="polite" aria-atomic="false" aria-label="전투 로그">
+        <div class="battle-log-panel" role="log" aria-live="polite" aria-atomic="false" aria-relevant="additions text" aria-label="전투 로그">
             @if (!string.IsNullOrWhiteSpace(ActionError))
             {
                 <div class="form-message battle-recovery-message" role="alert">

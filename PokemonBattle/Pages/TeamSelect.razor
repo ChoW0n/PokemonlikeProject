@@ -36,7 +36,7 @@
                 <div class="screen-heading team-heading">
                     <div>
                         <p class="eyebrow">TEAM LOADOUT / STEP 1</p>
-                        <h1>팀 구성</h1>
+                        <h1 id="team-select-heading">팀 구성</h1>
                         <p class="intro">포켓몬을 선택해 팀을 만들고, 카드에서 기술·특성·도구를 구성하세요.</p>
                     </div>
                     <div class="flow-count" aria-label="@($"팀 슬롯 {TeamLoadouts.Count} / {Math.Min(UnlockedIds.Count, 6)}")">
@@ -54,12 +54,13 @@
                     <span>@(CanStart ? "배틀을 시작할 수 있습니다." : "카드를 눌러 1~6마리를 구성하세요.")</span>
                 </div>
                 <label class="visually-hidden" for="pokemon-search">포켓몬 이름 검색</label>
-                <input id="pokemon-search" class="dex-search"
+                 <input id="pokemon-search" class="dex-search" type="search"
                        placeholder="포켓몬 이름 검색..."
+                        autocomplete="off" aria-controls="@(TotalMatchCount > 0 ? "pokemon-results" : null)"
                        value="@RawSearchText"
                        @oninput="OnSearchChanged" />
 
-                <button type="button" class="lock-toggle" aria-pressed="@(ShowLocked ? "true" : "false")" @onclick="() => ShowLocked = !ShowLocked">
+                 <button type="button" class="lock-toggle" aria-pressed="@(ShowLocked ? "true" : "false")" aria-controls="@(TotalMatchCount > 0 ? "pokemon-results" : null)" @onclick="() => ShowLocked = !ShowLocked">
                     @(ShowLocked ? "잠긴 포켓몬 숨기기" : "잠긴 포켓몬 보기")
                 </button>
 
@@ -78,12 +79,12 @@
                 }
                 else
                 {
-                    <div class="dex-grid">
+                    <div id="pokemon-results" class="dex-grid" role="group" aria-label="포켓몬 선택 목록">
                         @foreach (var entry in FilteredPokemon)
                         {
                             bool isUnlocked = UnlockedIds.Contains(entry.Key);
                             var existingInTeam = TeamLoadouts.FirstOrDefault(l => l.PokemonId == entry.Key);
-                            <button type="button" class="dex-entry dex-entry-button @(existingInTeam != null ? "is-selected" : "") @(isUnlocked ? "" : "is-locked")"
+                             <button type="button" class="dex-entry dex-entry-button @(existingInTeam != null ? "is-selected" : "") @(isUnlocked ? "" : "is-locked")"
                                  disabled="@(!isUnlocked)"
                                  aria-label="@($"{(isUnlocked ? entry.Value.Name : "잠긴 포켓몬")}, 도감 번호 {entry.Key}{(existingInTeam != null ? $", 현재 팀에 레벨 {existingInTeam.Level}" : "")}")"
                                  aria-pressed="@(existingInTeam != null ? "true" : "false")"
@@ -149,7 +150,9 @@
                     <input id="preset-name" class="dex-search" placeholder="프리셋 이름" maxlength="80" value="@PresetName" @oninput="OnPresetNameChanged" />
                     <button type="button" disabled="@(IsOperationBusy || TeamLoadouts.Count == 0 || string.IsNullOrWhiteSpace(PresetName))" @onclick="SaveCurrentPreset">@(IsOperationBusy ? "처리 중..." : "저장")</button>
                 </div>
-                <p class="form-message" role="status" aria-live="polite">@PresetMessage</p>
+                 <p class="form-message @(PresetMessageIsError ? "is-error" : "is-success")"
+                    role="@(PresetMessageIsError ? "alert" : "status")"
+                    aria-live="@(PresetMessageIsError ? "assertive" : "polite")">@PresetMessage</p>
                 @if (PresetNames.Count == 0)
                 {
                     <p class="preset-empty">저장된 프리셋이 없습니다.</p>
@@ -176,7 +179,7 @@
                 <div class="screen-heading detail-heading">
                     <div>
                         <p class="eyebrow">TEAM LOADOUT / STEP 2</p>
-                        <h1>@picked.Name 구성</h1>
+                         <h1 id="team-config-heading">@picked.Name 구성</h1>
                         <p class="intro">필수 조건은 기술 1개 이상입니다. 항목을 눌러 설명을 확인한 뒤 선택하세요.</p>
                     </div>
                     <span class="detail-state">@(TeamLoadouts.Any(l => l.PokemonId == ConfiguringId.Value) ? "팀 구성 수정" : "새 팀원")</span>
@@ -221,6 +224,7 @@
                              aria-label="@($"{move.Name}, {(move.IsStatus ? "변화기" : "공격기")}{(DraftMoves.Contains(moveKey) ? ", 선택됨" : "")}")"
                              aria-pressed="@(DraftMoves.Contains(moveKey) ? "true" : "false")"
                              aria-expanded="@(ViewingMoveKey == moveKey ? "true" : "false")"
+                             aria-controls="@(ViewingMoveKey == moveKey ? "selected-move-info" : null)"
                              @onclick="() => ViewOrToggleMove(moveKey)">
                             <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
                              <span class="dex-name">@move.Name @(move.Priority > 0 ? "우선" : "") @(IsTechnicalMachineMove(picked, moveKey) ? "· TM" : "") @(IsRunStolenMove(picked, moveKey) ? "· 강탈" : "")</span>
@@ -232,7 +236,7 @@
                 @if (ViewingMoveKey != null)
                 {
                     var vmove = MoveDatabase.All[ViewingMoveKey];
-                    <div class="info-panel">
+                     <div id="selected-move-info" class="info-panel" role="region" aria-label="@($"{vmove.Name} 상세 정보")">
                         @if (!vmove.IsStatus)
                         {
                             <GaugeBar Label="위력" Percent="@StatBarHelper.PowerPercent(vmove.Power)" ColorClass="@StatBarHelper.PowerColor(vmove.Power)" DisplayText="@vmove.Power.ToString()" />
@@ -250,12 +254,13 @@
                     @foreach (var ability in picked.AbilityNames)
                     {
                         <button type="button" class="dex-entry dex-entry-button @(DraftAbility == ability ? "is-selected" : string.Empty) @(ViewingAbility == ability ? "is-viewing" : "")"
-                             aria-label="@($"{ability}{(DraftAbility == ability ? ", 선택됨" : "")}")"
+                             aria-label="@($"{ability}{(DraftAbility == ability ? ", 선택됨" : "")}, 상세 보기")"
                              aria-pressed="@(DraftAbility == ability ? "true" : "false")"
                              aria-expanded="@(ViewingAbility == ability ? "true" : "false")"
+                             aria-controls="@(ViewingAbility == ability ? "selected-ability-info" : null)"
                              @onclick="() => ViewingAbility = ability">
                             <span class="dex-name">@ability</span>
-                             <span class="card-state @(DraftAbility == ability ? "is-selected" : "")">@(DraftAbility == ability ? "선택됨" : ViewingAbility == ability ? "상세 확인 중" : "선택하기")</span>
+                              <span class="card-state @(DraftAbility == ability ? "is-selected" : "")">@(DraftAbility == ability ? "선택됨" : ViewingAbility == ability ? "상세 확인 중" : "상세 보기")</span>
                             <span class="dex-type">@(AbilityDatabase.IsImplemented(ability)
                                 ? $"전투 적용 · {AbilityDatabase.GetImplementationGroup(ability)}"
                                 : $"설명만 제공 · {AbilityDatabase.GetImplementationGroup(ability)}")</span>
@@ -265,7 +270,7 @@
                 @if (ViewingAbility != null)
                 {
                     string desc = AbilityDatabase.All.TryGetValue(ViewingAbility, out var info) ? info.Description : "";
-                    <div class="info-panel">
+                     <div id="selected-ability-info" class="info-panel" role="region" aria-label="@($"{ViewingAbility} 상세 정보")">
                         <p class="info-desc"><strong>@(AbilityDatabase.IsImplemented(ViewingAbility)
                             ? $"전투에서 실제 적용됩니다. 분류: {AbilityDatabase.GetImplementationGroup(ViewingAbility)}"
                             : $"현재는 설명만 제공되며 전투 효과는 적용되지 않습니다. 우선순위 그룹: {AbilityDatabase.GetImplementationGroup(ViewingAbility)}")</strong></p>
@@ -289,10 +294,11 @@
                     <div class="dex-grid">
                         @foreach (var item in filteredItems)
                         {
-                            <button type="button" class="dex-entry dex-entry-button @(DraftItem == item.Name ? "is-selected" : string.Empty) @(ViewingItemName == item.Name ? "is-viewing" : "")"
+                        <button type="button" class="dex-entry dex-entry-button @(DraftItem == item.Name ? "is-selected" : string.Empty) @(ViewingItemName == item.Name ? "is-viewing" : "")"
                                  aria-label="@($"{item.Name}{(DraftItem == item.Name ? ", 선택됨" : "")}")"
                                  aria-pressed="@(DraftItem == item.Name ? "true" : "false")"
                                  aria-expanded="@(ViewingItemName == item.Name ? "true" : "false")"
+                                 aria-controls="@(ViewingItemName == item.Name ? "selected-item-info" : null)"
                                  @onclick="() => ViewingItemName = item.Name">
                                 @if (item.IconUrl != null)
                                 {
@@ -307,7 +313,7 @@
                 @if (ViewingItemName != null)
                 {
                     var vitem = ItemDatabase.GetAvailableItems(picked.Name).First(i => i.Name == ViewingItemName);
-                    <div class="info-panel">
+                    <div id="selected-item-info" class="info-panel" role="region" aria-label="@($"{vitem.Name} 상세 정보")">
                         <p class="info-desc">@vitem.Description</p>
                          <button type="button" class="info-select-btn @(DraftItem == ViewingItemName ? "is-active" : "")" aria-pressed="@(DraftItem == ViewingItemName ? "true" : "false")" @onclick="() => DraftItem = ViewingItemName">
                             @(DraftItem == ViewingItemName ? "선택됨" : "이 도구 선택")
@@ -356,6 +362,7 @@
     private string ItemSearchText = "";
     private string PresetName = "";
     private string PresetMessage = "";
+    private bool PresetMessageIsError;
     private List<PokemonLoadout> TeamLoadouts = new();
     private List<string> PresetNames = new();
     private HashSet<int> UnlockedIds = new();
@@ -533,6 +540,7 @@
         if (!TeamLoadoutRules.CanUseItem(TeamLoadouts, ConfiguringId.Value, DraftItem))
         {
             PresetMessage = "이미 다른 팀원이 사용 중인 도구입니다. 다른 도구를 선택해주세요.";
+            PresetMessageIsError = true;
             return;
         }
 
@@ -550,6 +558,7 @@
             if (!await State.TryLearnTechnicalMachineAsync(moveKey))
             {
                 PresetMessage = "기술머신 보유 수량이 부족합니다. 다시 선택해주세요.";
+                PresetMessageIsError = true;
                 return;
             }
         }
@@ -598,6 +607,7 @@
             PresetMessage = saved
                 ? $"'{name}' 프리셋을 저장했습니다."
                 : "프리셋을 저장하지 못했습니다. 로그인 상태를 확인해주세요.";
+            PresetMessageIsError = !saved;
             if (saved)
             {
                 PresetName = "";
@@ -607,6 +617,7 @@
         catch
         {
             PresetMessage = "프리셋 저장 중 문제가 발생했습니다. 다시 시도해주세요.";
+            PresetMessageIsError = true;
         }
         finally
         {
@@ -630,6 +641,7 @@
             if (loaded == null)
             {
                 PresetMessage = $"'{name}' 프리셋을 찾을 수 없습니다.";
+                PresetMessageIsError = true;
                 await RefreshPresetNames();
                 return;
             }
@@ -658,10 +670,12 @@
 
             TeamLoadouts = TeamLoadoutRules.NormalizeUniqueItems(TeamLoadouts);
             PresetMessage = $"'{name}' 프리셋을 불러왔습니다.";
+            PresetMessageIsError = false;
         }
         catch
         {
             PresetMessage = "프리셋을 불러오는 중 문제가 발생했습니다. 다시 시도해주세요.";
+            PresetMessageIsError = true;
         }
         finally
         {
@@ -679,11 +693,13 @@
             PresetMessage = deleted
                 ? $"'{name}' 프리셋을 삭제했습니다."
                 : $"'{name}' 프리셋을 찾을 수 없습니다.";
+            PresetMessageIsError = !deleted;
             await RefreshPresetNames();
         }
         catch
         {
             PresetMessage = "프리셋 삭제 중 문제가 발생했습니다. 다시 시도해주세요.";
+            PresetMessageIsError = true;
         }
         finally
         {
@@ -706,6 +722,7 @@
         catch
         {
             PresetMessage = "팀 저장 중 문제가 발생했습니다. 다시 시도해주세요.";
+            PresetMessageIsError = true;
         }
         finally
         {

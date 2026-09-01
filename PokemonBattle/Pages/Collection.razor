@@ -19,11 +19,11 @@
         </div>
 
         <div id="collection-top" class="pokedex-screen">
-            <div class="collection-sticky-nav" aria-label="컬렉션 탐색">
+            <nav class="collection-sticky-nav" aria-label="컬렉션 탐색">
                 <button type="button" class="collection-back" @onclick="GoBack">← 홈으로</button>
                 <span class="collection-nav-title">COLLECTION</span>
                 <a class="collection-nav-top" href="#collection-top">↑ 맨 위</a>
-            </div>
+            </nav>
 
             <div class="collection-header">
                 <div>
@@ -53,11 +53,11 @@
                         <label for="collection-search">포켓몬 찾기</label>
                         <input id="collection-search" class="dex-search" type="search"
                                placeholder="이름, 영문 이름, 도감 번호로 검색"
-                               value="@SearchText" @oninput="OnSearchChanged" />
+                               value="@SearchText" autocomplete="off" @oninput="OnSearchChanged" />
                     </div>
                     <div class="collection-filter-field">
                         <label for="collection-type-filter">타입 필터</label>
-                        <select id="collection-type-filter" value="@SelectedType" @onchange="OnTypeChanged">
+                        <select id="collection-type-filter" value="@SelectedType" aria-label="포켓몬 타입 필터" @onchange="OnTypeChanged">
                             <option value="all">전체 타입</option>
                             @foreach (var type in PokemonTypes)
                             {
