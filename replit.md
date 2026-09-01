@@ -12,8 +12,7 @@
 - `pnpm run verify` — build the app, then run the battle regression suite as a separate validation step
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` or `ConnectionStrings__DefaultConnection` — Postgres connection string
-- External deployment: see `DEPLOYMENT.md`; `ADMIN_BOOTSTRAP_PASSWORD` is required only when creating the first administrator in a new database
+- Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
 
