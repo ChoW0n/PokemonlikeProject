@@ -1,0 +1,50 @@
+2026-09-01T08:21:19.813845582Z               CREATE UNIQUE INDEX IF NOT EXISTS "IX_TechnicalMachines_Username_MoveKey"
+2026-09-01T08:21:19.813848142Z                   ON "TechnicalMachines" ("Username", "MoveKey");
+2026-09-01T08:21:21.518845041Z info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+2026-09-01T08:21:21.518904832Z       Executed DbCommand (293ms) [Parameters=[@__bootstrapAdminUsername_0='?'], CommandType='Text', CommandTimeout='30']
+2026-09-01T08:21:21.518913072Z       SELECT EXISTS (
+2026-09-01T08:21:21.518918092Z           SELECT 1
+2026-09-01T08:21:21.518923872Z           FROM "Users" AS u
+2026-09-01T08:21:21.518929052Z           WHERE u."Username" = @__bootstrapAdminUsername_0)
+2026-09-01T08:21:22.217479785Z info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+2026-09-01T08:21:22.217524426Z       Executed DbCommand (3ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+2026-09-01T08:21:22.217531906Z       SELECT u."Id", u."IsAdmin", u."PasswordHash", u."Username"
+2026-09-01T08:21:22.217537036Z       FROM "Users" AS u
+2026-09-01T08:21:22.217542046Z       WHERE lower(u."Username") = 'admin'
+2026-09-01T08:21:22.217546917Z       ORDER BY u."Id"
+2026-09-01T08:21:22.52308994Z info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+2026-09-01T08:21:22.523110531Z       Executed DbCommand (3ms) [Parameters=[@__keeper_Username_0='?'], CommandType='Text', CommandTimeout='30']
+2026-09-01T08:21:22.523115881Z       SELECT p."Id", p."CurrentScore", p."DifficultyAdjustment", p."HighScore", p."LegendaryEncounterHistoryJson", p."LegendaryProgressPercent", p."LoadoutsJson", p."RoundPerformancesJson", p."RunMetaStateJson", p."Username"
+2026-09-01T08:21:22.523123331Z       FROM "PlayerRuns" AS p
+2026-09-01T08:21:22.523127951Z       WHERE p."Username" = @__keeper_Username_0
+2026-09-01T08:21:22.523132481Z       ORDER BY p."HighScore" DESC, p."CurrentScore" DESC, p."Id" DESC
+2026-09-01T08:21:22.623350502Z info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+2026-09-01T08:21:22.623369663Z       Executed DbCommand (3ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+2026-09-01T08:21:22.623374723Z       CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_Username"
+2026-09-01T08:21:22.623379733Z           ON "Users" ("Username");
+2026-09-01T08:21:22.628476849Z info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+2026-09-01T08:21:22.62849537Z       Executed DbCommand (4ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+2026-09-01T08:21:22.628501119Z       INSERT INTO "PlayerSkillRatings" ("Username")
+2026-09-01T08:21:22.62850724Z       SELECT "Username" FROM "Users"
+2026-09-01T08:21:22.62851177Z       ON CONFLICT ("Username") DO NOTHING;
+2026-09-01T08:21:22.732202163Z warn: Microsoft.AspNetCore.DataProtection.Repositories.FileSystemXmlRepository[60]
+2026-09-01T08:21:22.732223273Z       Storing keys in a directory '/root/.aspnet/DataProtection-Keys' that may not be persisted outside of the container. Protected data will be unavailable when container is destroyed. For more information go to https://aka.ms/aspnet/dataprotectionwarning
+2026-09-01T08:21:23.017147247Z warn: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[35]
+2026-09-01T08:21:23.017166348Z       No XML encryptor configured. Key {ef2011e5-b146-40f0-9a04-69efcb36e6a9} may be persisted to storage in unencrypted form.
+2026-09-01T08:21:23.113997548Z warn: Microsoft.AspNetCore.Hosting.Diagnostics[15]
+2026-09-01T08:21:23.114014528Z       Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:10000'.
+2026-09-01T08:21:23.815830319Z info: Microsoft.Hosting.Lifetime[14]
+2026-09-01T08:21:23.815846299Z       Now listening on: http://0.0.0.0:10000
+2026-09-01T08:21:23.815849479Z info: Microsoft.Hosting.Lifetime[0]
+2026-09-01T08:21:23.815852769Z       Application started. Press Ctrl+C to shut down.
+2026-09-01T08:21:23.815855669Z info: Microsoft.Hosting.Lifetime[0]
+2026-09-01T08:21:23.815858509Z       Hosting environment: Production
+2026-09-01T08:21:23.815861239Z info: Microsoft.Hosting.Lifetime[0]
+2026-09-01T08:21:23.81588296Z       Content root path: /app
+2026-09-01T08:21:32.012240056Z ==> Your service is live 🎉
+2026-09-01T08:21:32.304298864Z ==> 
+2026-09-01T08:21:32.308457965Z ==> ///////////////////////////////////////////////////////////
+2026-09-01T08:21:32.31128385Z ==> 
+2026-09-01T08:21:32.314001052Z ==> Available at your primary URL https://pokemonlikeproject.onrender.com
+2026-09-01T08:21:32.316662293Z ==> 
+2026-09-01T08:21:32.319021746Z ==> ///////////////////////////////////////////////////////////
