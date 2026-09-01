@@ -278,6 +278,18 @@ public sealed class AbilityLifecycleEffectHandler : IBattleEffectHandler
     {
         if (context.TotalDamage <= 0) return;
 
+        if (!context.Defender.IsFainted
+            && context.Defender.HasActiveHeldItem(context.Attacker)
+            && context.Defender.HeldItem == "약점보험"
+            && context.Defender.LastMultiplier >= 2.0)
+        {
+            context.Defender.HeldItem = "없음";
+            context.Defender.ChangeStage("attack", 2);
+            context.Defender.ChangeStage("special-attack", 2);
+            await context.ShowMessage(
+                $"{context.Defender.Data.Name}의 약점보험으로 공격과 특수공격이 크게 올랐다!");
+        }
+
         if (context.Defender.IsFainted && !context.Attacker.IsFainted
             && context.Attacker.HasActiveAbility("자기과신", context.Defender))
         {
@@ -512,19 +524,6 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
             context.Attacker.CurrentHp = Math.Max(0, context.Attacker.CurrentHp - damage);
             if (context.Attacker.CurrentHp == 0) context.Attacker.MarkFainted();
             await context.ShowMessage($"{context.Attacker.Data.Name}은(는) 유폭으로 데미지를 입었다!");
-        }
-
-        if (context.Defender.IsFainted || context.Attacker.IsFainted) return;
-
-        if (context.Defender.HasActiveHeldItem(context.Attacker)
-            && context.Defender.HeldItem == "약점보험"
-            && context.Defender.LastMultiplier >= 2.0)
-        {
-            context.Defender.HeldItem = "없음";
-            context.Defender.ChangeStage("attack", 2);
-            context.Defender.ChangeStage("special-attack", 2);
-            await context.ShowMessage(
-                $"{context.Defender.Data.Name}의 약점보험으로 공격과 특수공격이 크게 올랐다!");
         }
 
         if (context.Defender.HasActiveAbility("나쁜손버릇", context.Attacker)

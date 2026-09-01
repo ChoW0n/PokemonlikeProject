@@ -181,11 +181,13 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
             && context.MoveKey != "stockpile"
             && context.Random.Next(100) < Math.Min(100, move.StatChangeChance * chanceMultiplier))
         {
+            bool selfStatDropApplied = false;
             foreach (var statChange in move.StatChanges)
             {
                 bool targetsSelf = statChange.TargetsSelf || IsSelfStatChange(context.MoveKey, statChange.Stat);
                 var target = targetsSelf ? attacker : defender;
                 if (target.IsFainted) continue;
+                if (targetsSelf && statChange.Change < 0) selfStatDropApplied = true;
 
                 int before = target.StatStages[statChange.Stat];
                 target.ChangeStage(statChange.Stat, statChange.Change, causedByOpponent: !targetsSelf);
@@ -199,6 +201,11 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
                     string? reaction = target.TriggerStatDropAbility();
                     if (reaction != null) await context.ShowMessage(reaction);
                 }
+            }
+
+            if (selfStatDropApplied && attacker.TryRestoreWithWhiteHerb())
+            {
+                await context.ShowMessage($"{attacker.Data.Name}은(는) 하얀허브로 능력 저하를 회복했다!");
             }
         }
     }

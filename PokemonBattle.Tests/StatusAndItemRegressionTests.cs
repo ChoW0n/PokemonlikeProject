@@ -172,7 +172,7 @@ public sealed class StatusAndItemRegressionTests
     [Fact]
     public async Task Air_balloon_blocks_ground_damage_then_pops_on_damage()
     {
-        var attacker = CreatePokemon(25, "earthquake");
+        var attacker = CreatePokemon(74, "earthquake", "tackle");
         var defender = CreatePokemon(202, "tackle", heldItem: "풍선");
         int hpBefore = defender.CurrentHp;
         var engine = CreateFullEngine();
@@ -246,7 +246,7 @@ public sealed class StatusAndItemRegressionTests
     [Fact]
     public async Task White_herb_restores_self_stat_drop()
     {
-        var attacker = CreatePokemon(25, "close-combat", heldItem: "하얀허브");
+        var attacker = CreatePokemon(68, "close-combat", heldItem: "하얀허브");
         var defender = CreatePokemon(202, "tackle");
 
         await CreateFullEngine().TakeTurnAsync(
