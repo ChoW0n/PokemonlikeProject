@@ -6,6 +6,9 @@ public static class TeamLoadoutRules
 {
     public const string NoItem = "없음";
 
+    public static string NormalizeItemName(string? itemName) =>
+        string.IsNullOrWhiteSpace(itemName) ? NoItem : itemName.Trim();
+
     // 입력 순서를 팀 배틀 순서로 간주하고, 첫 번째 도구만 보존한다.
     public static List<PokemonLoadout> NormalizeUniqueItems(IEnumerable<PokemonLoadout> loadouts)
     {
@@ -15,9 +18,7 @@ public static class TeamLoadoutRules
         foreach (var loadout in loadouts)
         {
             var copy = loadout.Clone();
-            copy.ChosenItem = string.IsNullOrWhiteSpace(copy.ChosenItem)
-                ? NoItem
-                : copy.ChosenItem.Trim();
+            copy.ChosenItem = NormalizeItemName(copy.ChosenItem);
 
             if (copy.ChosenItem != NoItem && !usedItems.Add(copy.ChosenItem))
             {
@@ -36,8 +37,8 @@ public static class TeamLoadoutRules
     {
         return loadouts
             .Where(loadout => excludingPokemonId == null || loadout.PokemonId != excludingPokemonId)
-            .Select(loadout => loadout.ChosenItem)
-            .Where(item => !string.IsNullOrWhiteSpace(item) && item != NoItem)
+            .Select(loadout => NormalizeItemName(loadout.ChosenItem))
+            .Where(item => item != NoItem)
             .ToHashSet(StringComparer.Ordinal);
     }
 
@@ -45,16 +46,15 @@ public static class TeamLoadoutRules
         IEnumerable<PokemonLoadout> loadouts,
         int pokemonId,
         string? itemName) =>
-        string.IsNullOrWhiteSpace(itemName)
-        || itemName == NoItem
-        || !UsedItems(loadouts, pokemonId).Contains(itemName);
+        NormalizeItemName(itemName) == NoItem
+        || !UsedItems(loadouts, pokemonId).Contains(NormalizeItemName(itemName));
 
     public static bool HasDuplicateItems(IEnumerable<PokemonLoadout> loadouts)
     {
         var usedItems = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var item in loadouts.Select(loadout => loadout.ChosenItem))
+        foreach (var item in loadouts.Select(loadout => NormalizeItemName(loadout.ChosenItem)))
         {
-            if (string.IsNullOrWhiteSpace(item) || item == NoItem) continue;
+            if (item == NoItem) continue;
             if (!usedItems.Add(item)) return true;
         }
 

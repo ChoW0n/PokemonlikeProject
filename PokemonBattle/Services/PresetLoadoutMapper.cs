@@ -12,11 +12,10 @@ public static class PresetLoadoutMapper
             .GroupBy(loadout => loadout.PokemonId)
             .ToDictionary(group => group.Key, group => group.First().Level);
 
-        return preset
-            .Select(loadout => loadout.Clone(
+        return TeamLoadoutRules.NormalizeUniqueItems(
+            preset.Select(loadout => loadout.Clone(
                 currentLevels.TryGetValue(loadout.PokemonId, out var currentLevel)
                     ? currentLevel
-                    : 1))
-            .ToList();
+                    : 1)));
     }
 }

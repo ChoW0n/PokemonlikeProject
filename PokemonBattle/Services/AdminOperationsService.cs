@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PokemonBattle.Data;
@@ -11,8 +10,6 @@ public sealed class AdminOperationsService
     private readonly DatabaseContextExecutor _database;
     private readonly CurrentUserService _currentUser;
     private static readonly int[] StarterIds = { 1, 4, 7 };
-    private static readonly JsonSerializerOptions JsonOptions = new() { IncludeFields = true };
-
     [ActivatorUtilitiesConstructor]
     public AdminOperationsService(
         DatabaseContextExecutor database,
@@ -227,7 +224,7 @@ public sealed class AdminOperationsService
                 .ToList();
 
             var run = await GetOrCreateRunAsync(db, target.Username);
-            run.LoadoutsJson = JsonSerializer.Serialize(team, JsonOptions);
+            run.LoadoutsJson = LoadoutJson.Serialize(team);
             return await SaveWithAuditAsync(
                 db, "테스트 팀 주입", target.Username, "대표 포켓몬 6마리를 레벨 100으로 설정함");
         });

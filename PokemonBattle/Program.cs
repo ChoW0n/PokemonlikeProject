@@ -163,6 +163,11 @@ using (var scope = app.Services.CreateScope())
         );
         CREATE UNIQUE INDEX IF NOT EXISTS ""IX_TechnicalMachines_Username_MoveKey""
             ON ""TechnicalMachines"" (""Username"", ""MoveKey"");
+        CREATE TABLE IF NOT EXISTS ""AppMaintenanceMarkers"" (
+            ""Key"" TEXT PRIMARY KEY,
+            ""AppliedAtUtc"" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            ""Details"" TEXT NOT NULL DEFAULT ''
+        );
     ");
 
     if (!db.Users.Any(u => u.Username == "admin"))
@@ -187,6 +192,11 @@ using (var scope = app.Services.CreateScope())
         SELECT "Username" FROM "Users"
         ON CONFLICT ("Username") DO NOTHING;
         """);
+
+    await PlayerRunItemCleanup.ApplyOnceAsync(
+        db,
+        scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("PlayerRunItemCleanup"));
 }
 
 if (!app.Environment.IsDevelopment())

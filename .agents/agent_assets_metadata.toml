@@ -14,3 +14,17 @@ mtime_ms = 1788273906760
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:7f38b434-fb48-49e8-bfe1-a6131a03e62d/dd1c1627-8269-47dc-9308-1a096ecd4996/f6cd4a21-489e-4a3b-a3ae-198e7effb80e"
 storage_version_token = "1788273908123100"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "T7ai_gDRt4bvUw5WVQ5vd"
+uri = "file://claude-context-bundle.md"
+type = "text"
+title = "Updated Pokemon Battle Claude context bundle"
+description = "Updated verification guidance: local build/test checks remain, production validation now uses Render public URL, healthz, Render logs, and read-only Supabase Postgres checks."
+logical_id = "e19d396f-d7e7-4c53-a808-eb843195c4d1"
+content_hash = "sha256:6031fe05e83c97fedf279b0fd67d23393ec7c01dba80788f33131515cf8c353a"
+size = 2213261
+mtime_ms = 1788303322505
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:7f38b434-fb48-49e8-bfe1-a6131a03e62d/e19d396f-d7e7-4c53-a808-eb843195c4d1/cc0b2bb3-36bf-4e13-88d9-2579d1e2dd63"
+storage_version_token = "1788303337735922"
+content_type = "text/markdown"

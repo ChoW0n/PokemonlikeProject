@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System.Text.Json;
 using PokemonBattle.Data;
 using PokemonBattle.Models;
 
@@ -9,11 +8,6 @@ namespace PokemonBattle.Services;
 public class RunStore
 {
     private readonly DatabaseContextExecutor _database;
-    private static readonly JsonSerializerOptions LoadoutJsonOptions = new()
-    {
-        IncludeFields = true
-    };
-
     [ActivatorUtilitiesConstructor]
     public RunStore(DatabaseContextExecutor database)
     {
@@ -36,7 +30,7 @@ public class RunStore
     {
         return await _database.ExecuteAsync("run.load", async db =>
         {
-            var run = await db.PlayerRuns.AsNoTracking()
+            var run = await db.PlayerRuns
                 .FirstOrDefaultAsync(r => r.Username == username);
             if (run == null)
             {
@@ -51,18 +45,20 @@ public class RunStore
                     new RunMetaState());
             }
 
-            var loadouts = JsonSerializer.Deserialize<List<PokemonLoadout>>(
-                run.LoadoutsJson,
-                LoadoutJsonOptions) ?? new List<PokemonLoadout>();
-            var legendaryEncounterHistory = JsonSerializer.Deserialize<List<LegendaryEncounterHistoryEntry>>(
-                run.LegendaryEncounterHistoryJson,
-                LoadoutJsonOptions) ?? new List<LegendaryEncounterHistoryEntry>();
-            var roundPerformances = JsonSerializer.Deserialize<List<RunRoundPerformance>>(
-                run.RoundPerformancesJson,
-                LoadoutJsonOptions) ?? new List<RunRoundPerformance>();
-            var metaState = JsonSerializer.Deserialize<RunMetaState>(
-                run.RunMetaStateJson,
-                LoadoutJsonOptions) ?? new RunMetaState();
+            var loadouts = LoadoutJson.Deserialize(run.LoadoutsJson);
+            var normalizedLoadoutsJson = LoadoutJson.Serialize(loadouts);
+            if (!string.Equals(run.LoadoutsJson, normalizedLoadoutsJson, StringComparison.Ordinal))
+            {
+                run.LoadoutsJson = normalizedLoadoutsJson;
+                await db.SaveChangesAsync();
+            }
+
+            var legendaryEncounterHistory = System.Text.Json.JsonSerializer.Deserialize<List<LegendaryEncounterHistoryEntry>>(
+                run.LegendaryEncounterHistoryJson) ?? new List<LegendaryEncounterHistoryEntry>();
+            var roundPerformances = System.Text.Json.JsonSerializer.Deserialize<List<RunRoundPerformance>>(
+                run.RoundPerformancesJson) ?? new List<RunRoundPerformance>();
+            var metaState = System.Text.Json.JsonSerializer.Deserialize<RunMetaState>(
+                run.RunMetaStateJson) ?? new RunMetaState();
             return (
                 run.CurrentScore,
                 Math.Max(0, run.HighScore),
@@ -92,16 +88,16 @@ public class RunStore
         await _database.ExecuteAsync("run.save", async db =>
         {
             var run = await db.PlayerRuns.FirstOrDefaultAsync(r => r.Username == username);
-            string json = JsonSerializer.Serialize(loadouts, LoadoutJsonOptions);
-            string historyJson = JsonSerializer.Serialize(
+            string json = LoadoutJson.Serialize(loadouts);
+            string historyJson = System.Text.Json.JsonSerializer.Serialize(
                 legendaryEncounterHistory ?? new List<LegendaryEncounterHistoryEntry>(),
-                LoadoutJsonOptions);
-            string roundPerformancesJson = JsonSerializer.Serialize(
+                new System.Text.Json.JsonSerializerOptions { IncludeFields = true });
+            string roundPerformancesJson = System.Text.Json.JsonSerializer.Serialize(
                 roundPerformances ?? new List<RunRoundPerformance>(),
-                LoadoutJsonOptions);
-            string metaStateJson = JsonSerializer.Serialize(
+                new System.Text.Json.JsonSerializerOptions { IncludeFields = true });
+            string metaStateJson = System.Text.Json.JsonSerializer.Serialize(
                 RunMetaCatalog.Normalize(metaState),
-                LoadoutJsonOptions);
+                new System.Text.Json.JsonSerializerOptions { IncludeFields = true });
             int safeHighScore = Math.Max(0, highScore);
             int safeProgress = Math.Clamp(legendaryProgressPercent, 0, LegendaryProgression.MaxProgressPercent);
             int safeDifficulty = Math.Clamp(

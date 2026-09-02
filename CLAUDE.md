@@ -64,9 +64,12 @@ git diff --check
 전투 상태를 변경하는 테스트는 `BattleWeather`와 `BattleField`를 반드시 정리해야 합니다.
 두 상태는 모델 계산과 효과 핸들러가 함께 참조하는 공유 전투 상태이므로 테스트 병렬 실행도 피합니다.
 
-Blazor 서버 코드를 변경했다면 Replit의 기존 워크플로
-`artifacts/pokemon-battle: web`을 재시작하고 로그와 `/healthz`를 확인하세요.
-워크플로를 새로 만들거나 기존 워크플로 이름을 바꾸지 마세요.
+운영 배포는 Render와 Supabase Postgres를 기준으로 검증합니다.
+
+- `https://pokemonlikeproject.onrender.com/`가 정상 응답하는지 확인하세요.
+- `https://pokemonlikeproject.onrender.com/healthz`가 `{"status":"ok"}`를 반환하는지 확인하세요.
+- Render 서비스 로그에서 애플리케이션이 정상 기동하고 Supabase Postgres 연결 오류가 없는지 확인하세요.
+- 실제 운영 데이터 확인이 필요할 때는 Supabase 운영 DB를 읽기 전용으로만 조회하세요.
 
 ## 협업 방식
 

@@ -55,17 +55,26 @@ Unity 없이 순수 C#/.NET 8 Blazor Server로 만든 싱글플레이 포켓몬 
 
 ## 현재 변경 파일
 
-- `PokemonBattle/Models/MoveDatabase.cs` — 기술 카탈로그와 능력치 변화 메타데이터 기준 복구
-- `PokemonBattle/Models/PokemonDatabase.cs` — 공식 신장 카탈로그 적용
-- `docs/battle-regression-baseline.md` — 전투 규칙·도감 데이터 기준값 문서
+- `PokemonBattle/Pages/TeamSelect.razor` — 팀 카드 재진입, 기술 더블클릭 토글, 아이템 재할당 확인 UI
+- `PokemonBattle/Services/LoadoutJson.cs`·`TeamLoadoutRules.cs` — 모든 팀 저장 경계의 아이템 정규화
+- `PokemonBattle/Services/RunStore.cs`·`PlayerProgressionStore.cs`·`PostgresPresetStore.cs` — 저장·로드 시 중복 아이템 방어
+- `PokemonBattle/Services/PlayerRunItemCleanup.cs`·`Program.cs` — marker 기반 PlayerRuns 1회성 아이템 초기화
+- `PokemonBattle.Tests/ProgressionRegressionTests.cs` — 공백 포함 중복과 아이템 초기화 회귀 테스트
 
 ## 검증된 상태
 
 - `dotnet build PokemonBattle/PokemonBattle.csproj --no-restore` 성공
 - `dotnet test PokemonBattle.Tests/PokemonBattle.Tests.csproj --no-restore` 성공
-- 현재 회귀 테스트 총 142개 통과, 경고 0개
-- Replit 워크플로 `artifacts/pokemon-battle: web` 정상 실행
-- 앱 로그에서 `http://0.0.0.0:3000` 리스닝과 정상 시작 확인
+- `git diff --check` 성공
+- 현재 회귀 테스트 총 144개 통과
+- 테스트 환경에서 xUnit analyzer 캐시가 누락될 수 있으므로 실패 시 `dotnet restore PokemonBattle.Tests/PokemonBattle.Tests.csproj --force --no-cache` 후 다시 실행한다.
+- `artifacts/pokemon-battle: web` 워크플로 재기동 성공, `http://127.0.0.1:3000/healthz`가 `{"status":"ok"}`를 반환한다.
+- 운영 사이트는 Render 공개 URL `https://pokemonlikeproject.onrender.com/`를 기준으로 확인한다.
+- `https://pokemonlikeproject.onrender.com/healthz`가 `{"status":"ok"}`를 반환하는지 확인한다.
+- Render 서비스 로그에서 애플리케이션이 정상 기동하고 Supabase Postgres 연결 오류가 없는지 확인한다.
+- 실제 운영 데이터 확인이 필요할 때는 Supabase 운영 DB를 읽기 전용으로만 조회한다.
+- startup 로그에서 `changed-runs=1; cleared-loadouts=6`을 확인했다.
+- 실제 연결 DB에서 cleanup marker 1개, `PlayerRuns` 4행·로드아웃 9개, `ChosenItem != "없음"` 0개를 확인했다.
 
 ## 다음 에이전트가 따라야 할 제안
 
@@ -73,7 +82,7 @@ Unity 없이 순수 C#/.NET 8 Blazor Server로 만든 싱글플레이 포켓몬 
 2. 새 전투 규칙은 `MoveRuleMetadata`와 효과 핸들러를 우선 활용하고, `Battle.razor`에는 표시·입력만 추가하세요.
 3. 새 기술이나 특성을 연결할 때는 기술 데이터 설명만 추가하지 말고 실행 경로와 결정적 회귀 테스트를 함께 추가하세요.
 4. 날씨·필드 상태를 만지는 모든 테스트는 `Reset()`을 호출하고 테스트 간 공유 상태가 섞이지 않게 유지하세요.
-5. 서버 코드 변경 후에는 기존 워크플로를 재시작하고 `/healthz`, 빌드, 전체 테스트를 다시 확인하세요.
+5. 서버 코드 변경 후에는 로컬 빌드·전체 테스트를 다시 확인하고, Render 공개 URL·`/healthz`·Render 로그·Supabase Postgres 연결 상태를 운영 검증 기준으로 확인하세요.
 6. 작업 완료 시 이 문서의 `현재 변경 파일`·`검증된 상태`를 최신 사실에 맞게 갱신하세요.
 7. Claude 앱/웹에서 작업했다면 변경 후 새 번들을 생성해 다음 대화에 전달하세요.
 
