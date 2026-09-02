@@ -3,6 +3,7 @@
 @using PokemonBattle.Services
 @inject CurrentUserService CurrentUser
 @inject UnlockService Unlocks
+@inject PokemonMasteryStore Mastery
 @inject NavigationManager Nav
 
 <PageTitle>획득한 포켓몬</PageTitle>
@@ -81,6 +82,12 @@
                 <div class="dex-grid collection-grid" role="list" aria-label="획득한 포켓몬 목록">
                     @foreach (var entry in FilteredOwnedPokemon)
                     {
+                        int masteryWins = MasteryWins.TryGetValue(entry.Key, out var recordedWins)
+                            ? recordedWins
+                            : 0;
+                        int masteryTier = PokemonMasteryRules.GetTier(masteryWins);
+                        int masteryBonus = PokemonMasteryRules.GetBonusPercent(masteryWins);
+                        int nextMasteryThreshold = PokemonMasteryRules.GetNextThreshold(masteryWins);
                         <article class="dex-entry collection-card" role="listitem">
                             <span class="dex-number">No.@entry.Key.ToString("D3")</span>
                             <img src="@entry.Value.EffectiveImageUrl" alt="@entry.Value.Name" class="dex-sprite" />
@@ -92,6 +99,19 @@
                                     <img src="@TypeIcons.GetUrl(entry.Value.Type2.Value)" class="type-icon-img small" alt="@entry.Value.Type2" />
                                 }
                             </span>
+                            <div class="mastery-progress"
+                                 aria-label="@($"{entry.Value.Name} 숙련도 {masteryWins}회, {PokemonMasteryRules.GetTierLabel(masteryWins)}, 영구 스탯 보너스 {masteryBonus}%")">
+                                <span class="mastery-label">숙련도 · @PokemonMasteryRules.GetTierLabel(masteryWins)</span>
+                                <span class="mastery-count">@(masteryWins)회 기여 · 전 스탯 +@masteryBonus%</span>
+                                @if (nextMasteryThreshold == 0)
+                                {
+                                    <span class="mastery-next">최고 단계 달성</span>
+                                }
+                                else
+                                {
+                                    <span class="mastery-next">다음 단계까지 @(nextMasteryThreshold - masteryWins)회</span>
+                                }
+                            </div>
                         </article>
                     }
                 </div>
@@ -159,6 +179,7 @@
         }
 
         var unlockedIds = await Unlocks.GetUnlockedIds();
+        MasteryWins = await Mastery.LoadAsync(CurrentUser.Username!);
         OwnedPokemon = unlockedIds
             .Where(PokemonDatabase.All.ContainsKey)
             .OrderBy(id => id)
@@ -173,4 +194,6 @@
         SelectedType = args.Value?.ToString() ?? "all";
 
     private void GoBack() => Nav.NavigateTo("/");
+
+    private Dictionary<int, int> MasteryWins { get; set; } = new();
 }

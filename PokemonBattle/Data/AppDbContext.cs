@@ -23,6 +23,8 @@ public class AppDbContext : DbContext
 
     public DbSet<TechnicalMachineInventory> TechnicalMachines => Set<TechnicalMachineInventory>();
 
+    public DbSet<PokemonMastery> PokemonMasteries => Set<PokemonMastery>();
+
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -45,6 +47,10 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<TechnicalMachineInventory>()
             .HasIndex(machine => new { machine.Username, machine.MoveKey })
+            .IsUnique();
+
+        modelBuilder.Entity<PokemonMastery>()
+            .HasIndex(mastery => new { mastery.Username, mastery.PokemonId })
             .IsUnique();
     }
 }

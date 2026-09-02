@@ -517,16 +517,31 @@
         if (State.PlayerLoadouts.Count > 0)
         {
             PlayerTeam = State.PlayerLoadouts.Select(l =>
-                new Pokemon(PokemonDatabase.All[l.PokemonId], l.ChosenMoveNames, l.ChosenAbility, l.ChosenItem, l.Level)
+                new Pokemon(
+                    PokemonDatabase.All[l.PokemonId],
+                    l.ChosenMoveNames,
+                    l.ChosenAbility,
+                    l.ChosenItem,
+                    l.Level,
+                    masteryBonusPercent: State.GetPokemonMasteryBonusPercent(l.PokemonId))
             ).ToList();
         }
         else if (State.PlayerTeamIds.Count > 0)
         {
-            PlayerTeam = State.PlayerTeamIds.Select(id => new Pokemon(PokemonDatabase.All[id])).ToList();
+            PlayerTeam = State.PlayerTeamIds
+                .Select(id => new Pokemon(
+                    PokemonDatabase.All[id],
+                    masteryBonusPercent: State.GetPokemonMasteryBonusPercent(id)))
+                .ToList();
         }
         else
         {
-            PlayerTeam = new List<Pokemon> { new Pokemon(PokemonDatabase.All[State.SelectedPokemonId]) };
+            PlayerTeam = new List<Pokemon>
+            {
+                new Pokemon(
+                    PokemonDatabase.All[State.SelectedPokemonId],
+                    masteryBonusPercent: State.GetPokemonMasteryBonusPercent(State.SelectedPokemonId))
+            };
         }
         foreach (var pokemon in PlayerTeam)
         {

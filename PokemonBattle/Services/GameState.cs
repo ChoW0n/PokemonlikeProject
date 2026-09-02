@@ -12,6 +12,7 @@ public class GameState
     private readonly CurrentUserService _currentUser;
     private readonly SkillRatingService _skillRatings;
     private readonly PlayerProgressionStore? _progression;
+    private readonly PokemonMasteryStore? _mastery;
     private readonly SemaphoreSlim _persistGate = new(1, 1);
     private readonly SemaphoreSlim _outcomeGate = new(1, 1);
 
@@ -35,6 +36,7 @@ public class GameState
     public bool IsRivalBattle { get; private set; }
     public List<MailboxMessage> MailboxMessages { get; private set; } = new();
     public List<TechnicalMachineInventory> TechnicalMachines { get; private set; } = new();
+    public IReadOnlyDictionary<int, int> PokemonMasteryWins => _masteryWins;
 
     public int SelectedPokemonId { get; private set; } = 1;
     public int EnemyPokemonId { get; private set; } = 4;
@@ -72,6 +74,7 @@ public class GameState
     private bool _battleOutcomeProcessed;
     private readonly List<RunRoundPerformance> _roundPerformances = new();
     private readonly List<StolenMoveOption> _battleUsedEnemyMoves = new();
+    private readonly Dictionary<int, int> _masteryWins = new();
     private readonly Random _metaRandom = new();
 
     public event Action? OnChange;
@@ -83,7 +86,8 @@ public class GameState
         RunStore runStore,
         CurrentUserService currentUser,
         SkillRatingService skillRatings,
-        PlayerProgressionStore? progression = null)
+        PlayerProgressionStore? progression = null,
+        PokemonMasteryStore? mastery = null)
     {
         _scoreStore = scoreStore;
         _presetStore = presetStore;
@@ -92,6 +96,7 @@ public class GameState
         _currentUser = currentUser;
         _skillRatings = skillRatings;
         _progression = progression;
+        _mastery = mastery;
     }
 
     public IReadOnlyList<LegendaryEncounterHistoryEntry> LegendaryEncounterHistory =>
@@ -145,6 +150,14 @@ public class GameState
             RivalPending = accountProgress.rivalPending;
             MailboxMessages = accountProgress.messages;
             TechnicalMachines = accountProgress.machines;
+        }
+        _masteryWins.Clear();
+        if (_mastery != null)
+        {
+            foreach (var entry in await _mastery.LoadAsync(_currentUser.Username!))
+            {
+                _masteryWins[entry.Key] = entry.Value;
+            }
         }
 
         //방어 코드: 도감에 없는 포켓몬(예: 크래시로 깨진 PokemonId=0)이 하나라도 섞여있으면
@@ -654,9 +667,19 @@ public class GameState
                 _currentUser.Username!, PlayerLoadouts, IsRivalBattle, won: true);
             await RefreshAccountProgress();
         }
+        if (_mastery != null && _currentUser.IsLoggedIn)
+        {
+            var masteryIds = PlayerLoadouts.Select(loadout => loadout.PokemonId).ToList();
+            await _mastery.RecordVictoryContributionsAsync(
+                _currentUser.Username!, masteryIds);
+            PokemonMasteryStore.ApplyVictoryContributions(_masteryWins, masteryIds);
+        }
         CurrentScreen = GameScreen.Result;
         NotifyChange();
     }
+
+    public int GetPokemonMasteryBonusPercent(int pokemonId) =>
+        PokemonMasteryRules.GetBonusPercent(_masteryWins.GetValueOrDefault(pokemonId));
 
     public async Task LoseBattle(int turns = 0, IEnumerable<Pokemon>? playerTeam = null)
     {

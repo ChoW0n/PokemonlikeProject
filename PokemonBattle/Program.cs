@@ -46,6 +46,8 @@ builder.Services.AddScoped<SkillRatingService>(serviceProvider =>
 builder.Services.AddScoped<LeaderboardService>();
 builder.Services.AddScoped<PlayerProgressionStore>(serviceProvider =>
     new PlayerProgressionStore(serviceProvider.GetRequiredService<DatabaseContextExecutor>()));
+builder.Services.AddScoped<PokemonMasteryStore>(serviceProvider =>
+    new PokemonMasteryStore(serviceProvider.GetRequiredService<DatabaseContextExecutor>()));
 builder.Services.AddScoped<AdminDashboardService>(serviceProvider =>
     new AdminDashboardService(
         serviceProvider.GetRequiredService<DatabaseContextExecutor>(),
@@ -96,6 +98,14 @@ using (var scope = app.Services.CreateScope())
             ""Username"" TEXT NOT NULL,
             ""PokemonId"" INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS ""PokemonMasteries"" (
+            ""Id"" SERIAL PRIMARY KEY,
+            ""Username"" TEXT NOT NULL,
+            ""PokemonId"" INTEGER NOT NULL,
+            ""VictoryContributions"" INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ""IX_PokemonMasteries_Username_PokemonId""
+            ON ""PokemonMasteries"" (""Username"", ""PokemonId"");
         CREATE TABLE IF NOT EXISTS ""PlayerRuns"" (
             ""Id"" SERIAL PRIMARY KEY,
             ""Username"" TEXT NOT NULL,
@@ -321,6 +331,29 @@ void ConsolidateAdminAccounts(AppDbContext db)
         foreach (var run in db.PlayerRuns.Where(run => run.Username == duplicateUsername).ToList())
         {
             run.Username = keeper.Username;
+        }
+
+        var keeperMasteries = db.PokemonMasteries
+            .Where(mastery => mastery.Username == keeper.Username)
+            .ToDictionary(mastery => mastery.PokemonId);
+        var duplicateMasteries = db.PokemonMasteries
+            .Where(mastery => mastery.Username == duplicateUsername)
+            .ToList();
+        foreach (var duplicateMastery in duplicateMasteries)
+        {
+            if (keeperMasteries.TryGetValue(duplicateMastery.PokemonId, out var keeperMastery))
+            {
+                keeperMastery.VictoryContributions = Math.Min(
+                    int.MaxValue,
+                    Math.Max(0, keeperMastery.VictoryContributions)
+                    + Math.Max(0, duplicateMastery.VictoryContributions));
+                db.PokemonMasteries.Remove(duplicateMastery);
+            }
+            else
+            {
+                duplicateMastery.Username = keeper.Username;
+                keeperMasteries[duplicateMastery.PokemonId] = duplicateMastery;
+            }
         }
 
         var keeperRating = db.PlayerSkillRatings
