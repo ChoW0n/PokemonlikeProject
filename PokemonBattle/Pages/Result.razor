@@ -94,8 +94,14 @@
                         </button>
                     }
                 </div>
-                <div class="enemy-grid" role="list" aria-label="기술을 배울 포켓몬">
-                    @foreach (var loadout in State.PlayerLoadouts.Where(loadout => loadout.ChosenMoveNames.Count < 4))
+                @if (State.PlayerLoadouts.Count == 0)
+                {
+                    <p class="form-message" role="status">선택 가능한 포켓몬이 없습니다.</p>
+                }
+                else
+                {
+                    <div class="enemy-grid" role="list" aria-label="기술을 배울 포켓몬">
+                    @foreach (var loadout in State.PlayerLoadouts)
                     {
                         var data = PokemonDatabase.All[loadout.PokemonId];
                         <article class="enemy-card @(SelectedStolenTargetId == loadout.PokemonId ? "is-selected" : "")" role="listitem">
@@ -107,7 +113,8 @@
                             </button>
                         </article>
                     }
-                </div>
+                    </div>
+                }
                 @if (SelectedStolenTargetId is int targetId)
                 {
                     var targetLoadout = State.PlayerLoadouts.FirstOrDefault(loadout => loadout.PokemonId == targetId);
@@ -145,11 +152,17 @@
                 @foreach (var candidate in Candidates)
                 {
                     bool owned = OwnedIds.Contains(candidate.Key);
+                    bool inCurrentTeam = State.PlayerLoadouts.Any(loadout => loadout.PokemonId == candidate.Key);
+                    string candidateStatus = owned
+                        ? (inCurrentTeam
+                            ? "보유 중 · 선택 시 추가 레벨"
+                            : "보유 중(이번 팀엔 없음) · 선택해도 효과 없음")
+                        : "미보유 · 선택 시 해금";
                     <article class="enemy-card @(SelectedCatchId == candidate.Key ? "is-selected" : string.Empty)" role="listitem">
-                        <button type="button" class="enemy-card-toggle" aria-label="@($"{candidate.Value.Name}, {(owned ? "보유 중 · 선택 시 추가 레벨" : "미보유 · 선택 시 해금")}")" aria-pressed="@(SelectedCatchId == candidate.Key ? "true" : "false")" title="두 번 클릭하면 바로 등록합니다." @onclick="() => SelectedCatchId = candidate.Key" @ondblclick="ClaimPokemon" @ondblclick:preventDefault>
+                        <button type="button" class="enemy-card-toggle" aria-label="@($"{candidate.Value.Name}, {candidateStatus}")" aria-pressed="@(SelectedCatchId == candidate.Key ? "true" : "false")" title="두 번 클릭하면 바로 등록합니다." @onclick="() => SelectedCatchId = candidate.Key" @ondblclick="ClaimPokemon" @ondblclick:preventDefault>
                             <img src="@candidate.Value.EffectiveImageUrl" alt="" class="enemy-sprite" />
                             <span class="enemy-card-title">@candidate.Value.Name</span>
-                            <span class="enemy-card-status">@(owned ? "보유 중 · 선택 시 추가 레벨" : "미보유 · 선택 시 해금")</span>
+                            <span class="enemy-card-status">@candidateStatus</span>
                         </button>
                     </article>
                 }
