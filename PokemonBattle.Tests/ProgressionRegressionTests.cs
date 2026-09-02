@@ -75,6 +75,43 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public void ItemRulesTrimWhitespaceBeforeCheckingDuplicates()
+    {
+        var loadouts = new[]
+        {
+            new PokemonLoadout { PokemonId = 1, ChosenItem = " 기합의띠 " },
+            new PokemonLoadout { PokemonId = 4, ChosenItem = "기합의띠" }
+        };
+
+        Assert.True(TeamLoadoutRules.HasDuplicateItems(loadouts));
+        Assert.False(TeamLoadoutRules.CanUseItem(loadouts, 7, " 기합의띠 "));
+        Assert.Equal("기합의띠", TeamLoadoutRules.NormalizeUniqueItems(loadouts)[0].ChosenItem);
+        Assert.Equal(TeamLoadoutRules.NoItem, TeamLoadoutRules.NormalizeUniqueItems(loadouts)[1].ChosenItem);
+    }
+
+    [Fact]
+    public void OneTimeItemCleanupClearsItemsWithoutChangingOtherLoadoutData()
+    {
+        var original = new PokemonLoadout
+        {
+            PokemonId = 25,
+            ChosenMoveNames = new List<string> { "thunder-shock" },
+            ChosenAbility = "정전기",
+            ChosenItem = " 기합의띠 ",
+            Level = 18
+        };
+
+        var cleared = Assert.Single(LoadoutJson.ClearChosenItems(
+            new[] { original }));
+
+        Assert.Equal(25, cleared.PokemonId);
+        Assert.Equal(new[] { "thunder-shock" }, cleared.ChosenMoveNames);
+        Assert.Equal("정전기", cleared.ChosenAbility);
+        Assert.Equal(18, cleared.Level);
+        Assert.Equal(TeamLoadoutRules.NoItem, cleared.ChosenItem);
+    }
+
+    [Fact]
     public void ProItemSelectionReturnsNoItemWhenEveryCandidateIsAlreadyUsed()
     {
         var item = ItemDatabase.GeneralItems.First(item => item.Name == "기합의띠");
@@ -562,6 +599,7 @@ public class ProgressionRegressionTests
                 Assert.Equal(1, restoredLoadout.PokemonId);
                 Assert.Equal(7, restoredLoadout.Level);
                 Assert.Equal(new[] { "tackle" }, restoredLoadout.ChosenMoveNames);
+                Assert.Equal("기합의띠", restoredLoadout.ChosenItem);
             }
         });
     }

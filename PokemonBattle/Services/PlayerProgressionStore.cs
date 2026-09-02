@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -10,11 +9,6 @@ namespace PokemonBattle.Services;
 public sealed class PlayerProgressionStore
 {
     private readonly DatabaseContextExecutor _database;
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        IncludeFields = true
-    };
-
     [ActivatorUtilitiesConstructor]
     public PlayerProgressionStore(DatabaseContextExecutor database)
     {
@@ -64,7 +58,7 @@ public sealed class PlayerProgressionStore
             var profile = await GetOrCreateAsync(db, username);
             var preferences = DeserializePreferences(profile.MovePreferencesJson);
             MovePreferenceRules.Record(preferences, moveKey);
-            profile.MovePreferencesJson = JsonSerializer.Serialize(preferences, JsonOptions);
+            profile.MovePreferencesJson = System.Text.Json.JsonSerializer.Serialize(preferences);
             profile.UpdatedAtUtc = DateTime.UtcNow;
             await db.SaveChangesAsync();
         });
@@ -80,7 +74,7 @@ public sealed class PlayerProgressionStore
             {
                 MovePreferenceRules.Record(preferences, moveKey);
             }
-            profile.MovePreferencesJson = JsonSerializer.Serialize(preferences, JsonOptions);
+            profile.MovePreferencesJson = System.Text.Json.JsonSerializer.Serialize(preferences);
             profile.UpdatedAtUtc = DateTime.UtcNow;
             await db.SaveChangesAsync();
         });
@@ -351,13 +345,12 @@ public sealed class PlayerProgressionStore
     }
 
     private static string SerializeLoadouts(IEnumerable<PokemonLoadout> loadouts) =>
-        JsonSerializer.Serialize(loadouts.ToList(), JsonOptions);
+        LoadoutJson.Serialize(loadouts);
 
     private static List<PokemonLoadout> DeserializeLoadouts(string json) =>
-        JsonSerializer.Deserialize<List<PokemonLoadout>>(json, JsonOptions)
-        ?? new List<PokemonLoadout>();
+        LoadoutJson.Deserialize(json);
 
     private static MovePreferenceProfile DeserializePreferences(string json) =>
-        JsonSerializer.Deserialize<MovePreferenceProfile>(json, JsonOptions)
+        System.Text.Json.JsonSerializer.Deserialize<MovePreferenceProfile>(json)
         ?? new MovePreferenceProfile();
 }

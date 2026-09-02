@@ -335,6 +335,10 @@ public class GameState
     public void BeginBattle(bool? rival = null)
     {
         if (rival.HasValue) IsRivalBattle = rival.Value;
+        PlayerLoadouts = TeamLoadoutRules.NormalizeUniqueItems(PlayerLoadouts);
+        PlayerTeamIds = PlayerLoadouts.Select(loadout => loadout.PokemonId).ToList();
+        EnemyLoadouts = TeamLoadoutRules.NormalizeUniqueItems(EnemyLoadouts);
+        EnemyTeamIds = EnemyLoadouts.Select(loadout => loadout.PokemonId).ToList();
         _battleOutcomeProcessed = false;
         _battleUsedEnemyMoves.Clear();
         CovenantRewardMessage = "";
