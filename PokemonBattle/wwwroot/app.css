@@ -3663,6 +3663,28 @@ p { line-height: 1.72; }
 .dex-detail-level, .config-label, .collection-count, .starter-count { color: var(--gold-300); }
 .collection-page .pokedex-shell { max-width: 1360px; }
 .collection-grid, .starter-grid { max-height: none; }
+.mastery-progress {
+    display: grid;
+    gap: 3px;
+    width: 100%;
+    margin-top: 9px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(195, 166, 99, .14);
+    text-align: center;
+}
+.mastery-label {
+    color: var(--gold-300);
+    font-family: var(--font-mono);
+    font-size: .58rem;
+    letter-spacing: .04em;
+}
+.mastery-count,
+.mastery-next {
+    color: var(--ash);
+    font-size: .63rem;
+    line-height: 1.45;
+}
+.mastery-next { color: var(--muted); }
 .team-order-list { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 11px; }
 .team-order-card { padding: 14px; }
 .order-buttons button { border: 1px solid var(--line-soft); border-radius: 0 !important; background: var(--steel-800); }

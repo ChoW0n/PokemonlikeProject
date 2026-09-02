@@ -11,6 +11,7 @@ public class Pokemon
     private PokemonType? typeOverride2;
     private string heldItem = "없음";
     private int runMaxHpPenaltyPercent;
+    private int masteryBonusPercent;
 
     public PokemonData Data;
     public string ActorId { get; }
@@ -140,8 +141,20 @@ public class Pokemon
 
     private static readonly Random rng = new Random();
 
-    private int StatHp(int baseStat) => (2 * baseStat + 31) * Level / 100 + Level + 10;
-    private int StatOther(int baseStat) => (2 * baseStat + 31) * Level / 100 + 5;
+    private int MasteryAdjustedBaseStat(int baseStat) =>
+        baseStat * (100 + masteryBonusPercent) / 100;
+
+    private int StatHp(int baseStat)
+    {
+        int adjustedBaseStat = MasteryAdjustedBaseStat(baseStat);
+        return (2 * adjustedBaseStat + 31) * Level / 100 + Level + 10;
+    }
+
+    private int StatOther(int baseStat)
+    {
+        int adjustedBaseStat = MasteryAdjustedBaseStat(baseStat);
+        return (2 * adjustedBaseStat + 31) * Level / 100 + 5;
+    }
 
     public int MaxHp => Math.Max(1,
         StatHp(IsTransformed || IsIllusionActive ? originalData.BaseHp : Data.BaseHp)
@@ -341,13 +354,16 @@ public class Pokemon
         string ability = "",
         string item = "없음",
         int level = 1,
-        PokemonGender? gender = null)
+        PokemonGender? gender = null,
+        int masteryBonusPercent = 0)
     {
         originalData = data;
         originalAbility = ability;
         Data = data;
         ActorId = $"{data.EnglishName}-{Interlocked.Increment(ref nextActorNumber)}";
         Level = level;
+        masteryBonusPercent = Math.Clamp(masteryBonusPercent, 0, PokemonMasteryRules.MaximumTier);
+        this.masteryBonusPercent = masteryBonusPercent;
         Gender = gender ?? InferGender(data);
         CurrentHp = MaxHp;
         IsFainted = false;
