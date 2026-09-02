@@ -79,9 +79,9 @@
             <p class="config-label">현재 관록: @string.Join(" · ", State.ActiveLegacies.Select(legacy => legacy.Name))</p>
         }
 
-        @if (State.PendingStolenMoveChoices.Count > 0)
-        {
-            <section class="info-panel" aria-label="기술 강탈">
+        <section class="info-panel" aria-label="기술 강탈">
+            @if (State.PendingStolenMoveChoices.Count > 0)
+            {
                 <strong>기술 강탈</strong>
                 <p class="info-desc">실제로 사용된 상대 기술 중 하나를 현재 팀 포켓몬에게 배웁니다. 기술 칸이 가득 찼다면 교체할 기존 기술도 선택하세요.</p>
                 <div class="move-chip-row">
@@ -140,8 +140,13 @@
                 <button type="button" disabled="@(!CanClaimStolenMove || IsSubmitting)"
                         @onclick="ClaimStolenMove">선택한 기술 강탈</button>
                 <p class="form-message" role="status">@StolenMoveMessage</p>
-            </section>
-        }
+            }
+            else
+            {
+                <strong>기술 강탈</strong>
+                <p class="info-desc">이번 전투에서는 상대가 강탈 가능한 기술을 사용하지 않았습니다. 상태이상기, 전설 포켓몬의 기술, 이미 강탈한 기술은 후보에서 제외됩니다.</p>
+            }
+        </section>
 
         <LegendaryHistory />
 

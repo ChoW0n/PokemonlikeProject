@@ -53,6 +53,7 @@
         </button>
         <button type="button" class="secondary-action" @onclick="OpenLeaderboard">유저 랭킹</button>
         <button type="button" @onclick="OpenCollection">획득한 포켓몬 전체 보기</button>
+        <button type="button" class="secondary-action" @onclick="OpenWiki">게임 위키</button>
         <button type="button" class="secondary-action" @onclick="SignOut">로그아웃</button>
     </nav>
 </main>
@@ -86,6 +87,7 @@
     private void OpenMailbox() => Nav.NavigateTo("/mailbox");
     private void OpenLeaderboard() => Nav.NavigateTo("/leaderboard");
     private void OpenCollection() => Nav.NavigateTo("/collection");
+    private void OpenWiki() => Nav.NavigateTo("/wiki");
 
     private void SignOut()
     {

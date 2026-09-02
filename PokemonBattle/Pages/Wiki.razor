@@ -1,0 +1,167 @@
+@page "/wiki"
+@using PokemonBattle.Models
+@using PokemonBattle.Services
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Nav
+
+<PageTitle>게임 위키</PageTitle>
+
+<main class="wiki-page" aria-labelledby="wiki-title">
+    <header class="page-header wiki-header">
+        <p class="eyebrow">POKÉMON BATTLE / FIELD GUIDE</p>
+        <h1 id="wiki-title">게임 위키</h1>
+        <p class="intro">런을 더 깊게 운영하기 위해 알아두면 좋은 고유 시스템을 한곳에 모았습니다.</p>
+    </header>
+
+    <nav class="wiki-nav" aria-label="위키 목차">
+        <a href="#rewards">보상 시스템</a>
+        <a href="#run-systems">런 시스템</a>
+        <a href="#progression">성장과 진행</a>
+    </nav>
+
+    <section id="rewards" class="wiki-section" aria-labelledby="rewards-title">
+        <div class="section-heading">
+            <p class="eyebrow">REWARD SYSTEMS</p>
+            <h2 id="rewards-title">전투 보상</h2>
+        </div>
+
+        <article class="wiki-card wiki-card-featured">
+            <p class="wiki-card-kicker">SPECIAL REWARD</p>
+            <h3>기술 강탈</h3>
+            <p>승리한 전투에서 상대가 실제로 사용한 공격 기술만 후보가 됩니다. 상태이상기(변화기)는 제외되며, 후보는 최대 6개까지 무작위로 제시됩니다.</p>
+            <ul class="wiki-list">
+                <li>전투 중 사용 기록은 새 전투가 시작되면 초기화됩니다.</li>
+                <li>전설 포켓몬의 기술과 이미 강탈한 기술은 후보에서 제외됩니다.</li>
+                <li>종족의 원래 기술 습득 목록과 관계없이 어떤 팀 포켓몬에게든 가르칠 수 있습니다.</li>
+                <li>기술이 4개인 포켓몬은 기존 기술 하나를 골라 교체합니다.</li>
+            </ul>
+            <p class="wiki-note">이번 전투에서 조건에 맞는 기술이 없으면 결과 화면에 후보 대신 그 이유가 표시됩니다.</p>
+        </article>
+
+        <article class="wiki-card">
+            <p class="wiki-card-kicker">RIVAL REWARD</p>
+            <h3>기술머신</h3>
+            <p>라이벌전 승리 시 보관함에 지급되는 소모품입니다. 팀 편성 화면에서 사용하면 해당 포켓몬이 원래 배울 수 있는 기술 중 하나를 가르칠 수 있습니다.</p>
+            <p class="wiki-note">기술 강탈과 달리 기술머신은 포켓몬 종족별 습득 가능 기술 목록을 따릅니다.</p>
+        </article>
+    </section>
+
+    <section id="run-systems" class="wiki-section" aria-labelledby="run-systems-title">
+        <div class="section-heading">
+            <p class="eyebrow">RUN SYSTEMS</p>
+            <h2 id="run-systems-title">런을 바꾸는 선택</h2>
+        </div>
+
+        <article class="wiki-card">
+            <p class="wiki-card-kicker">PERMANENT RUN BOOSTS</p>
+            <h3>관록의 유산</h3>
+            <p>승리할 때마다 3개의 후보 중 하나를 고르는 런 전체 강화입니다. 한 번 선택한 유산은 해당 런 동안 계속 적용됩니다.</p>
+            <div class="wiki-entry-grid">
+                @foreach (var legacy in RunMetaCatalog.Legacies)
+                {
+                    <article class="wiki-entry">
+                        <h4>@legacy.Name</h4>
+                        <p>@legacy.Description</p>
+                    </article>
+                }
+            </div>
+        </article>
+
+        <article class="wiki-card">
+            <p class="wiki-card-kicker">BATTLEFIELD CONDITIONS</p>
+            <h3>배틀필드 각인</h3>
+            <p>각 라운드에는 네 가지 조합 중 하나가 무작위로 적용됩니다. 날씨와 필드 효과를 읽고 팀의 강점을 살려보세요.</p>
+            <div class="wiki-entry-grid">
+                @foreach (var imprint in RunMetaCatalog.BattlefieldImprints)
+                {
+                    <article class="wiki-entry">
+                        <h4>@imprint.Name</h4>
+                        <p><strong>@BattlefieldCondition(imprint)</strong></p>
+                        <p>@imprint.Description</p>
+                    </article>
+                }
+            </div>
+        </article>
+
+        <article class="wiki-card">
+            <p class="wiki-card-kicker">HIGH RISK / HIGH REWARD</p>
+            <h3>위험 서약</h3>
+            <p>더 까다로운 전투 조건을 받아들이는 대신 다음 보상을 키우는 선택입니다. 선택한 서약의 불이익은 정해진 범위에 적용됩니다.</p>
+            <div class="wiki-entry-grid">
+                @foreach (var covenant in RunMetaCatalog.RiskCovenants)
+                {
+                    <article class="wiki-entry">
+                        <h4>@covenant.Name</h4>
+                        <p>@covenant.Description</p>
+                        <p class="wiki-reward"><span>보상</span> @covenant.RewardDescription</p>
+                    </article>
+                }
+            </div>
+        </article>
+    </section>
+
+    <section id="progression" class="wiki-section" aria-labelledby="progression-title">
+        <div class="section-heading">
+            <p class="eyebrow">PROGRESSION</p>
+            <h2 id="progression-title">성장과 진행</h2>
+        </div>
+
+        <div class="wiki-entry-grid wiki-entry-grid-wide">
+            <article class="wiki-card wiki-entry">
+                <p class="wiki-card-kicker">LEGENDARY ENCOUNTER</p>
+                <h3>전설 포켓몬 출현</h3>
+                <p>라운드를 클리어할수록 전설 출현 진행도가 쌓입니다. 진행도가 100%가 되면 다음 상대 후보에 전설 포켓몬이 등장할 수 있습니다.</p>
+            </article>
+
+            <article class="wiki-card wiki-entry">
+                <p class="wiki-card-kicker">SKILL-BASED DIFFICULTY</p>
+                <h3>실력 기반 난이도 자동 조절</h3>
+                <p>런이 끝날 때마다 클리어 라운드 수, 평균 남은 HP 비율, 턴 효율을 바탕으로 계정별 실력 평점이 갱신됩니다. 다음 런의 상대 레벨과 팀 구성 난이도에 반영됩니다.</p>
+            </article>
+
+            <article class="wiki-card wiki-entry">
+                <p class="wiki-card-kicker">CAPTURE REWARD</p>
+                <h3>포획 후보</h3>
+                <p>승리하면 방금 쓰러뜨린 상대 팀에서 1마리를 데려갈 수 있습니다. 이미 해금한 포켓몬은 이번 런 팀에 있을 때만 레벨이 오르고, 팀에 없으면 추가 효과가 없습니다. 미해금 포켓몬은 새로 해금됩니다.</p>
+            </article>
+
+            <article class="wiki-card wiki-entry">
+                <p class="wiki-card-kicker">POKÉDEX / COLLECTION</p>
+                <h3>도감과 보유 포켓몬</h3>
+                <p>한 번 해금한 포켓몬은 계정에 영구 보관됩니다. 런이 패배로 끝나도 해금 기록은 사라지지 않으며, 도감에서 다시 확인할 수 있습니다.</p>
+            </article>
+
+            <article class="wiki-card wiki-entry">
+                <p class="wiki-card-kicker">SPECIAL BATTLE</p>
+                <h3>라이벌전</h3>
+                <p>특정 조건에서 등장하는 특별 전투입니다. 승리하면 보관함에 기술머신이 지급되므로, 다음 팀 편성에서 새로운 기술 조합을 준비할 수 있습니다.</p>
+            </article>
+        </div>
+    </section>
+
+    <div class="wiki-actions">
+        <button type="button" class="secondary-action" @onclick="GoHome">홈으로 돌아가기</button>
+    </div>
+</main>
+
+@code {
+    protected override void OnInitialized()
+    {
+        if (!CurrentUser.IsLoggedIn)
+        {
+            Nav.NavigateTo("/login");
+        }
+    }
+
+    private void GoHome() => Nav.NavigateTo("/");
+
+    private static string BattlefieldCondition(BattlefieldImprintDefinition imprint) =>
+        imprint.Id switch
+        {
+            "ember-wastes" => "맑음 / 쾌청 · 물 기술 약화",
+            "storm-garden" => "비 · 전기 필드",
+            "moonlit-marsh" => "안개 필드 · 드래곤 기술 약화",
+            "iron-dust" => "모래바람",
+            _ => "특수 전장 효과"
+        };
+}
