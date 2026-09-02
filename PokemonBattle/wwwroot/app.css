@@ -5847,3 +5847,149 @@ p {
         margin-top: 8px;
     }
 }
+
+/* ===== 전투 처리 중 로그 재생 상태 =====
+   선택 UI는 DOM에 남겨 접근성 상태와 메뉴 선택을 보존하되, busy 동안
+   접어서 포커스·클릭을 막는다. 로그는 같은 command panel 안에서 부드럽게
+   확장되어 행동 선택과 재생 상태가 교대되는 리듬을 만든다. */
+.action-selection-slot {
+    max-height: 60rem;
+    overflow: hidden;
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+    transition:
+        max-height 360ms cubic-bezier(.22, 1, .36, 1),
+        opacity 220ms ease,
+        transform 360ms cubic-bezier(.22, 1, .36, 1),
+        visibility 0s linear 0s;
+}
+
+.action-selection-slot.is-hidden {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-10px);
+    visibility: hidden;
+    transition:
+        max-height 360ms cubic-bezier(.22, 1, .36, 1),
+        opacity 180ms ease,
+        transform 360ms cubic-bezier(.22, 1, .36, 1),
+        visibility 0s linear 360ms;
+}
+
+.battle-playback-status {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 5px 12px;
+    max-height: 0;
+    margin: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-6px);
+    visibility: hidden;
+    color: var(--ash);
+    font-size: .72rem;
+    line-height: 1.5;
+    transition:
+        max-height 300ms ease,
+        margin 300ms ease,
+        opacity 180ms ease,
+        transform 300ms ease,
+        visibility 0s linear 300ms;
+}
+
+.battle-playback-status.is-active {
+    max-height: 5rem;
+    margin: 4px 0 12px;
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+    transition:
+        max-height 300ms ease,
+        margin 300ms ease,
+        opacity 220ms ease 60ms,
+        transform 300ms ease,
+        visibility 0s linear 0s;
+}
+
+.playback-kicker {
+    color: var(--gold-500);
+    font-family: var(--font-mono);
+    font-size: .56rem;
+    letter-spacing: .14em;
+}
+
+.battle-playback-status strong {
+    color: var(--gold-300);
+    font-size: .9rem;
+}
+
+.battle-playback-status span:last-child {
+    color: var(--muted);
+}
+
+.battle-log-panel {
+    transition:
+        min-height 420ms cubic-bezier(.22, 1, .36, 1),
+        max-height 420ms cubic-bezier(.22, 1, .36, 1),
+        margin 360ms ease,
+        padding 360ms ease,
+        gap 300ms ease;
+}
+
+.battle-log-panel.is-playback {
+    min-height: clamp(18rem, 31vw, 27rem);
+    max-height: clamp(22rem, 42vw, 32rem);
+    justify-content: center;
+    margin-top: 0;
+    padding: clamp(1.25rem, 3.5vw, 2.5rem);
+    gap: 8px;
+    background:
+        linear-gradient(145deg, rgba(101, 70, 38, .12), transparent 48%),
+        rgba(5, 6, 7, .9);
+    box-shadow: inset 0 0 0 1px rgba(195, 166, 99, .06);
+}
+
+.battle-log-panel.is-playback .log-line {
+    max-width: 48rem;
+    margin-inline: auto;
+    font-size: clamp(.95rem, 1.25vw, 1.12rem);
+    line-height: 1.9;
+}
+
+.battle-log-panel.is-playback .log-prompt {
+    color: var(--gold-300);
+}
+
+@media (max-width: 760px) {
+    .battle-log-panel.is-playback {
+        min-height: 15rem;
+        max-height: 22rem;
+        padding: 1.25rem;
+    }
+
+    .battle-log-panel.is-playback .log-line {
+        font-size: .92rem;
+        line-height: 1.75;
+    }
+}
+
+@media (max-width: 420px) {
+    .battle-log-panel.is-playback {
+        min-height: 14rem;
+        max-height: 20rem;
+        padding: 1rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .action-selection-slot,
+    .action-selection-slot.is-hidden,
+    .battle-playback-status,
+    .battle-playback-status.is-active,
+    .battle-log-panel {
+        transition-duration: .001ms;
+    }
+}

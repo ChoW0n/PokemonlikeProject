@@ -4,6 +4,7 @@ using PokemonBattle.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Microsoft.AspNetCore.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,13 @@ builder.Services.AddDbContextFactory<AppDbContext>(options => options.UseNpgsql(
         maxRetryCount: 5,
         maxRetryDelay: TimeSpan.FromSeconds(10),
         errorCodesToAdd: null)));
+
+builder.Services.AddSignalR(options =>
+{
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromMinutes(2);
+    options.HandshakeTimeout = TimeSpan.FromSeconds(30);
+});
 
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<DatabaseContextExecutor>(serviceProvider =>
@@ -62,7 +70,13 @@ builder.Services.AddScoped<IPresetStore>(serviceProvider =>
 builder.Services.AddScoped<GameState>();
 
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents(options =>
+    {
+        options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(30);
+        options.DisconnectedCircuitMaxRetained = 500;
+        options.JSInteropDefaultCallTimeout = TimeSpan.FromMinutes(2);
+        options.MaxBufferedUnacknowledgedRenderBatches = 20;
+    });
 
 var app = builder.Build();
 

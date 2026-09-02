@@ -11,7 +11,8 @@
 
 <body>
     <Routes @rendermode="InteractiveServer" />
-    <script src="_framework/blazor.web.js"></script>
+    <script src="_framework/blazor.web.js" autostart="false"></script>
+    <script src="js/blazorConnection.js?v=@CacheBuster"></script>
     <script src="js/battleEffects.js?v=@CacheBuster"></script>
 </body>
 
