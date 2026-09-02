@@ -55,20 +55,24 @@ Unity 없이 순수 C#/.NET 8 Blazor Server로 만든 싱글플레이 포켓몬 
 
 ## 현재 변경 파일
 
-- `PokemonBattle/Models/MoveDatabase.cs` — 기술 카탈로그와 능력치 변화 메타데이터 기준 복구
-- `PokemonBattle/Models/PokemonDatabase.cs` — 공식 신장 카탈로그 적용
-- `docs/battle-regression-baseline.md` — 전투 규칙·도감 데이터 기준값 문서
+- `PokemonBattle/Pages/TeamSelect.razor` — 팀 카드 재진입, 기술 더블클릭 토글, 아이템 재할당 확인 UI
+- `PokemonBattle/Services/LoadoutJson.cs`·`TeamLoadoutRules.cs` — 모든 팀 저장 경계의 아이템 정규화
+- `PokemonBattle/Services/RunStore.cs`·`PlayerProgressionStore.cs`·`PostgresPresetStore.cs` — 저장·로드 시 중복 아이템 방어
+- `PokemonBattle/Services/PlayerRunItemCleanup.cs`·`Program.cs` — marker 기반 PlayerRuns 1회성 아이템 초기화
+- `PokemonBattle.Tests/ProgressionRegressionTests.cs` — 공백 포함 중복과 아이템 초기화 회귀 테스트
 
 ## 검증된 상태
 
 - `dotnet build PokemonBattle/PokemonBattle.csproj --no-restore` 성공
 - `dotnet test PokemonBattle.Tests/PokemonBattle.Tests.csproj --no-restore` 성공
 - `git diff --check` 성공
-- 현재 회귀 테스트 총 142개 통과, 경고 0개
+- 현재 회귀 테스트 총 144개 통과
+- 테스트 환경에서 xUnit analyzer 캐시가 누락될 수 있으므로 실패 시 `dotnet restore PokemonBattle.Tests/PokemonBattle.Tests.csproj --force --no-cache` 후 다시 실행한다.
 - 운영 사이트는 Render 공개 URL `https://pokemonlikeproject.onrender.com/`를 기준으로 확인한다.
 - `https://pokemonlikeproject.onrender.com/healthz`가 `{"status":"ok"}`를 반환하는지 확인한다.
 - Render 서비스 로그에서 애플리케이션이 정상 기동하고 Supabase Postgres 연결 오류가 없는지 확인한다.
 - 실제 운영 데이터 확인이 필요할 때는 Supabase 운영 DB를 읽기 전용으로만 조회한다.
+- startup 로그의 `One-time PlayerRuns item cleanup completed`와 `AppMaintenanceMarkers` marker를 확인해 1회성 정리 결과를 검증한다.
 
 ## 다음 에이전트가 따라야 할 제안
 

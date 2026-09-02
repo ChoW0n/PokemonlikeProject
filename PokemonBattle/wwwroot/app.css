@@ -852,6 +852,26 @@ h1 {
 }
 .info-select-btn.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 
+.item-confirm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(10, 5, 8, .72);
+}
+.item-confirm-dialog {
+    width: min(100%, 440px);
+    padding: 24px;
+    border: 1px solid var(--gold-500);
+    background: var(--steel-950);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .45);
+}
+.item-confirm-dialog h2 { margin: 0 0 10px; color: #fff; }
+.item-confirm-dialog p:not(.eyebrow) { margin: 0; color: rgba(255,255,255,.82); line-height: 1.6; }
+.item-confirm-dialog .footer-actions { justify-content: flex-end; margin-top: 22px; }
+
 .pokedex-footer { margin-top: var(--sp-3); display: flex; justify-content: space-between; align-items: center; gap: var(--sp-2); color: #fff; }
 .pokedex-footer p { font-size: 0.8rem; font-weight: 700; }
 .pokedex-footer button {
@@ -913,7 +933,9 @@ h1 {
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 12px;
     background: rgba(255,255,255,0.04);
+    cursor: pointer;
 }
+.team-order-card:focus-visible { outline: 3px solid var(--gold-500); outline-offset: 3px; }
 
 .team-order-summary {
     display: grid;

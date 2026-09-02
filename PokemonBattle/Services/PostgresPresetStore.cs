@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PokemonBattle.Data;
@@ -10,11 +9,6 @@ public class PostgresPresetStore : IPresetStore
 {
     private readonly DatabaseContextExecutor _database;
     private readonly CurrentUserService _currentUser;
-    private static readonly JsonSerializerOptions LoadoutJsonOptions = new()
-    {
-        IncludeFields = true
-    };
-
     [ActivatorUtilitiesConstructor]
     public PostgresPresetStore(DatabaseContextExecutor database, CurrentUserService currentUser)
     {
@@ -36,7 +30,7 @@ public class PostgresPresetStore : IPresetStore
         var snapshot = TeamLoadoutRules.NormalizeUniqueItems(team)
             .Select(loadout => loadout.Clone(level: 1))
             .ToList();
-        string json = JsonSerializer.Serialize(snapshot, LoadoutJsonOptions);
+        string json = LoadoutJson.Serialize(snapshot);
 
         // The unique key plus ON CONFLICT makes simultaneous saves a deterministic update.
         await _database.ExecuteAsync("preset.save", db => db.Database.ExecuteSqlInterpolatedAsync($"""
@@ -61,9 +55,7 @@ public class PostgresPresetStore : IPresetStore
                 .FirstOrDefaultAsync(item => item.Username == username && item.Name == normalizedName);
             if (preset == null) return null;
 
-            var loadouts = JsonSerializer.Deserialize<List<PokemonLoadout>>(
-                preset.LoadoutsJson,
-                LoadoutJsonOptions) ?? new List<PokemonLoadout>();
+            var loadouts = LoadoutJson.Deserialize(preset.LoadoutsJson);
 
             return TeamLoadoutRules.NormalizeUniqueItems(loadouts)
                 .Select(loadout => loadout.Clone(level: 1))
