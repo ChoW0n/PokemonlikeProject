@@ -68,11 +68,13 @@ Unity 없이 순수 C#/.NET 8 Blazor Server로 만든 싱글플레이 포켓몬 
 - `git diff --check` 성공
 - 현재 회귀 테스트 총 144개 통과
 - 테스트 환경에서 xUnit analyzer 캐시가 누락될 수 있으므로 실패 시 `dotnet restore PokemonBattle.Tests/PokemonBattle.Tests.csproj --force --no-cache` 후 다시 실행한다.
+- `artifacts/pokemon-battle: web` 워크플로 재기동 성공, `http://127.0.0.1:3000/healthz`가 `{"status":"ok"}`를 반환한다.
 - 운영 사이트는 Render 공개 URL `https://pokemonlikeproject.onrender.com/`를 기준으로 확인한다.
 - `https://pokemonlikeproject.onrender.com/healthz`가 `{"status":"ok"}`를 반환하는지 확인한다.
 - Render 서비스 로그에서 애플리케이션이 정상 기동하고 Supabase Postgres 연결 오류가 없는지 확인한다.
 - 실제 운영 데이터 확인이 필요할 때는 Supabase 운영 DB를 읽기 전용으로만 조회한다.
-- startup 로그의 `One-time PlayerRuns item cleanup completed`와 `AppMaintenanceMarkers` marker를 확인해 1회성 정리 결과를 검증한다.
+- startup 로그에서 `changed-runs=1; cleared-loadouts=6`을 확인했다.
+- 실제 연결 DB에서 cleanup marker 1개, `PlayerRuns` 4행·로드아웃 9개, `ChosenItem != "없음"` 0개를 확인했다.
 
 ## 다음 에이전트가 따라야 할 제안
 
