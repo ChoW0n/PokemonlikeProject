@@ -84,8 +84,7 @@ public sealed class AdminDashboardService
                 {
                     try
                     {
-                        loadouts = JsonSerializer.Deserialize<List<PokemonLoadout>>(
-                            run.LoadoutsJson, JsonOptions) ?? new();
+                        loadouts = LoadoutJson.Deserialize(run.LoadoutsJson);
                         history = JsonSerializer.Deserialize<List<LegendaryEncounterHistoryEntry>>(
                             run.LegendaryEncounterHistoryJson, JsonOptions) ?? new();
                     }
@@ -152,7 +151,7 @@ public sealed class AdminDashboardService
 
         foreach (var progression in progressions.Where(item => normalUsernames.Contains(item.Username)))
         {
-            var loadouts = DeserializeList<PokemonLoadout>(progression.LatestLoadoutsJson);
+            var loadouts = DeserializeLoadouts(progression.LatestLoadoutsJson);
             if (loadouts.Count > 0) usersWithTeams++;
             foreach (var loadout in loadouts)
             {
@@ -237,6 +236,9 @@ public sealed class AdminDashboardService
 
     private static List<T> DeserializeList<T>(string json) => Deserialize<List<T>>(json) ?? new();
 
+    private static List<PokemonLoadout> DeserializeLoadouts(string json) =>
+        LoadoutJson.Deserialize(json);
+
     private static T? Deserialize<T>(string json)
     {
         try { return JsonSerializer.Deserialize<T>(json, JsonOptions); }
@@ -277,7 +279,7 @@ public sealed class AdminDashboardService
             var runLoadouts = new List<PokemonLoadout>();
             if (run != null)
             {
-                runLoadouts = DeserializeList<PokemonLoadout>(run.LoadoutsJson);
+                runLoadouts = LoadoutJson.Deserialize(run.LoadoutsJson);
                 team = runLoadouts
                     .Where(loadout => PokemonDatabase.All.ContainsKey(loadout.PokemonId))
                     .Select(loadout =>
@@ -297,7 +299,7 @@ public sealed class AdminDashboardService
 
             var analyticsLoadouts = progression == null
                 ? runLoadouts
-                : DeserializeList<PokemonLoadout>(progression.LatestLoadoutsJson);
+                : DeserializeLoadouts(progression.LatestLoadoutsJson);
             var personalAnalytics = BuildPersonalAnalytics(
                 analyticsLoadouts,
                 progression,

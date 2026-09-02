@@ -128,16 +128,17 @@
                         {
                             int idx = i;
                             var data = PokemonDatabase.All[TeamLoadouts[idx].PokemonId];
-                            <div class="team-order-card" role="listitem">
+                            <div class="team-order-card" role="listitem" tabindex="0" aria-label="@($"{data.Name} 팀 구성 수정")"
+                                 @onclick="() => StartConfiguring(TeamLoadouts[idx].PokemonId, true)">
                                 <div class="team-order-summary">
                                     <span class="dex-number">#@(idx + 1) · Lv.@TeamLoadouts[idx].Level</span>
                                     <img src="@data.EffectiveImageUrl" alt="@data.Name" class="team-order-sprite" />
                                     <span class="dex-name">@data.Name</span>
                                 </div>
                                 <div class="order-buttons">
-                                     <button type="button" class="order-button" aria-label="@($"{data.Name} 팀 순서 위로 이동")" disabled="@(idx == 0)" @onclick="() => MoveOrderUp(idx)">↑</button>
-                                     <button type="button" class="order-button" aria-label="@($"{data.Name} 팀 순서 아래로 이동")" disabled="@(idx == TeamLoadouts.Count - 1)" @onclick="() => MoveOrderDown(idx)">↓</button>
-                                     <button type="button" class="order-button remove-btn" aria-label="@($"{data.Name} 팀에서 제거")" @onclick="() => RemoveFromTeam(idx)">✕</button>
+                                     <button type="button" class="order-button" aria-label="@($"{data.Name} 팀 순서 위로 이동")" disabled="@(idx == 0)" @onclick="() => MoveOrderUp(idx)" @onclick:stopPropagation>↑</button>
+                                     <button type="button" class="order-button" aria-label="@($"{data.Name} 팀 순서 아래로 이동")" disabled="@(idx == TeamLoadouts.Count - 1)" @onclick="() => MoveOrderDown(idx)" @onclick:stopPropagation>↓</button>
+                                     <button type="button" class="order-button remove-btn" aria-label="@($"{data.Name} 팀에서 제거")" @onclick="() => RemoveFromTeam(idx)" @onclick:stopPropagation>✕</button>
                                 </div>
                             </div>
                         }
@@ -225,9 +226,9 @@
                              aria-pressed="@(DraftMoves.Contains(moveKey) ? "true" : "false")"
                              aria-expanded="@(ViewingMoveKey == moveKey ? "true" : "false")"
                              aria-controls="@(ViewingMoveKey == moveKey ? "selected-move-info" : null)"
-                             title="클릭하면 기술을 선택하고 상세 정보를 표시합니다."
+                              title="클릭하면 상세 정보를 표시합니다. 더블클릭하면 선택하거나 해제합니다."
                              @onclick="() => SelectMoveFromCard(moveKey)"
-                             @ondblclick="() => SelectMoveFromCard(moveKey)"
+                              @ondblclick="() => ToggleMove(moveKey)"
                              @ondblclick:preventDefault>
                             <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
                              <span class="dex-name">@move.Name @(move.Priority > 0 ? "우선" : "") @(IsTechnicalMachineMove(picked, moveKey) ? "· TM" : "") @(IsRunStolenMove(picked, moveKey) ? "· 강탈" : "")</span>
@@ -305,10 +306,9 @@
                                  aria-pressed="@(DraftItem == item.Name ? "true" : "false")"
                                  aria-expanded="@(ViewingItemName == item.Name ? "true" : "false")"
                                  aria-controls="@(ViewingItemName == item.Name ? "selected-item-info" : null)"
-                                 title="클릭하면 도구를 장착하고 상세 정보를 표시합니다."
+                                  title="클릭하면 상세 정보를 표시합니다. 아래 버튼으로 장착합니다."
                                  @onclick="() => SelectItemFromCard(item.Name)"
-                                 @ondblclick="() => SelectItemFromCard(item.Name)"
-                                 @ondblclick:preventDefault>
+                                  @ondblclick="() => SelectItemFromCard(item.Name)">
                                 @if (item.IconUrl != null)
                                 {
                                     <img src="@item.IconUrl" alt="@item.Name" class="item-icon" />
@@ -324,9 +324,27 @@
                     var vitem = ItemDatabase.GetAvailableItems(picked.Name).First(i => i.Name == ViewingItemName);
                     <div id="selected-item-info" class="info-panel" role="region" aria-label="@($"{vitem.Name} 상세 정보")">
                         <p class="info-desc">@vitem.Description</p>
-                         <button type="button" class="info-select-btn @(DraftItem == ViewingItemName ? "is-active" : "")" aria-pressed="@(DraftItem == ViewingItemName ? "true" : "false")" @onclick="() => DraftItem = ViewingItemName">
+                          <button type="button" class="info-select-btn @(DraftItem == ViewingItemName ? "is-active" : "")" aria-pressed="@(DraftItem == ViewingItemName ? "true" : "false")" @onclick="() => RequestItemSelection(ViewingItemName)">
                             @(DraftItem == ViewingItemName ? "선택됨" : "이 도구 선택")
                         </button>
+                    </div>
+                }
+                @if (PendingItemName != null && PendingItemOwnerId != null)
+                {
+                    int ownerId = PendingItemOwnerId.Value;
+                    string ownerName = PokemonDatabase.All.TryGetValue(ownerId, out var ownerData)
+                        ? ownerData.Name
+                        : $"포켓몬 #{ownerId}";
+                    <div class="item-confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="item-confirm-title">
+                        <div class="item-confirm-dialog">
+                            <p class="eyebrow">ITEM REASSIGNMENT</p>
+                            <h2 id="item-confirm-title">도구를 교체할까요?</h2>
+                            <p>@($"{ownerName}이(가) 이미 장착 중입니다. 해제하고 이 포켓몬에게 장착하시겠습니까?")</p>
+                            <div class="footer-actions">
+                                <button type="button" @onclick="CancelItemReassignment">취소</button>
+                                <button type="button" @onclick="ConfirmItemReassignment">확인</button>
+                            </div>
+                        </div>
                     </div>
                 }
 
@@ -385,6 +403,8 @@
     private string? ViewingMoveKey;
     private string? ViewingAbility;
     private string? ViewingItemName;
+    private string? PendingItemName;
+    private int? PendingItemOwnerId;
 
     private bool CanStart => TeamLoadouts.Count is >= 1 and <= 6;
 
@@ -451,10 +471,8 @@
 
     private List<Item> FilteredItems(string pokemonName)
     {
-        var unavailableItems = TeamLoadoutRules.UsedItems(TeamLoadouts, ConfiguringId);
         return ItemDatabase.GetAvailableItems(pokemonName)
             .Where(i => i.Name.Contains(ItemSearchText))
-            .Where(i => i.Name == TeamLoadoutRules.NoItem || !unavailableItems.Contains(i.Name))
             .ToList();
     }
 
@@ -502,6 +520,8 @@
         ViewingMoveKey = null;
         ViewingAbility = null;
         ViewingItemName = null;
+        PendingItemName = null;
+        PendingItemOwnerId = null;
 
         var existing = TeamLoadouts.FirstOrDefault(l => l.PokemonId == id);
 
@@ -511,17 +531,13 @@
             : new List<string>();
 
         DraftAbility = existing?.ChosenAbility ?? PokemonDatabase.All[id].AbilityNames.FirstOrDefault() ?? "";
-        DraftItem = existing?.ChosenItem ?? "없음";
+        DraftItem = TeamLoadoutRules.NormalizeItemName(existing?.ChosenItem);
         DraftLevel = existing?.Level ?? State.CurrentRunLevel;
     }
 
     private void SelectMoveFromCard(string moveKey)
     {
         ViewingMoveKey = moveKey;
-        if (!DraftMoves.Contains(moveKey) && DraftMoves.Count < 4)
-        {
-            DraftMoves.Add(moveKey);
-        }
     }
 
     private void SelectAbilityFromCard(string ability)
@@ -533,7 +549,49 @@
     private void SelectItemFromCard(string itemName)
     {
         ViewingItemName = itemName;
-        DraftItem = itemName;
+    }
+
+    private void RequestItemSelection(string itemName)
+    {
+        if (ConfiguringId == null) return;
+
+        string normalizedItemName = TeamLoadoutRules.NormalizeItemName(itemName);
+        var owner = TeamLoadouts.FirstOrDefault(loadout =>
+            loadout.PokemonId != ConfiguringId.Value
+            && TeamLoadoutRules.NormalizeItemName(loadout.ChosenItem) == normalizedItemName
+            && normalizedItemName != TeamLoadoutRules.NoItem);
+
+        if (owner == null)
+        {
+            DraftItem = normalizedItemName;
+            PendingItemName = null;
+            PendingItemOwnerId = null;
+            return;
+        }
+
+        PendingItemName = normalizedItemName;
+        PendingItemOwnerId = owner.PokemonId;
+    }
+
+    private void ConfirmItemReassignment()
+    {
+        if (PendingItemName == null || PendingItemOwnerId == null || ConfiguringId == null) return;
+
+        var owner = TeamLoadouts.FirstOrDefault(loadout => loadout.PokemonId == PendingItemOwnerId.Value);
+        if (owner != null)
+        {
+            owner.ChosenItem = TeamLoadoutRules.NoItem;
+        }
+
+        DraftItem = PendingItemName;
+        PendingItemName = null;
+        PendingItemOwnerId = null;
+    }
+
+    private void CancelItemReassignment()
+    {
+        PendingItemName = null;
+        PendingItemOwnerId = null;
     }
 
     private void ToggleMove(string moveKey)
@@ -594,11 +652,14 @@
             PokemonId = ConfiguringId.Value,
             ChosenMoveNames = new List<string>(DraftMoves),
             ChosenAbility = DraftAbility,
-            ChosenItem = DraftItem,
+            ChosenItem = TeamLoadoutRules.NormalizeItemName(DraftItem),
             Level = DraftLevel
         });
+        TeamLoadouts = TeamLoadoutRules.NormalizeUniqueItems(TeamLoadouts);
 
         ConfiguringId = null;
+        PendingItemName = null;
+        PendingItemOwnerId = null;
     }
 
     private void MoveOrderUp(int idx)
