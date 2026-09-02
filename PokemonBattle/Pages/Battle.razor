@@ -142,166 +142,178 @@
             </p>
         </div>
 
-        @if (Menu == BattleMenu.Main)
-        {
-            <div class="action-grid">
-                <button type="button" class="action-tile action-attack" disabled="@IsBusy" @onclick="OpenAttackMenu">
-                    <span class="action-icon">COMMAND 01</span>
-                    <strong>공격</strong>
-                    <small>기술과 효과 확인</small>
-                </button>
-                <button type="button" class="action-tile action-switch" disabled="@IsBusy" @onclick="() => Menu = BattleMenu.Switch">
-                    <span class="action-icon">COMMAND 02</span>
-                    <strong>교체</strong>
-                    <small>팀에서 출전 선택</small>
-                </button>
-            </div>
-        }
-        else if (Menu == BattleMenu.Attack)
-        {
-            <div class="selection-helper">
-                <span class="selection-helper-label">AVAILABLE MOVES</span>
-                <span>사용할 기술을 고르세요. 선택 후 시전 확정</span>
-            </div>
-            <div class="move-name-grid">
-                @foreach (var moveKey in HeroMoveKeys)
-                {
-                    var move = MoveDatabase.All[moveKey];
-                    int ppLoop = Hero.CurrentPP[moveKey];
-                    <button type="button"
-                            class="move-name-button @(PendingMoveKey == moveKey ? "is-pending" : "") @(!Hero.CanUseMove(moveKey) ? "is-unavailable" : "")"
-                            disabled="@(IsBusy || !Hero.CanUseMove(moveKey))"
-                             aria-pressed="@(PendingMoveKey == moveKey ? "true" : "false")"
-                             aria-label="@($"{move.Name}, PP {ppLoop}/{move.MaxPP}{(PendingMoveKey == moveKey ? ", 선택됨" : "")}{(Hero.CanUseMove(moveKey) ? "" : ", 사용할 수 없음")}")"
-                             aria-describedby="@(PendingMoveKey == moveKey ? "selected-move-details" : null)"
-                             @onclick="() => TapMove(moveKey)"
-                             @ondblclick="() => UseMove(moveKey)"
-                             @ondblclick:preventDefault>
-                        <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
-                        <span class="move-type-label">@TypeKor(move.Type)</span>
-                        <span class="move-name-text">@move.Name @(move.Priority > 0 ? "우선" : "") @(Hero.ChoiceLockedMove != null && Hero.ChoiceLockedMove != moveKey ? "고정" : "")</span>
-                        <span class="move-pp-num">PP @ppLoop/@move.MaxPP</span>
-                    </button>
-                }
-                @if (!HeroHasUsableMove)
-                {
-                    <button type="button"
-                            class="move-name-button"
-                            disabled="@IsBusy"
-                            aria-label="몸부림, 사용 가능한 기술 없음"
-                            @onclick="() => UseMove(null)"
-                            @ondblclick="() => UseMove(null)"
-                            @ondblclick:preventDefault>
-                        <span class="type-dot" style="background:@TypeColors.GetHex(PokemonType.Normal)"></span>
-                        <span class="move-type-label">노말</span>
-                        <span class="move-name-text">몸부림</span>
-                        <span class="move-pp-num">PP 없음</span>
-                    </button>
-                }
-            </div>
-
-            @if (PendingMoveKey != null)
+        <div class="action-selection-slot @(IsBusy ? "is-hidden" : "")"
+             aria-hidden="@(IsBusy ? "true" : "false")">
+            @if (Menu == BattleMenu.Main)
             {
-                var pmove = MoveDatabase.All[PendingMoveKey];
-                    double pmult = pmove.IsStatus ? 1.0 : Rules.PreviewMultiplier(pmove, Enemy, Hero);
-                int pp = Hero.CurrentPP[PendingMoveKey];
-                <div id="selected-move-details" class="move-detail-panel" role="region" aria-labelledby="selected-move-heading">
-                    <div class="move-detail-heading">
-                        <div>
-                            <span class="move-detail-kicker">SELECTED MOVE</span>
-                             <h3 id="selected-move-heading">@pmove.Name 상세 정보</h3>
-                        </div>
-                        <span class="move-type-badge" style="border-color:@TypeColors.GetHex(pmove.Type); color:@TypeColors.GetHex(pmove.Type)">@TypeKor(pmove.Type)</span>
-                    </div>
-                    @if (!pmove.IsStatus)
-                    {
-                        <GaugeBar Label="위력" Percent="@StatBarHelper.PowerPercent(pmove.Power)" ColorClass="@StatBarHelper.PowerColor(pmove.Power)" DisplayText="@pmove.Power.ToString()" />
-                    }
-                    <GaugeBar Label="명중" Percent="@(pmove.AlwaysHits ? 100 : StatBarHelper.AccuracyPercent(pmove.Accuracy))" ColorClass="@(pmove.AlwaysHits ? "gauge-vhigh" : StatBarHelper.AccuracyColor(pmove.Accuracy))" DisplayText="@(pmove.AlwaysHits ? "필중" : $"{pmove.Accuracy}%")" />
-                    <GaugeBar Label="PP" Percent="@StatBarHelper.PpPercent(pp, pmove.MaxPP)" ColorClass="@StatBarHelper.PpColor(pp, pmove.MaxPP)" DisplayText="@($"{pp}/{pmove.MaxPP}")" />
-                    @if (pmove.MaxHits > 1)
-                    {
-                        <p class="move-star-line">연속 타격 · @pmove.MinHits~@(pmove.MaxHits)회</p>
-                    }
-                    @if (pmult >= 2.0)
-                    {
-                        <p class="move-star-line">효과가 굉장하다</p>
-                    }
-                    @{ var summary = MoveEffectSummary(pmove); }
-                    @if (summary != "")
-                    {
-                        <p class="move-detail-effect">@summary</p>
-                    }
-                    <p class="move-detail-desc">@(string.IsNullOrWhiteSpace(pmove.Description) ? "설명 없음" : pmove.Description)</p>
-                    <div class="move-detail-actions">
-                         <button type="button" class="move-cancel" aria-label="기술 선택 취소" @onclick="() => PendingMoveKey = null">취소</button>
-                         <button type="button" class="move-confirm" aria-label="@($"{pmove.Name} 시전 확정")" disabled="@IsBusy" @onclick="() => UseMove(PendingMoveKey!)">이 기술 시전</button>
-                    </div>
+                <div class="action-grid">
+                    <button type="button" class="action-tile action-attack" disabled="@IsBusy" @onclick="OpenAttackMenu">
+                        <span class="action-icon">COMMAND 01</span>
+                        <strong>공격</strong>
+                        <small>기술과 효과 확인</small>
+                    </button>
+                    <button type="button" class="action-tile action-switch" disabled="@IsBusy" @onclick="() => Menu = BattleMenu.Switch">
+                        <span class="action-icon">COMMAND 02</span>
+                        <strong>교체</strong>
+                        <small>팀에서 출전 선택</small>
+                    </button>
                 </div>
             }
-
-            <button type="button" class="back-button" aria-label="행동 선택으로 돌아가기" disabled="@IsBusy" @onclick="() => { Menu = BattleMenu.Main; PendingMoveKey = null; }">← 뒤로</button>
-        }
-        else if (Menu == BattleMenu.Switch)
-        {
-            <div class="selection-helper">
-                <span class="selection-helper-label">SWITCH ORDER</span>
-                <span>교체는 한 턴을 사용하며 상대의 행동이 이어집니다.</span>
-            </div>
-            @if (!Rules.CanSwitch(Hero, Enemy))
+            else if (Menu == BattleMenu.Attack)
             {
-                <p class="move-detail-effect command-warning" role="alert">@($"{Enemy.Data.Name}의 {Enemy.SelectedAbility} 때문에 교체할 수 없습니다.")</p>
-            }
-            <div class="move-grid" role="group" aria-label="교체 가능한 포켓몬">
-                @for (int i = 0; i < PlayerTeam.Count; i++)
-                {
-                    int idx = i;
-                    var member = PlayerTeam[idx];
-                    bool canSwitch = !member.IsFainted && idx != PlayerTeamIndex
-                        && Rules.CanSwitch(Hero, Enemy);
-                    <button type="button"
-                             class="move-button team-choice-button @(!canSwitch ? "is-unavailable" : "")"
-                            disabled="@(IsBusy || !canSwitch)"
-                            aria-label="@($"{member.Data.Name}, 레벨 {member.Level}, HP {member.CurrentHp}/{member.MaxHp}{(member.IsFainted ? ", 기절" : "")}{(!canSwitch ? ", 교체할 수 없음" : "")}")"
-                            @onclick="() => SwitchTo(idx)">
-                        <div class="move-main">
-                            <span class="move-name">@member.Data.Name</span>
-                            <span class="move-meta">Lv.@member.Level · HP @member.CurrentHp/@member.MaxHp @(member.IsFainted ? "· 기절" : "")</span>
-                        </div>
-                        <span class="choice-state">@(member.IsFainted ? "기절" : idx == PlayerTeamIndex ? "출전 중" : canSwitch ? "교체" : "불가")</span>
-                    </button>
-                }
-                <button type="button" class="back-button" aria-label="행동 선택으로 돌아가기" disabled="@IsBusy" @onclick="() => Menu = BattleMenu.Main">← 뒤로</button>
-            </div>
-        }
-        else if (Menu == BattleMenu.ForcedSwitch)
-        {
-            <div class="forced-switch-notice" role="alert">
-                <strong>강제 교체</strong>
-                <span>전투를 계속하려면 쓰러지지 않은 포켓몬을 선택하세요.</span>
-            </div>
-            <div class="move-grid" role="group" aria-label="강제 교체 가능한 포켓몬">
-                @for (int i = 0; i < PlayerTeam.Count; i++)
-                {
-                    int idx = i;
-                    var member = PlayerTeam[idx];
-                    bool canPick = !member.IsFainted;
-                    <button type="button"
-                             class="move-button team-choice-button @(!canPick ? "is-unavailable" : "")"
-                            disabled="@(!canPick)"
-                            aria-label="@($"{member.Data.Name}, 레벨 {member.Level}, HP {member.CurrentHp}/{member.MaxHp}{(member.IsFainted ? ", 기절" : "")}")"
-                            @onclick="() => ForcedSwitchTo(idx)">
-                        <div class="move-main">
-                            <span class="move-name">@member.Data.Name</span>
-                            <span class="move-meta">Lv.@member.Level · HP @member.CurrentHp/@member.MaxHp @(member.IsFainted ? "· 기절" : "")</span>
-                        </div>
-                        <span class="choice-state">@(member.IsFainted ? "기절" : "출전")</span>
-                    </button>
-                }
-            </div>
-        }
+                <div class="selection-helper">
+                    <span class="selection-helper-label">AVAILABLE MOVES</span>
+                    <span>사용할 기술을 고르세요. 선택 후 시전 확정</span>
+                </div>
+                <div class="move-name-grid">
+                    @foreach (var moveKey in HeroMoveKeys)
+                    {
+                        var move = MoveDatabase.All[moveKey];
+                        int ppLoop = Hero.CurrentPP[moveKey];
+                        <button type="button"
+                                class="move-name-button @(PendingMoveKey == moveKey ? "is-pending" : "") @(!Hero.CanUseMove(moveKey) ? "is-unavailable" : "")"
+                                disabled="@(IsBusy || !Hero.CanUseMove(moveKey))"
+                                 aria-pressed="@(PendingMoveKey == moveKey ? "true" : "false")"
+                                 aria-label="@($"{move.Name}, PP {ppLoop}/{move.MaxPP}{(PendingMoveKey == moveKey ? ", 선택됨" : "")}{(Hero.CanUseMove(moveKey) ? "" : ", 사용할 수 없음")}")"
+                                 aria-describedby="@(PendingMoveKey == moveKey ? "selected-move-details" : null)"
+                                 @onclick="() => TapMove(moveKey)"
+                                 @ondblclick="() => UseMove(moveKey)"
+                                 @ondblclick:preventDefault>
+                            <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
+                            <span class="move-type-label">@TypeKor(move.Type)</span>
+                            <span class="move-name-text">@move.Name @(move.Priority > 0 ? "우선" : "") @(Hero.ChoiceLockedMove != null && Hero.ChoiceLockedMove != moveKey ? "고정" : "")</span>
+                            <span class="move-pp-num">PP @ppLoop/@move.MaxPP</span>
+                        </button>
+                    }
+                    @if (!HeroHasUsableMove)
+                    {
+                        <button type="button"
+                                class="move-name-button"
+                                disabled="@IsBusy"
+                                aria-label="몸부림, 사용 가능한 기술 없음"
+                                @onclick="() => UseMove(null)"
+                                @ondblclick="() => UseMove(null)"
+                                @ondblclick:preventDefault>
+                            <span class="type-dot" style="background:@TypeColors.GetHex(PokemonType.Normal)"></span>
+                            <span class="move-type-label">노말</span>
+                            <span class="move-name-text">몸부림</span>
+                            <span class="move-pp-num">PP 없음</span>
+                        </button>
+                    }
+                </div>
 
-        <div class="battle-log-panel" role="log" aria-live="polite" aria-atomic="false" aria-relevant="additions text" aria-label="전투 로그">
+                @if (PendingMoveKey != null)
+                {
+                    var pmove = MoveDatabase.All[PendingMoveKey];
+                        double pmult = pmove.IsStatus ? 1.0 : Rules.PreviewMultiplier(pmove, Enemy, Hero);
+                    int pp = Hero.CurrentPP[PendingMoveKey];
+                    <div id="selected-move-details" class="move-detail-panel" role="region" aria-labelledby="selected-move-heading">
+                        <div class="move-detail-heading">
+                            <div>
+                                <span class="move-detail-kicker">SELECTED MOVE</span>
+                                 <h3 id="selected-move-heading">@pmove.Name 상세 정보</h3>
+                            </div>
+                            <span class="move-type-badge" style="border-color:@TypeColors.GetHex(pmove.Type); color:@TypeColors.GetHex(pmove.Type)">@TypeKor(pmove.Type)</span>
+                        </div>
+                        @if (!pmove.IsStatus)
+                        {
+                            <GaugeBar Label="위력" Percent="@StatBarHelper.PowerPercent(pmove.Power)" ColorClass="@StatBarHelper.PowerColor(pmove.Power)" DisplayText="@pmove.Power.ToString()" />
+                        }
+                        <GaugeBar Label="명중" Percent="@(pmove.AlwaysHits ? 100 : StatBarHelper.AccuracyPercent(pmove.Accuracy))" ColorClass="@(pmove.AlwaysHits ? "gauge-vhigh" : StatBarHelper.AccuracyColor(pmove.Accuracy))" DisplayText="@(pmove.AlwaysHits ? "필중" : $"{pmove.Accuracy}%")" />
+                        <GaugeBar Label="PP" Percent="@StatBarHelper.PpPercent(pp, pmove.MaxPP)" ColorClass="@StatBarHelper.PpColor(pp, pmove.MaxPP)" DisplayText="@($"{pp}/{pmove.MaxPP}")" />
+                        @if (pmove.MaxHits > 1)
+                        {
+                            <p class="move-star-line">연속 타격 · @pmove.MinHits~@(pmove.MaxHits)회</p>
+                        }
+                        @if (pmult >= 2.0)
+                        {
+                            <p class="move-star-line">효과가 굉장하다</p>
+                        }
+                        @{ var summary = MoveEffectSummary(pmove); }
+                        @if (summary != "")
+                        {
+                            <p class="move-detail-effect">@summary</p>
+                        }
+                        <p class="move-detail-desc">@(string.IsNullOrWhiteSpace(pmove.Description) ? "설명 없음" : pmove.Description)</p>
+                        <div class="move-detail-actions">
+                             <button type="button" class="move-cancel" aria-label="기술 선택 취소" @onclick="() => PendingMoveKey = null">취소</button>
+                             <button type="button" class="move-confirm" aria-label="@($"{pmove.Name} 시전 확정")" disabled="@IsBusy" @onclick="() => UseMove(PendingMoveKey!)">이 기술 시전</button>
+                        </div>
+                    </div>
+                }
+
+                <button type="button" class="back-button" aria-label="행동 선택으로 돌아가기" disabled="@IsBusy" @onclick="() => { Menu = BattleMenu.Main; PendingMoveKey = null; }">← 뒤로</button>
+            }
+            else if (Menu == BattleMenu.Switch)
+            {
+                <div class="selection-helper">
+                    <span class="selection-helper-label">SWITCH ORDER</span>
+                    <span>교체는 한 턴을 사용하며 상대의 행동이 이어집니다.</span>
+                </div>
+                @if (!Rules.CanSwitch(Hero, Enemy))
+                {
+                    <p class="move-detail-effect command-warning" role="alert">@($"{Enemy.Data.Name}의 {Enemy.SelectedAbility} 때문에 교체할 수 없습니다.")</p>
+                }
+                <div class="move-grid" role="group" aria-label="교체 가능한 포켓몬">
+                    @for (int i = 0; i < PlayerTeam.Count; i++)
+                    {
+                        int idx = i;
+                        var member = PlayerTeam[idx];
+                        bool canSwitch = !member.IsFainted && idx != PlayerTeamIndex
+                            && Rules.CanSwitch(Hero, Enemy);
+                        <button type="button"
+                                 class="move-button team-choice-button @(!canSwitch ? "is-unavailable" : "")"
+                                disabled="@(IsBusy || !canSwitch)"
+                                aria-label="@($"{member.Data.Name}, 레벨 {member.Level}, HP {member.CurrentHp}/{member.MaxHp}{(member.IsFainted ? ", 기절" : "")}{(!canSwitch ? ", 교체할 수 없음" : "")}")"
+                                @onclick="() => SwitchTo(idx)">
+                            <div class="move-main">
+                                <span class="move-name">@member.Data.Name</span>
+                                <span class="move-meta">Lv.@member.Level · HP @member.CurrentHp/@member.MaxHp @(member.IsFainted ? "· 기절" : "")</span>
+                            </div>
+                            <span class="choice-state">@(member.IsFainted ? "기절" : idx == PlayerTeamIndex ? "출전 중" : canSwitch ? "교체" : "불가")</span>
+                        </button>
+                    }
+                    <button type="button" class="back-button" aria-label="행동 선택으로 돌아가기" disabled="@IsBusy" @onclick="() => Menu = BattleMenu.Main">← 뒤로</button>
+                </div>
+            }
+            else if (Menu == BattleMenu.ForcedSwitch)
+            {
+                <div class="forced-switch-notice" role="alert">
+                    <strong>강제 교체</strong>
+                    <span>전투를 계속하려면 쓰러지지 않은 포켓몬을 선택하세요.</span>
+                </div>
+                <div class="move-grid" role="group" aria-label="강제 교체 가능한 포켓몬">
+                    @for (int i = 0; i < PlayerTeam.Count; i++)
+                    {
+                        int idx = i;
+                        var member = PlayerTeam[idx];
+                        bool canPick = !member.IsFainted;
+                        <button type="button"
+                                 class="move-button team-choice-button @(!canPick ? "is-unavailable" : "")"
+                                disabled="@(!canPick)"
+                                aria-label="@($"{member.Data.Name}, 레벨 {member.Level}, HP {member.CurrentHp}/{member.MaxHp}{(member.IsFainted ? ", 기절" : "")}")"
+                                @onclick="() => ForcedSwitchTo(idx)">
+                            <div class="move-main">
+                                <span class="move-name">@member.Data.Name</span>
+                                <span class="move-meta">Lv.@member.Level · HP @member.CurrentHp/@member.MaxHp @(member.IsFainted ? "· 기절" : "")</span>
+                            </div>
+                            <span class="choice-state">@(member.IsFainted ? "기절" : "출전")</span>
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="battle-playback-status @(IsBusy ? "is-active" : "")"
+             aria-hidden="@(!IsBusy ? "true" : "false")"
+             role="status"
+             aria-live="polite">
+            <span class="playback-kicker">COMBAT PLAYBACK</span>
+            <strong>전투 처리 중</strong>
+            <span>전투 로그를 재생하고 있습니다. 잠시 기다려 주세요.</span>
+        </div>
+
+        <div class="battle-log-panel @(IsBusy ? "is-playback" : "")" role="log" aria-live="polite" aria-atomic="false" aria-relevant="additions text" aria-label="전투 로그">
             @if (!string.IsNullOrWhiteSpace(ActionError))
             {
                 <div class="form-message battle-recovery-message" role="alert">
@@ -813,6 +825,7 @@
         if (IsBusy) return;
         IsBusy = true;
         ActionError = null;
+        await InvokeAsync(StateHasChanged);
 
         try
         {
@@ -886,6 +899,7 @@
         if (IsBusy) return;
         IsBusy = true;
         ActionError = null;
+        await InvokeAsync(StateHasChanged);
 
         try
         {
@@ -936,6 +950,7 @@
 
         IsBusy = true;
         ActionError = null;
+        await InvokeAsync(StateHasChanged);
         try
         {
             BeginActionLog();

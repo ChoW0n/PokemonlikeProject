@@ -20,3 +20,4 @@
 - [DI constructor ambiguity](di-constructor-ambiguity.md) — legacy test constructors need explicit production DI factory registrations.
 - [Production app URL](production-app-url.md) — public Render URL for deployed-site checks and verification.
 - [Npgsql startup transactions](npgsql-startup-transactions.md) — wrap startup data cleanup transactions in the configured execution strategy.
+- [GitHub LFS publishing](github-lfs-publishing.md) — generated self-contained bundles can block pushes; keep source pushes free of unknown LFS objects.
