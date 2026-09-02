@@ -23,7 +23,9 @@ async function fillLogin(page: Page, username: string, password: string) {
   await expect(passwordInput).toHaveValue(password);
   await page.getByRole("button", { name: "로그인" }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.locator("main.start-page")).toContainText(`${username} 님, 환영합니다!`);
+  await expect(page.locator("main.start-page")).toContainText(
+    `${username} 님, 다시 전장으로 돌아오셨습니다.`,
+  );
 }
 
 async function register(page: Page, username: string, password: string) {
@@ -58,6 +60,23 @@ async function configureStarter(
 }
 
 async function enterBattle(page: Page) {
+  if (page.url().endsWith("/starter")) {
+    for (const starter of starterMoves) {
+      const card = page.getByRole("button", { name: starter.pokemon });
+      await card.click();
+      await expect(card).toHaveAttribute("aria-pressed", "true");
+    }
+
+    const confirm = page.getByRole("button", { name: "이 3마리로 시작하기" });
+    await expect(confirm).toBeEnabled();
+    await confirm.click({ force: true });
+    await page.waitForTimeout(300);
+    if (page.url().endsWith("/starter")) {
+      await confirm.click({ force: true });
+    }
+  }
+
+  await expect(page).toHaveURL(/\/preview$/);
   await page.getByRole("button", { name: /이 상대 팀.*과 배틀 준비하기/ }).click();
   await expect(page).toHaveURL(/\/(select|continue)$/);
 
@@ -126,7 +145,7 @@ function readHighScore(page: Page) {
     .locator("main.result-page, main.start-page")
     .innerText()
     .then((text) => {
-      const match = text.match(/최고 기록:\s*(\d+)/);
+      const match = text.match(/최고 기록\s*:?\s*(\d+)/);
       if (!match) throw new Error(`Could not find high score in: ${text}`);
       return Number(match[1]);
     });
@@ -144,7 +163,7 @@ test("persists a personal high score after signing in to a fresh browser session
 
   await register(page, username, password);
   await fillLogin(page, username, password);
-  await expect(page.locator("main.start-page")).toContainText("최고 기록: 0");
+  await expect(page.locator("main.start-page")).toContainText(/최고 기록\s*0/);
 
   let wonSetupRound = false;
   for (let attempt = 0; attempt < 3 && !wonSetupRound; attempt += 1) {
@@ -154,7 +173,6 @@ test("persists a personal high score after signing in to a fresh browser session
     }
 
     await page.getByRole("button", { name: "시작하기" }).click();
-    await expect(page).toHaveURL(/\/preview$/);
     await enterBattle(page);
     await playBattle(page);
     wonSetupRound = await page.getByRole("heading", { name: "승리!" }).count() > 0;
@@ -184,13 +202,15 @@ test("persists a personal high score after signing in to a fresh browser session
 
   await page.getByRole("button", { name: "처음부터 다시 시작" }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.locator("main.start-page")).toContainText(`최고 기록: ${highScore}`);
+  await expect(page.locator("main.start-page")).toContainText(new RegExp(`최고 기록\\s*${highScore}`));
 
   const freshContext = await browser.newContext();
   try {
     const freshPage = await freshContext.newPage();
     await fillLogin(freshPage, username, password);
-    await expect(freshPage.locator("main.start-page")).toContainText(`최고 기록: ${highScore}`);
+    await expect(freshPage.locator("main.start-page")).toContainText(
+      new RegExp(`최고 기록\\s*${highScore}`),
+    );
   } finally {
     await freshContext.close();
   }

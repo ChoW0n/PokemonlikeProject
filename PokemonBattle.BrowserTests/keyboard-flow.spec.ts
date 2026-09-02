@@ -61,6 +61,22 @@ async function configureStarter(page: Page, name: RegExp) {
   await pressEnter(page, addToTeam);
 }
 
+async function configureInitialStarters(page: Page) {
+  for (const starterName of starterNames) {
+    const card = page.getByRole("button", { name: starterName });
+    await card.click();
+    await expect(card).toHaveAttribute("aria-pressed", "true");
+  }
+
+  const confirm = page.getByRole("button", { name: "이 3마리로 시작하기" });
+  await expect(confirm).toBeEnabled();
+  await confirm.click({ force: true });
+  await page.waitForTimeout(300);
+  if (page.url().endsWith("/starter")) {
+    await confirm.click({ force: true });
+  }
+}
+
 async function waitForBattleReadyOrResult(page: Page) {
   await expect
     .poll(
@@ -90,9 +106,10 @@ async function issueKeyboardBattleCommand(page: Page) {
   }
 
   const forcedSwitch = page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" });
-  if (await forcedSwitch.count()) {
-    const availableMember = page.locator(".move-button:not(:disabled)").first();
-    await pressEnter(page, availableMember);
+  const availableMember = page.locator(".move-button:not(:disabled)").first();
+  if ((await forcedSwitch.count()) && (await forcedSwitch.isVisible()) && (await availableMember.count())) {
+    await availableMember.focus();
+    await page.keyboard.press("Enter");
     return;
   }
 
@@ -122,6 +139,10 @@ test("completes the game flow with keyboard controls at mobile and desktop width
 
   const start = page.getByRole("button", { name: "시작하기" });
   await pressEnter(page, start);
+  if (page.url().endsWith("/starter")) {
+    await expect(page.getByRole("heading", { name: "스타터 선택" })).toBeVisible();
+    await configureInitialStarters(page);
+  }
   await expect(page).toHaveURL(/\/preview$/);
   await assertNoHorizontalOverflow(page);
 
@@ -135,21 +156,27 @@ test("completes the game flow with keyboard controls at mobile and desktop width
 
   const confirmOpponents = page.getByRole("button", { name: /이 상대 팀.*과 배틀 준비하기/ });
   await pressEnter(page, confirmOpponents);
-  await expect(page).toHaveURL(/\/select$/);
+  await expect(page).toHaveURL(/\/(select|continue)$/);
 
-  const startTeam = page.getByRole("button", { name: "이 팀으로 배틀 시작" });
-  await expect(startTeam).toBeDisabled();
+  if (page.url().endsWith("/continue")) {
+    const keepTeam = page.getByRole("button", { name: "현재 팀 유지하고 배틀 시작" });
+    await pressEnter(page, keepTeam);
+    await expect(page).toHaveURL(/\/battle$/);
+  } else {
+    const startTeam = page.getByRole("button", { name: "이 팀으로 배틀 시작" });
+    await expect(startTeam).toBeDisabled();
 
-  for (const starterName of starterNames) {
-    await configureStarter(page, starterName);
+    for (const starterName of starterNames) {
+      await configureStarter(page, starterName);
+    }
+
+    const selectedCards = page.locator(".dex-entry-button.is-selected[aria-pressed='true']");
+    await expect(selectedCards).toHaveCount(starterNames.length);
+    await expect(startTeam).toBeEnabled();
+    await assertNoHorizontalOverflow(page);
+    await pressEnter(page, startTeam);
+    await expect(page).toHaveURL(/\/battle$/);
   }
-
-  const selectedCards = page.locator(".dex-entry-button.is-selected[aria-pressed='true']");
-  await expect(selectedCards).toHaveCount(starterNames.length);
-  await expect(startTeam).toBeEnabled();
-  await assertNoHorizontalOverflow(page);
-  await pressEnter(page, startTeam);
-  await expect(page).toHaveURL(/\/battle$/);
 
   const speedToggle = page.getByRole("button", { name: "배틀 메시지 재생 속도 변경" });
   await pressEnter(page, speedToggle);

@@ -1,8 +1,10 @@
 @page "/wiki"
+@using Microsoft.JSInterop
 @using PokemonBattle.Models
 @using PokemonBattle.Services
 @inject CurrentUserService CurrentUser
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>게임 위키</PageTitle>
 
@@ -14,9 +16,9 @@
     </header>
 
     <nav class="wiki-nav" aria-label="위키 목차">
-        <a href="#rewards" data-enhance-nav="false">보상 시스템</a>
-        <a href="#run-systems" data-enhance-nav="false">런 시스템</a>
-        <a href="#progression" data-enhance-nav="false">성장과 진행</a>
+        <a href="#rewards" data-enhance-nav="false" @onclick="ScrollToRewards" @onclick:preventDefault>보상 시스템</a>
+        <a href="#run-systems" data-enhance-nav="false" @onclick="ScrollToRunSystems" @onclick:preventDefault>런 시스템</a>
+        <a href="#progression" data-enhance-nav="false" @onclick="ScrollToProgression" @onclick:preventDefault>성장과 진행</a>
     </nav>
 
     <section id="rewards" class="wiki-section" aria-labelledby="rewards-title">
@@ -165,6 +167,15 @@
     }
 
     private void GoHome() => Nav.NavigateTo("/");
+
+    private Task ScrollToRewards() => ScrollToSection("rewards");
+
+    private Task ScrollToRunSystems() => ScrollToSection("run-systems");
+
+    private Task ScrollToProgression() => ScrollToSection("progression");
+
+    private Task ScrollToSection(string id) =>
+        JS.InvokeVoidAsync("pokemonWiki.scrollToSection", id).AsTask();
 
     private static string BattlefieldCondition(BattlefieldImprintDefinition imprint) =>
         imprint.Id switch
