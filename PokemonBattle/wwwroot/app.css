@@ -1826,6 +1826,16 @@ button:disabled {
     transform: none;
 }
 
+.move-tile.is-unavailable {
+    opacity: 0.48;
+    filter: grayscale(0.7);
+    cursor: not-allowed;
+}
+
+.move-tile.is-unavailable:hover {
+    transform: none;
+}
+
 .enemy-card {
     min-width: 0;
 }
