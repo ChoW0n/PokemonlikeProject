@@ -665,6 +665,86 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public async Task TechnicalMachineSelectionConsumesExactlyOneAndSavedMoveSurvivesReload()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreatePlayerRunsTable(schema);
+            await CreateProgressionTables(schema);
+            const string username = "technical-machine-selection";
+            var initialLoadout = new PokemonLoadout
+            {
+                PokemonId = 1,
+                ChosenMoveNames = new List<string> { "tackle" },
+                ChosenAbility = "심록",
+                ChosenItem = TeamLoadoutRules.NoItem,
+                Level = 1
+            };
+
+            await using (var seedDb = CreateDbContext(schema))
+            {
+                await new RunStore(seedDb).Save(
+                    username,
+                    0,
+                    0,
+                    new List<PokemonLoadout> { initialLoadout },
+                    0);
+                seedDb.TechnicalMachines.Add(new TechnicalMachineInventory
+                {
+                    Username = username,
+                    MoveKey = "cut",
+                    Quantity = 1
+                });
+                await seedDb.SaveChangesAsync();
+            }
+
+            var currentUser = new CurrentUserService();
+            currentUser.SignIn(username, isAdmin: false);
+
+            await using (var db = CreateDbContext(schema))
+            {
+                var state = new GameState(
+                    new InMemoryScoreStore(),
+                    new InMemoryPresetStore(),
+                    new UnlockService(db, currentUser),
+                    new RunStore(db),
+                    currentUser,
+                    new SkillRatingService(db),
+                    new PlayerProgressionStore(db));
+
+                await state.LoadRunForCurrentUser();
+                Assert.Equal(1, state.TechnicalMachines.Single(machine => machine.MoveKey == "cut").Quantity);
+
+                var configuredLoadout = state.PlayerLoadouts.Single().Clone();
+                configuredLoadout.ChosenMoveNames.Add("cut");
+                Assert.True(await state.TryLearnTechnicalMachineAsync("cut"));
+                Assert.Equal(0, state.TechnicalMachines.Single(machine => machine.MoveKey == "cut").Quantity);
+                await state.SetPlayerLoadouts(new List<PokemonLoadout> { configuredLoadout });
+            }
+
+            await using (var freshDb = CreateDbContext(schema))
+            {
+                var restoredProgress = await new PlayerProgressionStore(freshDb).LoadAsync(username);
+                Assert.Empty(restoredProgress.machines);
+
+                var restoredState = new GameState(
+                    new InMemoryScoreStore(),
+                    new InMemoryPresetStore(),
+                    new UnlockService(freshDb, currentUser),
+                    new RunStore(freshDb),
+                    currentUser,
+                    new SkillRatingService(freshDb),
+                    new PlayerProgressionStore(freshDb));
+                await restoredState.LoadRunForCurrentUser();
+
+                var restoredLoadout = Assert.Single(restoredState.PlayerLoadouts);
+                Assert.Contains("cut", restoredLoadout.ChosenMoveNames);
+                Assert.False(await restoredState.TryLearnTechnicalMachineAsync("cut"));
+            }
+        });
+    }
+
+    [Fact]
     public async Task GameStatePersistsHighScoreAcrossNewRunAndFreshContext()
     {
         await WithTemporarySchema(async schema =>
