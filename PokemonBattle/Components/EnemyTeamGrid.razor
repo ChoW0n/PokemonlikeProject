@@ -1,0 +1,63 @@
+@using PokemonBattle.Models
+
+@if (Loadouts.Count > 0)
+{
+    <div class="enemy-grid" role="list" aria-label="@AriaLabel">
+        @foreach (var loadout in Loadouts)
+        {
+            var data = PokemonDatabase.All[loadout.PokemonId];
+            <article class="enemy-card @(SelectedId == loadout.PokemonId ? "is-selected" : string.Empty)" role="listitem">
+                <button type="button"
+                        class="enemy-card-toggle"
+                        aria-label="@($"{data.Name} 상대 정보 {(SelectedId == loadout.PokemonId ? "접기" : "펼치기")}")"
+                        aria-expanded="@(SelectedId == loadout.PokemonId ? "true" : "false")"
+                        @onclick="() => ToggleDetail(loadout.PokemonId)">
+                    <img src="@data.EffectiveImageUrl" alt="" class="enemy-sprite" />
+                    <span class="enemy-card-title">@data.Name</span>
+                    <span class="enemy-card-level">Lv.@loadout.Level</span>
+                </button>
+                <div class="hud-types" aria-label="@($"{data.Type1}{(data.Type2 != null ? $", {data.Type2}" : "")}")">
+                    <img src="@TypeIcons.GetUrl(data.Type1)" class="type-icon-img" alt="@data.Type1" />
+                    @if (data.Type2 != null)
+                    {
+                        <img src="@TypeIcons.GetUrl(data.Type2.Value)" class="type-icon-img" alt="@data.Type2" />
+                    }
+                </div>
+
+                @if (SelectedId == loadout.PokemonId)
+                {
+                    <div class="enemy-detail">
+                        <div class="gauge-group">
+                            <GaugeBar Label="HP" Percent="@StatBarHelper.StatPercent(data.BaseHp)" ColorClass="@StatBarHelper.StatColor(data.BaseHp)" DisplayText="@data.BaseHp.ToString()" />
+                            <GaugeBar Label="공격" Percent="@StatBarHelper.StatPercent(data.BaseAtk)" ColorClass="@StatBarHelper.StatColor(data.BaseAtk)" DisplayText="@data.BaseAtk.ToString()" />
+                            <GaugeBar Label="방어" Percent="@StatBarHelper.StatPercent(data.BaseDef)" ColorClass="@StatBarHelper.StatColor(data.BaseDef)" DisplayText="@data.BaseDef.ToString()" />
+                            <GaugeBar Label="특공" Percent="@StatBarHelper.StatPercent(data.BaseSpAtk)" ColorClass="@StatBarHelper.StatColor(data.BaseSpAtk)" DisplayText="@data.BaseSpAtk.ToString()" />
+                            <GaugeBar Label="특방" Percent="@StatBarHelper.StatPercent(data.BaseSpDef)" ColorClass="@StatBarHelper.StatColor(data.BaseSpDef)" DisplayText="@data.BaseSpDef.ToString()" />
+                            <GaugeBar Label="속도" Percent="@StatBarHelper.StatPercent(data.BaseSpd)" ColorClass="@StatBarHelper.StatColor(data.BaseSpd)" DisplayText="@data.BaseSpd.ToString()" />
+                        </div>
+                        <p class="enemy-ability">특성: @loadout.ChosenAbility</p>
+                        <div class="move-chip-row">
+                            @foreach (var moveKey in loadout.ChosenMoveNames)
+                            {
+                                var move = MoveDatabase.All[moveKey];
+                                <span class="move-chip" style="border-color:@TypeColors.GetHex(move.Type)">@move.Name</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </article>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<PokemonLoadout> Loadouts { get; set; } = Array.Empty<PokemonLoadout>();
+    [Parameter] public string AriaLabel { get; set; } = "상대 포켓몬 목록";
+
+    private int? SelectedId;
+
+    private void ToggleDetail(int id)
+    {
+        SelectedId = SelectedId == id ? null : id;
+    }
+}
