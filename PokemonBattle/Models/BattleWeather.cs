@@ -9,48 +9,42 @@ public static class BattleWeather
     public const string Sand = "모래바람";
     public const string Hail = "싸라기눈";
 
-    private sealed class WeatherState
-    {
-        public string Current = Clear;
-        public int TurnsRemaining;
-    }
-
-    private static readonly AsyncLocal<WeatherState?> state = new();
-    private static WeatherState CurrentState => state.Value ??= new WeatherState();
+    private static BattleEnvironment CurrentEnvironment => BattleEnvironmentContext.Active;
 
     public static string Current
     {
-        get => CurrentState.Current;
+        get => CurrentEnvironment.Weather;
         set
         {
-            CurrentState.Current = value;
-            CurrentState.TurnsRemaining = 0;
+            CurrentEnvironment.Weather = value;
+            CurrentEnvironment.WeatherTurnsRemaining = 0;
         }
     }
 
-    public static int TurnsRemaining => CurrentState.TurnsRemaining;
+    public static int TurnsRemaining => CurrentEnvironment.WeatherTurnsRemaining;
 
     public static bool AreEffectsSuppressed(Pokemon? first, Pokemon? second) =>
         HasWeatherNullifier(first, second) || HasWeatherNullifier(second, first);
 
     public static void Reset()
     {
-        state.Value = new WeatherState();
+        CurrentEnvironment.Weather = Clear;
+        CurrentEnvironment.WeatherTurnsRemaining = 0;
     }
 
     public static void Set(string weather, int turns = 0)
     {
-        CurrentState.Current = weather;
-        CurrentState.TurnsRemaining = Math.Max(0, turns);
+        CurrentEnvironment.Weather = weather;
+        CurrentEnvironment.WeatherTurnsRemaining = Math.Max(0, turns);
     }
 
     public static bool AdvanceTurn()
     {
-        if (CurrentState.TurnsRemaining <= 0) return false;
-        CurrentState.TurnsRemaining--;
-        if (CurrentState.TurnsRemaining > 0) return false;
+        if (CurrentEnvironment.WeatherTurnsRemaining <= 0) return false;
+        CurrentEnvironment.WeatherTurnsRemaining--;
+        if (CurrentEnvironment.WeatherTurnsRemaining > 0) return false;
 
-        CurrentState.Current = Clear;
+        CurrentEnvironment.Weather = Clear;
         return true;
     }
 

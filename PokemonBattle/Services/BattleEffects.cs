@@ -232,6 +232,7 @@ public sealed class BattleEndOfTurnContext
 {
     public Pokemon Pokemon { get; }
     public Pokemon? Opponent { get; }
+    public bool IsHero { get; }
     public Random Random { get; }
     public Func<BattleEvent, Task> Emit { get; }
     public RunMetaState? RunMeta { get; }
@@ -241,10 +242,12 @@ public sealed class BattleEndOfTurnContext
         Func<BattleEvent, Task> emit,
         Pokemon? opponent = null,
         Random? random = null,
-        RunMetaState? runMeta = null)
+        RunMetaState? runMeta = null,
+        bool isHero = false)
     {
         Pokemon = pokemon;
         Opponent = opponent;
+        IsHero = isHero;
         Random = random ?? System.Random.Shared;
         Emit = emit;
         RunMeta = runMeta;

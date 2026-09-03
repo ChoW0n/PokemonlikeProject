@@ -59,13 +59,13 @@ public sealed class RunMetaEffectHandler : IBattleEffectHandler
     public async Task EndOfTurnAsync(BattleEndOfTurnContext context)
     {
         var meta = context.RunMeta;
-        if (meta == null || context.Pokemon.IsFainted) return;
+        if (meta == null || context.Pokemon.IsFainted || !context.IsHero) return;
         if (!meta.LegacyIds.Contains("last-breath")) return;
 
         int before = context.Pokemon.CurrentHp;
         context.Pokemon.CurrentHp = Math.Min(
             context.Pokemon.MaxHp,
-            context.Pokemon.CurrentHp + Math.Max(1, context.Pokemon.MaxHp / 12));
+            context.Pokemon.CurrentHp + Math.Max(1, context.Pokemon.MaxHp / 16));
         if (context.Pokemon.CurrentHp > before)
         {
             await context.ShowMessage(

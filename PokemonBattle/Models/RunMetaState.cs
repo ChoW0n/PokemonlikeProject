@@ -118,7 +118,7 @@ public static class RunMetaCatalog
             "HP가 75% 이상일 때 받는 공격 피해가 25% 감소합니다.",
             RunLegacyEffect.HighHpDefense),
         new("last-breath", "마지막 불씨",
-            "턴 종료 시 HP를 1/12 회복합니다.",
+            "턴 종료 시 HP를 1/16 회복합니다.",
             RunLegacyEffect.EndTurnRecovery),
         new("hunters-eye", "사냥꾼의 눈",
             "공격 기술의 급소율이 1단계 증가합니다.",
