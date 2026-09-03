@@ -24,7 +24,7 @@
                     <span class="rival-badge" aria-label="라이벌전">라이벌전</span>
                 }
             </div>
-            <p class="intro">현재 날씨: @BattleWeather.Current · 필드: @BattleField.Current</p>
+            <p class="intro">현재 날씨: @Rules.CurrentWeather · 필드: @Rules.CurrentField</p>
         </div>
         <button type="button" class="speed-toggle" aria-label="배틀 메시지 재생 속도 변경" @onclick="CycleSpeed">재생속도 @SpeedLabel</button>
     </header>
@@ -33,8 +33,8 @@
         <p id="battle-state-summary" class="visually-hidden">상대와 내 포켓몬의 이름, 레벨, 타입, 현재 HP와 상태 이상을 표시합니다.</p>
         <div class="arena-meta" role="group" aria-label="현재 전장 정보">
             <span class="arena-meta-label">LIVE ARENA</span>
-            <span>날씨 · @BattleWeather.Current</span>
-            <span>필드 · @BattleField.Current</span>
+            <span>날씨 · @Rules.CurrentWeather</span>
+            <span>필드 · @Rules.CurrentField</span>
         </div>
         <div id="battle-fx-layer" class="battle-fx-layer" aria-hidden="true"></div>
         <div class="stage-slot slot-top">
@@ -183,7 +183,7 @@
                                  @ondblclick:preventDefault>
                             <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
                             <span class="move-type-label">@TypeKor(move.Type)</span>
-                            <span class="move-name-text">@move.Name @(move.Priority > 0 ? "우선" : "") @(Hero.ChoiceLockedMove != null && Hero.ChoiceLockedMove != moveKey ? "고정" : "")</span>
+                            <span class="move-name-text">@move.Name @(move.Priority > 0 ? "· 우선" : "") @(Hero.ChoiceLockedMove != null && Hero.ChoiceLockedMove != moveKey ? "· 고정" : "")</span>
                             <span class="move-pp-num">PP @ppLoop/@move.MaxPP</span>
                         </button>
                     }
@@ -603,11 +603,13 @@
         {
             var data = PokemonDatabase.All[id];
             var moves = EnemyTeamProvider.PickProMoveset(data);
-            string ability = EnemyTeamProvider.PickProAbility(data, moves);
+            int skillAdjustment = State.CurrentRunDifficultyAdjustment;
+            string ability = EnemyTeamProvider.PickProAbility(data, moves, skillAdjustment);
             var items = ItemDatabase.GetAvailableItems(data.Name)
                 .Where(item => item.Name == TeamLoadoutRules.NoItem || !usedItems.Contains(item.Name))
                 .ToList();
-            string item = EnemyTeamProvider.PickProItem(moves, items, usedItems);
+            string item = EnemyTeamProvider.PickProItem(
+                moves, items, usedItems, skillAdjustment);
             if (item != TeamLoadoutRules.NoItem)
             {
                 usedItems.Add(item);

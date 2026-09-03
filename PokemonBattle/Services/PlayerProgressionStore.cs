@@ -9,14 +9,27 @@ namespace PokemonBattle.Services;
 public sealed class PlayerProgressionStore
 {
     private readonly DatabaseContextExecutor _database;
+    private readonly Random _random;
+
     [ActivatorUtilitiesConstructor]
     public PlayerProgressionStore(DatabaseContextExecutor database)
+        : this(database, Random.Shared)
+    {
+    }
+
+    private PlayerProgressionStore(DatabaseContextExecutor database, Random random)
     {
         _database = database;
+        _random = random;
     }
 
     public PlayerProgressionStore(AppDbContext db)
-        : this(new DatabaseContextExecutor(db))
+        : this(db, Random.Shared)
+    {
+    }
+
+    public PlayerProgressionStore(AppDbContext db, Random random)
+        : this(new DatabaseContextExecutor(db), random)
     {
     }
 
@@ -135,6 +148,18 @@ public sealed class PlayerProgressionStore
             else
             {
                 profile.CompletedBattles++;
+                if (won && _random.Next(100) < 12)
+                {
+                    string rewardMoveKey = PickRewardMove(profile);
+                    await AddTechnicalMachineAsync(db, username, rewardMoveKey);
+                    await AddMessageIfMissingAsync(
+                        db,
+                        username,
+                        $"battle-{profile.CompletedBattles}-technical-machine",
+                        "기술머신 획득",
+                        $"{MoveDatabase.All[rewardMoveKey].Name} 기술머신을 1개 획득했습니다.");
+                }
+
                 if (profile.CompletedBattles % 50 == 0 && loadouts.Count > 0)
                 {
                     profile.RivalPending = true;

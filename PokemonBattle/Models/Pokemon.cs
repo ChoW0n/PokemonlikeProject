@@ -545,7 +545,7 @@ public class Pokemon
     {
         if (!StatStages.ContainsKey(stat) || delta == 0) return false;
         bool abilitySuppressed = IsAbilitySuppressedBy(opponent);
-        if (causedByOpponent && delta < 0 && HasActiveHeldItem() && HeldItem == "클리어아뮬렛")
+        if (causedByOpponent && delta < 0 && HasActiveHeldItem() && HeldItem == "클리어참")
             return false;
         if (causedByOpponent && delta < 0 && !abilitySuppressed
             && stat == "accuracy" && SelectedAbility == "날카로운눈")

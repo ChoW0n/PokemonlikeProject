@@ -241,7 +241,7 @@
                               @ondblclick="() => ToggleMove(moveKey)"
                              @ondblclick:preventDefault>
                             <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
-                              <span class="dex-name">@move.Name @(move.Priority > 0 ? "우선" : "") @(IsTechnicalMachineMove(picked, moveKey) ? "· TM" : "") @(IsRunStolenMove(picked, moveKey) ? "· 강탈" : "")</span>
+                              <span class="dex-name">@move.Name @(move.Priority > 0 ? "· 우선" : "") @(IsTechnicalMachineMove(picked, moveKey) ? "· TM" : "") @(IsRunStolenMove(picked, moveKey) ? "· 강탈" : "")</span>
                               <span class="card-state @(DraftMoves.Contains(moveKey) ? "is-selected" : "")">@(isMachineLocked ? "기술머신 필요" : DraftMoves.Contains(moveKey) ? "선택됨" : ViewingMoveKey == moveKey ? "상세 확인 중" : "선택하기")</span>
                              <span class="dex-type">@(isMachineOnly ? "TM 전용 · " : "")@(move.IsStatus ? "변화기" : "공격기")</span>
                         </button>
@@ -272,9 +272,9 @@
                              aria-pressed="@(DraftAbility == ability ? "true" : "false")"
                              aria-expanded="@(ViewingAbility == ability ? "true" : "false")"
                              aria-controls="@(ViewingAbility == ability ? "selected-ability-info" : null)"
-                             title="클릭하면 특성을 장착하고 상세 정보를 표시합니다."
+                              title="클릭하면 설명을 보고, 더블클릭하면 특성을 장착합니다."
                              @onclick="() => SelectAbilityFromCard(ability)"
-                             @ondblclick="() => SelectAbilityFromCard(ability)"
+                              @ondblclick="() => SelectAbilityAndEquip(ability)"
                              @ondblclick:preventDefault>
                             <span class="dex-name">@ability</span>
                               <span class="card-state @(DraftAbility == ability ? "is-selected" : "")">@(DraftAbility == ability ? "선택됨" : ViewingAbility == ability ? "상세 확인 중" : "상세 보기")</span>
@@ -440,6 +440,7 @@
                     var validKeys = PokemonDatabase.All.ContainsKey(l.PokemonId)
                         ? PokemonDatabase.All[l.PokemonId].MoveNames
                             .Concat(PokemonDatabase.All[l.PokemonId].MachineOnlyMoveNames)
+                            .Concat(State.RunStolenMoveKeysFor(l.PokemonId))
                             .ToHashSet()
                         : new HashSet<string>();
 
@@ -553,6 +554,11 @@
     }
 
     private void SelectAbilityFromCard(string ability)
+    {
+        ViewingAbility = ability;
+    }
+
+    private void SelectAbilityAndEquip(string ability)
     {
         ViewingAbility = ability;
         DraftAbility = ability;
@@ -770,6 +776,7 @@
                 {
                     var validKeys = PokemonDatabase.All[l.PokemonId].MoveNames.ToHashSet();
                     validKeys.UnionWith(PokemonDatabase.All[l.PokemonId].MachineOnlyMoveNames);
+                    validKeys.UnionWith(State.RunStolenMoveKeysFor(l.PokemonId));
                     return new PokemonLoadout
                     {
                         PokemonId = l.PokemonId,

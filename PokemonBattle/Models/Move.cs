@@ -137,7 +137,7 @@ public static class MoveRuleMetadata
     private static readonly HashSet<string> ProtectMoves = new()
     {
         "protect", "detect", "endure", "kings-shield", "baneful-bunker",
-        "spiky-shield", "obstruct", "silk-guard"
+        "spiky-shield", "obstruct"
     };
 
     private static readonly HashSet<string> RampageMoves = new()
@@ -185,6 +185,11 @@ public static class MoveRuleMetadata
     {
         "gust", "twister", "hurricane", "razor-wind", "silver-wind", "icy-wind",
         "tailwind", "whirlwind", "fairy-wind", "sand-attack", "heat-wave"
+    };
+
+    private static readonly HashSet<string> PowderMoves = new()
+    {
+        "sleep-powder", "stun-spore", "poison-powder", "spore", "cotton-spore"
     };
 
     private static readonly HashSet<string> SlicingMoves = new()
@@ -248,6 +253,7 @@ public static class MoveRuleMetadata
     public static bool IsBindingMove(string moveKey) => BindingMoves.Contains(moveKey);
     public static bool IsForcedSwitchMove(string moveKey) => ForcedSwitchMoves.Contains(moveKey);
     public static bool IsWindMove(string moveKey) => WindMoves.Contains(moveKey);
+    public static bool IsPowderMove(string moveKey) => PowderMoves.Contains(moveKey);
     public static bool IsSlicingMove(string moveKey) => SlicingMoves.Contains(moveKey);
 
     public static bool MakesContact(string moveKey, Move move) =>

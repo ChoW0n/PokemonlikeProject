@@ -129,11 +129,37 @@ public class RunMetaRegressionTests
         var context = new BattleEndOfTurnContext(
             pokemon,
             _ => Task.CompletedTask,
-            runMeta: new RunMetaState { LegacyIds = new List<string> { "last-breath" } });
+            runMeta: new RunMetaState { LegacyIds = new List<string> { "last-breath" } },
+            isHero: true);
 
         await handler.EndOfTurnAsync(context);
 
-        Assert.Equal(before + Math.Max(1, pokemon.MaxHp / 12), pokemon.CurrentHp);
+        Assert.Equal(before + Math.Max(1, pokemon.MaxHp / 16), pokemon.CurrentHp);
+    }
+
+    [Fact]
+    public async Task LastBreath_only_restores_the_player_side_at_turn_end()
+    {
+        var hero = NewPokemon(1);
+        var enemy = NewPokemon(4);
+        hero.CurrentHp = hero.MaxHp / 2;
+        enemy.CurrentHp = enemy.MaxHp / 2;
+        int heroBefore = hero.CurrentHp;
+        int enemyBefore = enemy.CurrentHp;
+        var engine = new BattleEngine(
+            new Random(1),
+            new IBattleEffectHandler[] { new RunMetaEffectHandler() });
+        engine.ConfigureRunMeta(new RunMetaState
+        {
+            LegacyIds = new List<string> { "last-breath" }
+        });
+
+        await engine.ApplyEndOfTurnEffectsAsync(
+            new[] { hero, enemy },
+            _ => Task.CompletedTask);
+
+        Assert.Equal(heroBefore + Math.Max(1, hero.MaxHp / 16), hero.CurrentHp);
+        Assert.Equal(enemyBefore, enemy.CurrentHp);
     }
 
     [Fact]

@@ -207,6 +207,22 @@ public sealed class AbilityRulesRegressionTests
     }
 
     [Fact]
+    public async Task Speed_boost_activates_on_the_first_turn_after_switching_in()
+    {
+        var pokemon = CreatePokemon(132, "tackle", ability: "가속");
+        var events = new List<BattleEvent>();
+
+        await CreateFullEngine().ApplyEndOfTurnEffectsAsync(
+            new[] { pokemon },
+            Capture(events));
+
+        Assert.Equal(1, pokemon.TurnsOnField);
+        Assert.Equal(1, pokemon.StatStages["speed"]);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("가속", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
     public async Task Unnerve_blocks_berry_consumption_until_the_opponent_leaves()
     {
         var eater = CreatePokemon(132, "tackle", heldItem: "자뭉열매");

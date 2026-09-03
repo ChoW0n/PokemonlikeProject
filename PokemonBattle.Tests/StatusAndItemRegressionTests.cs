@@ -244,6 +244,42 @@ public sealed class StatusAndItemRegressionTests
     }
 
     [Fact]
+    public async Task Covert_cloak_does_not_block_a_pure_status_move()
+    {
+        var attacker = CreatePokemon(1, "sleep-powder");
+        var defender = CreatePokemon(202, "tackle", heldItem: "은밀망토");
+
+        await CreateFullEngine(new FixedRandom(0)).TakeTurnAsync(
+            attacker, defender, "sleep-powder", attackerIsHero: true, _ => Task.CompletedTask);
+
+        Assert.Equal(StatusCondition.Sleep, defender.Status);
+    }
+
+    [Fact]
+    public async Task Overcoat_blocks_powder_status_even_when_the_move_is_status()
+    {
+        var attacker = CreatePokemon(1, "sleep-powder");
+        var defender = CreatePokemon(202, "tackle", ability: "인분");
+
+        await CreateFullEngine(new FixedRandom(0)).TakeTurnAsync(
+            attacker, defender, "sleep-powder", attackerIsHero: true, _ => Task.CompletedTask);
+
+        Assert.Equal(StatusCondition.None, defender.Status);
+    }
+
+    [Fact]
+    public void Powder_move_catalog_covers_the_supported_powder_family()
+    {
+        foreach (var moveKey in new[]
+        {
+            "sleep-powder", "stun-spore", "poison-powder", "spore", "cotton-spore"
+        })
+        {
+            Assert.True(MoveRuleMetadata.IsPowderMove(moveKey));
+        }
+    }
+
+    [Fact]
     public async Task White_herb_restores_self_stat_drop()
     {
         var attacker = CreatePokemon(68, "close-combat", heldItem: "하얀허브");
@@ -307,8 +343,8 @@ public sealed class StatusAndItemRegressionTests
         return new Pokemon(PokemonDatabase.All[pokemonId], moves.ToList(), ability, heldItem, level: 50);
     }
 
-    private static BattleEngine CreateFullEngine() => new(
-        new Random(1234),
+    private static BattleEngine CreateFullEngine(Random? random = null) => new(
+        random ?? new Random(1234),
         new IBattleEffectHandler[]
         {
             new MoveEffectHandler(),
@@ -323,4 +359,16 @@ public sealed class StatusAndItemRegressionTests
             events.Add(battleEvent);
             return Task.CompletedTask;
         };
+
+    private sealed class FixedRandom : Random
+    {
+        private readonly int value;
+
+        public FixedRandom(int value)
+        {
+            this.value = value;
+        }
+
+        public override int Next(int maxValue) => Math.Min(value, maxValue - 1);
+    }
 }
