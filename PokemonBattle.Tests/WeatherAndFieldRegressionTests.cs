@@ -270,6 +270,45 @@ public sealed class WeatherAndFieldRegressionTests
     }
 
     [Fact]
+    public async Task Battle_environment_survives_independent_async_calls()
+    {
+        try
+        {
+            var engine = CreateEngine();
+            var weatherAttacker = CreatePokemon(25, "rain-dance");
+            var fieldAttacker = CreatePokemon(25, "electric-terrain");
+            var defender = CreatePokemon(202, "tackle");
+
+            await engine.TakeTurnAsync(
+                weatherAttacker,
+                defender,
+                "rain-dance",
+                attackerIsHero: true,
+                _ => Task.CompletedTask);
+            await engine.TakeTurnAsync(
+                fieldAttacker,
+                defender,
+                "electric-terrain",
+                attackerIsHero: true,
+                _ => Task.CompletedTask);
+
+            await Task.Run(() => engine.ApplyEndOfTurnEffectsAsync(
+                Array.Empty<Pokemon>(),
+                _ => Task.CompletedTask));
+
+            Assert.Equal(BattleWeather.Rain, engine.CurrentWeather);
+            Assert.Equal(BattleField.Electric, engine.CurrentField);
+            Assert.Equal(4, BattleWeather.TurnsRemaining);
+            Assert.Equal(4, BattleField.TurnsRemaining);
+        }
+        finally
+        {
+            BattleWeather.Reset();
+            BattleField.Reset();
+        }
+    }
+
+    [Fact]
     public void Terrain_rules_apply_damage_boosts_and_defensive_reductions()
     {
         var attacker = CreatePokemon(25, "seed-bomb");

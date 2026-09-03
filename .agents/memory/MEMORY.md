@@ -22,3 +22,4 @@
 - [Npgsql startup transactions](npgsql-startup-transactions.md) — wrap startup data cleanup transactions in the configured execution strategy.
 - [GitHub LFS publishing](github-lfs-publishing.md) — generated self-contained bundles can block pushes; keep source pushes free of unknown LFS objects.
 - [PokeAPI move metadata generation](pokemon-data-generation.md) — machine-only requires nonempty all-version machine methods; unknown or failed lookups stay unlocked.
+- [Localized item identity](localized-item-identity.md) — item display names are runtime identifiers, so renames must update behavior checks and regression tests.

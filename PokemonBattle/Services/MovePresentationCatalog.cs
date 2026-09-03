@@ -27,7 +27,7 @@ public static class MovePresentationCatalog
         ["recover"] = "heal", ["roost"] = "heal", ["rest"] = "heal", ["soft-boiled"] = "heal",
         ["protect"] = "shield", ["detect"] = "shield", ["endure"] = "shield",
         ["kings-shield"] = "shield", ["baneful-bunker"] = "shield",
-        ["spiky-shield"] = "shield", ["obstruct"] = "shield", ["silk-guard"] = "shield",
+        ["spiky-shield"] = "shield", ["obstruct"] = "shield",
         ["solar-beam"] = "charge", ["skull-bash"] = "charge", ["fly"] = "charge",
         ["bounce"] = "charge", ["future-sight"] = "delayed", ["doom-desire"] = "delayed",
         ["self-destruct"] = "recoil", ["explosion"] = "recoil", ["memento"] = "recoil"

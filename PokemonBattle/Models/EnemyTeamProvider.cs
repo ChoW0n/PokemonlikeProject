@@ -171,7 +171,10 @@ public static class EnemyTeamProvider
         return chosen.Take(4).ToList();
     }
 
-    public static string PickProAbility(PokemonData data, IEnumerable<string> moveKeys)
+    public static string PickProAbility(
+        PokemonData data,
+        IEnumerable<string> moveKeys,
+        int skillAdjustment = 0)
     {
         var abilities = data.AbilityNames
             .Where(AbilityDatabase.IsImplemented)
@@ -184,13 +187,16 @@ public static class EnemyTeamProvider
         }
 
         var profile = AnalyzeMoveset(moveKeys);
-        return WeightedPick(abilities, ability => AbilityWeight(ability, profile));
+        return WeightedPick(
+            abilities,
+            ability => AbilityWeight(ability, profile, skillAdjustment));
     }
 
     public static string PickProItem(
         IEnumerable<string> moveKeys,
         IEnumerable<Item> availableItems,
-        ISet<string>? usedItemNames = null)
+        ISet<string>? usedItemNames = null,
+        int skillAdjustment = 0)
     {
         var available = availableItems
             .Where(item => usedItemNames == null || !usedItemNames.Contains(item.Name))
@@ -205,7 +211,9 @@ public static class EnemyTeamProvider
 
         var profile = AnalyzeMoveset(moveKeys);
         var weightedItems = available
-            .Select(item => (Item: item, Weight: ItemWeight(item.Name, profile)))
+            .Select(item => (
+                Item: item,
+                Weight: ItemWeight(item.Name, profile, skillAdjustment)))
             .Where(item => item.Weight > 0)
             .ToList();
 
@@ -214,7 +222,10 @@ public static class EnemyTeamProvider
             : WeightedPick(weightedItems, item => item.Weight).Item.Name;
     }
 
-    private static double AbilityWeight(string ability, MoveProfile profile)
+    private static double AbilityWeight(
+        string ability,
+        MoveProfile profile,
+        int skillAdjustment)
     {
         double weight = 1.0;
         bool physicalFocused = profile.PhysicalCount > profile.SpecialCount;
@@ -245,10 +256,13 @@ public static class EnemyTeamProvider
             weight += 3.0;
         }
 
-        return weight;
+        return ApplySkillAdjustment(weight, skillAdjustment);
     }
 
-    private static double ItemWeight(string itemName, MoveProfile profile)
+    private static double ItemWeight(
+        string itemName,
+        MoveProfile profile,
+        int skillAdjustment)
     {
         if (itemName is "구애머리띠" or "구애안경" or "구애스카프")
         {
@@ -259,22 +273,22 @@ public static class EnemyTeamProvider
 
             if (profile.IsPurePhysical)
             {
-                return itemName switch
+                return ApplySkillAdjustment(itemName switch
                 {
                     "구애머리띠" => 10,
                     "구애스카프" => 6,
                     _ => 0
-                };
+                }, skillAdjustment);
             }
 
             if (profile.IsPureSpecial)
             {
-                return itemName switch
+                return ApplySkillAdjustment(itemName switch
                 {
                     "구애안경" => 10,
                     "구애스카프" => 6,
                     _ => 0
-                };
+                }, skillAdjustment);
             }
 
             return 0;
@@ -282,7 +296,7 @@ public static class EnemyTeamProvider
 
         if (profile.HasStatusMove)
         {
-            return itemName switch
+            return ApplySkillAdjustment(itemName switch
             {
                 "생명의구슬" => 7,
                 "기합의띠" => 6,
@@ -290,29 +304,38 @@ public static class EnemyTeamProvider
                 "자뭉열매" or "오랭열매" or "무화열매" or "리샘열매" => 2.5,
                 "없음" => 0.5,
                 _ => 1
-            };
+            }, skillAdjustment);
         }
 
         if (profile.IsPurePhysical || profile.IsPureSpecial)
         {
-            return itemName switch
+            return ApplySkillAdjustment(itemName switch
             {
                 "생명의구슬" => 4,
                 "기합의띠" => 3,
                 "먹다남은음식" => 2,
                 "없음" => 0.5,
                 _ => 1
-            };
+            }, skillAdjustment);
         }
 
-        return itemName switch
+        return ApplySkillAdjustment(itemName switch
         {
             "생명의구슬" => 4,
             "기합의띠" => 3,
             "먹다남은음식" => 2,
             "없음" => 0.5,
             _ => 1
-        };
+        }, skillAdjustment);
+    }
+
+    private static double ApplySkillAdjustment(double weight, int skillAdjustment)
+    {
+        if (weight <= 0) return weight;
+
+        int boundedAdjustment = Math.Clamp(skillAdjustment, -3, 5);
+        double skillFactor = 1 + boundedAdjustment * 0.2;
+        return 1 + (weight - 1) * skillFactor;
     }
 
     private static MoveProfile AnalyzeMoveset(IEnumerable<string> moveKeys)

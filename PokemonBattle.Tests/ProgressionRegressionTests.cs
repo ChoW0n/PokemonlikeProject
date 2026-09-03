@@ -172,6 +172,65 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public void SkillAdjustment_strengthens_synergy_and_relaxes_low_skill_enemy_choices()
+    {
+        var data = new PokemonData(
+            "테스트포켓몬",
+            "test-pokemon",
+            PokemonType.Normal,
+            null,
+            50,
+            50,
+            50,
+            50,
+            50,
+            50,
+            new[] { "tackle" },
+            new[] { "근성", "유연" },
+            "",
+            "",
+            null,
+            1);
+
+        int highSkillOffensiveAbilities = Enumerable.Range(0, 400)
+            .Count(_ => EnemyTeamProvider.PickProAbility(
+                data,
+                new[] { "tackle", "take-down" },
+                skillAdjustment: 5) == "근성");
+        int lowSkillOffensiveAbilities = Enumerable.Range(0, 400)
+            .Count(_ => EnemyTeamProvider.PickProAbility(
+                data,
+                new[] { "tackle", "take-down" },
+                skillAdjustment: -3) == "근성");
+
+        Assert.True(highSkillOffensiveAbilities > lowSkillOffensiveAbilities + 40);
+    }
+
+    [Fact]
+    public void SkillAdjustment_makes_low_skill_enemy_items_more_random()
+    {
+        var items = new[]
+        {
+            ItemDatabase.GeneralItems.First(item => item.Name == "생명의구슬"),
+            ItemDatabase.GeneralItems.First(item => item.Name == TeamLoadoutRules.NoItem)
+        };
+
+        int highSkillNonEmptyItems = Enumerable.Range(0, 100)
+            .Count(_ => EnemyTeamProvider.PickProItem(
+                new[] { "tackle" },
+                items,
+                skillAdjustment: 5) == "생명의구슬");
+        int lowSkillEmptyItems = Enumerable.Range(0, 100)
+            .Count(_ => EnemyTeamProvider.PickProItem(
+                new[] { "tackle" },
+                items,
+                skillAdjustment: -3) == TeamLoadoutRules.NoItem);
+
+        Assert.Equal(100, highSkillNonEmptyItems);
+        Assert.True(lowSkillEmptyItems > 0);
+    }
+
+    [Fact]
     public void SkillRatingCalculatorUsesRoundsHpAndTurnEfficiency()
     {
         var strongWin = new RunPerformanceSummary(
@@ -207,6 +266,14 @@ public class ProgressionRegressionTests
             0,
             SkillRatingCalculator.CalculateDifficultyAdjustment(
                 SkillRatingCalculator.DefaultRating));
+        Assert.Equal(
+            -1,
+            SkillRatingCalculator.CalculateDifficultyAdjustment(
+                SkillRatingCalculator.DefaultRating - 50));
+        Assert.Equal(
+            1,
+            SkillRatingCalculator.CalculateDifficultyAdjustment(
+                SkillRatingCalculator.DefaultRating + 50));
         Assert.Equal(
             SkillRatingCalculator.MinimumDifficultyAdjustment,
             SkillRatingCalculator.CalculateDifficultyAdjustment(0));
@@ -626,7 +693,7 @@ public class ProgressionRegressionTests
 
             await using (var db = CreateDbContext(schema))
             {
-                var store = new PlayerProgressionStore(db);
+                var store = new PlayerProgressionStore(db, new FixedRandom(99));
                 await store.SaveLatestLoadoutsAsync(username, loadouts);
                 await store.RecordTeamSelectionsAsync(username, loadouts);
                 for (var battle = 0; battle < 50; battle++)
@@ -661,6 +728,45 @@ public class ProgressionRegressionTests
                 Assert.Empty(other.messages);
                 Assert.Empty(other.machines);
             }
+        });
+    }
+
+    [Fact]
+    public async Task General_victory_has_a_chance_to_grant_a_technical_machine_and_mail()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreatePlayerRunsTable(schema);
+            await CreateProgressionTables(schema);
+            var loadouts = new List<PokemonLoadout>
+            {
+                new()
+                {
+                    PokemonId = 1,
+                    ChosenMoveNames = new List<string> { "tackle" },
+                    ChosenAbility = "심록",
+                    ChosenItem = "없음",
+                    Level = 4
+                }
+            };
+
+            await using (var db = CreateDbContext(schema))
+            {
+                var store = new PlayerProgressionStore(db, new FixedRandom(0));
+                await store.CompleteBattleAsync(
+                    "general-machine-reward",
+                    loadouts,
+                    isRivalBattle: false,
+                    won: true);
+            }
+
+            await using var freshDb = CreateDbContext(schema);
+            var restored = await new PlayerProgressionStore(freshDb, new FixedRandom(99))
+                .LoadAsync("general-machine-reward");
+
+            Assert.Contains(restored.messages, message => message.Title == "기술머신 획득");
+            Assert.Single(restored.machines);
+            Assert.Equal(1, restored.machines[0].Quantity);
         });
     }
 
@@ -1133,4 +1239,16 @@ public class ProgressionRegressionTests
 
     private static string QuoteIdentifier(string identifier) =>
         "\"" + identifier.Replace("\"", "\"\"") + "\"";
+
+    private sealed class FixedRandom : Random
+    {
+        private readonly int value;
+
+        public FixedRandom(int value)
+        {
+            this.value = value;
+        }
+
+        public override int Next(int maxValue) => Math.Min(value, maxValue - 1);
+    }
 }

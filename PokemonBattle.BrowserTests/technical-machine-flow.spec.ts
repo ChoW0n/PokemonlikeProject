@@ -75,3 +75,23 @@ test("TM-only move stays locked without inventory, including detail and double-c
   await expect(cut).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("button", { name: "이 구성으로 팀에 추가" })).toBeEnabled();
 });
+
+test("ability cards preview on click and equip on double-click", async ({ page }) => {
+  await registerAndLogin(page);
+  await enterTeamSelect(page);
+
+  await page.getByRole("button", { name: /이상해씨, 도감 번호 1/ }).click();
+
+  const alternateAbility = page.getByRole("button", { name: /엽록소/ });
+  await expect(alternateAbility).toHaveCount(1);
+  await expect(alternateAbility).toHaveAttribute("aria-pressed", "false");
+
+  await alternateAbility.click();
+  await expect(alternateAbility).toHaveAttribute("aria-expanded", "true");
+  await expect(alternateAbility).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("button", { name: "이 특성 선택" })).toBeVisible();
+
+  await alternateAbility.dblclick();
+  await expect(alternateAbility).toHaveAttribute("aria-pressed", "true");
+  await expect(alternateAbility).toHaveClass(/is-selected/);
+});

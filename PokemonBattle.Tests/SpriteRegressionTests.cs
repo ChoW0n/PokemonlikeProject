@@ -54,7 +54,7 @@ public class SpriteRegressionTests
     [Fact]
     public void Items_without_an_official_sprite_do_not_render_broken_image_urls()
     {
-        Assert.Null(ItemDatabase.GeneralItems.Single(item => item.Name == "방호막").IconUrl);
-        Assert.Null(ItemDatabase.GeneralItems.Single(item => item.Name == "클리어아뮬렛").IconUrl);
+        Assert.Null(ItemDatabase.GeneralItems.Single(item => item.Name == "은밀망토").IconUrl);
+        Assert.Null(ItemDatabase.GeneralItems.Single(item => item.Name == "클리어참").IconUrl);
     }
 }

@@ -102,8 +102,11 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         var attacker = context.Attacker;
         var defender = context.Defender;
         bool suppressSecondaryEffects = attacker.HasActiveAbility("우격다짐", defender)
-            || (defender.HasActiveHeldItem(attacker) && defender.HeldItem == "방호막")
-            || (!move.IsStatus && defender.HasActiveAbility("인분", attacker))
+            || (!move.IsStatus
+                && defender.HasActiveHeldItem(attacker)
+                && defender.HeldItem == "은밀망토")
+            || (MoveRuleMetadata.IsPowderMove(context.MoveKey)
+                && defender.HasActiveAbility("인분", attacker))
             || defender.LastHitBlockedBySubstitute;
         int chanceMultiplier = attacker.HasActiveAbility("하늘의은총", defender) ? 2 : 1;
 
@@ -151,7 +154,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
             else if (defender.Status == StatusCondition.None
                 && !(defender.HasActiveHeldItem(attacker)
                     && defender.HeldItem == "방진고글"
-                    && context.MoveKey is "poison-powder" or "sleep-powder" or "stun-spore")
+                    && MoveRuleMetadata.IsPowderMove(context.MoveKey))
                 && !defender.IsImmuneToAilment(move.AilmentName, attacker))
             {
                 string ailment = context.MoveKey == "toxic" ? "toxic" : move.AilmentName;

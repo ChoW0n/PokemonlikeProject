@@ -12,6 +12,7 @@ public sealed class BattleEngine
     private readonly IReadOnlyList<IBattleEffectHandler> effectHandlers;
     private readonly BattleSideState heroSide = new();
     private readonly BattleSideState enemySide = new();
+    private readonly BattleEnvironment environment;
     public RunMetaState? ActiveRunMeta { get; private set; }
 
     public BattleEngine(IEnumerable<IBattleEffectHandler> handlers)
@@ -23,10 +24,30 @@ public sealed class BattleEngine
     {
         rng = random;
         effectHandlers = handlers.OrderBy(handler => handler.Order).ToArray();
+        environment = BattleEnvironmentContext.Active.Clone();
+    }
+
+    public string CurrentWeather
+    {
+        get
+        {
+            ActivateEnvironment();
+            return BattleWeather.Current;
+        }
+    }
+
+    public string CurrentField
+    {
+        get
+        {
+            ActivateEnvironment();
+            return BattleField.Current;
+        }
     }
 
     public int EffectiveSpeed(Pokemon pokemon, Pokemon? opponent = null)
     {
+        ActivateEnvironment();
         double speed = pokemon.EffectiveSpdAgainst(opponent);
         if (pokemon.HeldItem == "구애스카프" && pokemon.HasActiveHeldItem(opponent)) speed *= 1.5;
         return (int)speed;
@@ -37,6 +58,7 @@ public sealed class BattleEngine
 
     public bool CanSwitch(Pokemon active, Pokemon opponent)
     {
+        ActivateEnvironment();
         if (active.Ingrained
             || active.BindingTurnsRemaining > 0
             || active.RampageMoveKey != null) return false;
@@ -62,6 +84,7 @@ public sealed class BattleEngine
     /// </summary>
     public bool CanEscape(Pokemon active, Pokemon opponent, bool isWildBattle = true)
     {
+        ActivateEnvironment();
         if (!isWildBattle || active.IsFainted) return false;
         if (active.HasActiveAbility("도주", opponent)) return true;
         return CanSwitch(active, opponent);
@@ -69,6 +92,7 @@ public sealed class BattleEngine
 
     public double PreviewMultiplier(Move move, Pokemon target, Pokemon? attacker = null)
     {
+        ActivateEnvironment();
         PokemonType attackType = attacker?.ResolveMoveType(move, target) ?? move.Type;
         double multiplier = TypeChart.GetMultiplier(attackType, target.CurrentType1);
         if (target.CurrentType2 != null) multiplier *= TypeChart.GetMultiplier(attackType, target.CurrentType2.Value);
@@ -101,6 +125,7 @@ public sealed class BattleEngine
         string? initialWeather = null,
         string? initialField = null)
     {
+        ActivateEnvironment();
         BattleWeather.Reset();
         BattleField.Reset();
         heroSide.Reset();
@@ -146,6 +171,7 @@ public sealed class BattleEngine
         Pokemon? illusionTarget = null,
         bool isHeroSide = true)
     {
+        ActivateEnvironment();
         var messages = new List<string>();
         entrant.ResetFieldCounter();
         var side = isHeroSide ? heroSide : enemySide;
@@ -272,6 +298,7 @@ public sealed class BattleEngine
         Pokemon enemy,
         IReadOnlyCollection<string> enemyMoveKeys)
     {
+        ActivateEnvironment();
         string? enemyMoveKey = PickEnemyMove(enemy, enemyMoveKeys, hero);
         var heroMove = heroMoveKey == null ? null : MoveDatabase.All[heroMoveKey];
         var enemyMove = enemyMoveKey == null ? null : MoveDatabase.All[enemyMoveKey];
@@ -287,6 +314,7 @@ public sealed class BattleEngine
 
     public string? PickEnemyMove(Pokemon enemy, IReadOnlyCollection<string> moveKeys, Pokemon hero)
     {
+        ActivateEnvironment();
         var usable = moveKeys.Where(enemy.CanUseMove).ToArray();
         if (usable.Length == 0) return null;
 
@@ -332,9 +360,11 @@ public sealed class BattleEngine
         IEnumerable<Pokemon> activePokemon,
         Func<BattleEvent, Task> emit)
     {
+        ActivateEnvironment();
         var active = activePokemon.ToArray();
-        foreach (var pokemon in active)
+        for (int index = 0; index < active.Length; index++)
         {
+            var pokemon = active[index];
             if (pokemon.IsFainted) continue;
 
             var statusMessage = pokemon.ApplyEndOfTurnStatusDamage();
@@ -343,7 +373,7 @@ public sealed class BattleEngine
             var opponent = active.FirstOrDefault(candidate =>
                 !ReferenceEquals(candidate, pokemon) && !candidate.IsFainted);
             var context = new BattleEndOfTurnContext(
-                pokemon, emit, opponent, rng, ActiveRunMeta);
+                pokemon, emit, opponent, rng, ActiveRunMeta, isHero: index == 0);
             foreach (var handler in effectHandlers) await handler.EndOfTurnAsync(context);
             pokemon.AdvanceTurn();
         }
@@ -362,6 +392,7 @@ public sealed class BattleEngine
         IEnumerable<Pokemon> pokemon,
         Func<BattleEvent, Task> emit)
     {
+        ActivateEnvironment();
         foreach (var participant in pokemon)
         {
             if (participant.IsFainted) continue;
@@ -379,6 +410,7 @@ public sealed class BattleEngine
         Func<BattleEvent, Task> emit,
         bool? attackerMovedFirst = null)
     {
+        ActivateEnvironment();
         var result = new BattleTurnResult();
 
         if (attacker.MustRecharge)
@@ -1177,4 +1209,7 @@ public sealed class BattleEngine
         if (multiplier == 0) return "효과가 없는 것 같다...";
         return null;
     }
+
+    private void ActivateEnvironment() =>
+        BattleEnvironmentContext.Activate(environment);
 }

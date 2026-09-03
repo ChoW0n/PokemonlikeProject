@@ -172,11 +172,14 @@
         EnemyLoadouts = team.Select(e =>
         {
             var moves = EnemyTeamProvider.PickProMoveset(e.Value);
-            string ability = EnemyTeamProvider.PickProAbility(e.Value, moves);
+            int skillAdjustment = State.CurrentRunDifficultyAdjustment;
+            string ability = EnemyTeamProvider.PickProAbility(
+                e.Value, moves, skillAdjustment);
             var availableItems = ItemDatabase.GetAvailableItems(e.Value.Name)
                 .Where(item => item.Name == TeamLoadoutRules.NoItem || !usedItems.Contains(item.Name))
                 .ToList();
-            string item = EnemyTeamProvider.PickProItem(moves, availableItems, usedItems);
+            string item = EnemyTeamProvider.PickProItem(
+                moves, availableItems, usedItems, skillAdjustment);
             if (item != TeamLoadoutRules.NoItem)
             {
                 usedItems.Add(item);

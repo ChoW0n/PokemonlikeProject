@@ -733,6 +733,27 @@ public static class PokemonDatabase
         All[292].SpeciesNote = "설정상 '빈 껍질'이라 체력이 항상 1로 고정됩니다. 특성 '불가사의부적' 덕분에 효과가 굉장한 기술이 아니면 맞지 않아요.";
         All[360].SpeciesNote = "되받아치기 콘셉트라 카운터/미러코트 계열 기술 위주로 구성되어 있습니다.";
 
+        BackfillImplementedLearnableMoves();
         PokemonHeightCatalog.Apply(All);
+    }
+
+    private static readonly string[] BackfillableImplementedMoveKeys =
+    {
+        "counter", "mirror-coat", "kings-shield", "spiky-shield", "sticky-web", "switcheroo"
+    };
+
+    private static void BackfillImplementedLearnableMoves()
+    {
+        foreach (var data in All.Values)
+        {
+            var missingImplementedMoves = BackfillableImplementedMoveKeys
+                .Where(moveKey => data.LearnableMoveNames.Contains(moveKey, StringComparer.Ordinal)
+                    && !data.MoveNames.Contains(moveKey, StringComparer.Ordinal));
+
+            data.MoveNames = data.MoveNames
+                .Concat(missingImplementedMoves)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+        }
     }
 }

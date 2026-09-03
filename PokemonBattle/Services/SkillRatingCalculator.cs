@@ -67,7 +67,7 @@ public static class SkillRatingCalculator
 
     public static int CalculateDifficultyAdjustment(double rating)
     {
-        int adjustment = (int)Math.Floor((rating - DefaultRating) / 100);
+        int adjustment = (int)Math.Floor((rating - DefaultRating) / 50);
         return Math.Clamp(
             adjustment,
             MinimumDifficultyAdjustment,
