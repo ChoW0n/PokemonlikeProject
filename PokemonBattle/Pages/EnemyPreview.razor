@@ -166,7 +166,14 @@
                 ? State.CurrentRiskCovenant?.EnemyLevelBonus ?? 0
                 : 0));
 
-        var team = EnemyTeamProvider.GetRandomTeam(teamSize, poolSize, firstStageOnly, unlocked, State.LegendaryUnlocked);
+        var team = EnemyTeamProvider.GetRandomTeam(
+            teamSize,
+            poolSize,
+            firstStageOnly,
+            unlocked,
+            State.LegendaryUnlocked,
+            State.CurrentRunLevel,
+            State.CurrentRunDifficultyAdjustment);
 
         var usedItems = new HashSet<string>(StringComparer.Ordinal);
         EnemyLoadouts = team.Select(e =>

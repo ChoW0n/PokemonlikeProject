@@ -3377,6 +3377,8 @@ p { line-height: 1.72; }
 .fighter-sprite {
     width: clamp(190px, 22vw, 320px);
     height: clamp(190px, 22vw, 320px);
+    position: relative;
+    top: var(--species-ground-offset, 0px);
     object-fit: contain;
     scale: var(--species-scale, 1);
     transform-origin: bottom center;

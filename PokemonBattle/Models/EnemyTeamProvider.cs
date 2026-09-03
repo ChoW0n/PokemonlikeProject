@@ -86,7 +86,9 @@ public static class EnemyTeamProvider
         int poolSize,
         bool firstStageOnly,
         HashSet<int> excludeIds,
-        bool legendaryUnlocked = false)
+        bool legendaryUnlocked = false,
+        int round = 1,
+        int skillAdjustment = 0)
     {
         var candidates = PokemonDatabase.All
             .Where(p => p.Key <= poolSize)
@@ -104,50 +106,73 @@ public static class EnemyTeamProvider
         {
             pool = PokemonDatabase.All
                 .Where(p => p.Key <= poolSize)
+                .Where(p => !excludeIds.Contains(p.Key))
                 .Where(p => legendaryUnlocked || !LegendaryIds.Contains(p.Key))
                 .ToList();
             if (firstStageOnly) pool = pool.Where(p => FirstStageIds.Contains(p.Key)).ToList();
         }
 
-        if (!legendaryUnlocked)
-        {
-            return pool.OrderBy(_ => rng.Next()).Take(count).ToList();
-        }
+        if (pool.Count == 0 || count <= 0) return new();
 
-        var legendaryPool = pool
-            .Where(entry => LegendaryIds.Contains(entry.Key))
-            .ToList();
-        var nonLegendaryPool = pool
-            .Where(entry => !LegendaryIds.Contains(entry.Key))
-            .ToList();
-        var team = nonLegendaryPool
-            .OrderBy(_ => rng.Next())
-            .Take(count)
-            .ToList();
+        //라운드와 레이팅이 낮을 때는 거의 균등하게 뽑아 약한 종도 계속 등장하게 한다.
+        //진행할수록 종족값 상위 후보의 가중치가 커지지만, 최고 후보만 고정하지는 않는다.
+        int minBaseStatTotal = pool.Min(entry => GetBaseStatTotal(entry.Value));
+        int maxBaseStatTotal = pool.Max(entry => GetBaseStatTotal(entry.Value));
+        var remaining = pool.ToList();
+        var team = new List<KeyValuePair<int, PokemonData>>(Math.Min(count, pool.Count));
+        bool legendaryAlreadyChosen = false;
 
-        if (legendaryPool.Count > 0)
+        while (team.Count < count && remaining.Count > 0)
         {
-            if (team.Count < count)
-            {
-                //비전설 후보가 부족할 때만 빈자리를 전설 1마리로 채운다.
-                team.Add(legendaryPool[rng.Next(legendaryPool.Count)]);
-            }
-            else
-            {
-                //기존의 전체 후보 무작위 선택과 비슷한 등장 기회를 유지하되,
-                //전설 후보는 한 팀에서 최대 1마리만 허용한다.
-                double legendaryChance = Math.Min(
-                    1.0,
-                    count * legendaryPool.Count / (double)pool.Count);
-                if (rng.NextDouble() < legendaryChance)
-                {
-                    team[rng.Next(team.Count)] =
-                        legendaryPool[rng.Next(legendaryPool.Count)];
-                }
-            }
+            var eligible = legendaryUnlocked && legendaryAlreadyChosen
+                ? remaining.Where(entry => !LegendaryIds.Contains(entry.Key)).ToList()
+                : remaining;
+            if (eligible.Count == 0) break;
+
+            var chosen = WeightedPick(
+                eligible,
+                entry => GetSpeciesSelectionWeight(
+                    entry.Value,
+                    minBaseStatTotal,
+                    maxBaseStatTotal,
+                    round,
+                    skillAdjustment));
+            team.Add(chosen);
+            remaining.Remove(chosen);
+            legendaryAlreadyChosen |= LegendaryIds.Contains(chosen.Key);
         }
 
         return team.OrderBy(_ => rng.Next()).ToList();
+    }
+
+    public static int GetBaseStatTotal(PokemonData data) =>
+        data.BaseHp + data.BaseAtk + data.BaseDef
+        + data.BaseSpAtk + data.BaseSpDef + data.BaseSpd;
+
+    public static double GetSpeciesSelectionWeight(
+        PokemonData data,
+        int poolMinimumBaseStatTotal,
+        int poolMaximumBaseStatTotal,
+        int round = 1,
+        int skillAdjustment = 0)
+    {
+        double normalized = poolMaximumBaseStatTotal <= poolMinimumBaseStatTotal
+            ? 0.5
+            : Math.Clamp(
+                (GetBaseStatTotal(data) - poolMinimumBaseStatTotal)
+                    / (double)(poolMaximumBaseStatTotal - poolMinimumBaseStatTotal),
+                0,
+                1);
+
+        int safeRound = Math.Max(1, round);
+        double roundPressure = Math.Clamp((safeRound - 1) / 12.0, 0, 1);
+        double ratingPressure = Math.Clamp(skillAdjustment / 5.0, -0.35, 1);
+        double pressure = Math.Clamp(
+            0.25 + roundPressure * 0.8 + ratingPressure * 0.45,
+            0.2,
+            1.7);
+
+        return 1 + Math.Pow(normalized, 1.7) * pressure;
     }
 
     //프로급 기술 선택: 자속(STAB) 우선 + 서로 다른 속성으로 커버리지 확보 + 변화기 최소 1개 포함

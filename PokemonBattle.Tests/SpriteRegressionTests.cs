@@ -52,6 +52,14 @@ public class SpriteRegressionTests
     }
 
     [Fact]
+    public void Community_sprites_get_only_their_species_specific_grounding_offset()
+    {
+        Assert.Equal(12, PokemonSpriteScale.GroundOffsetFor("braviary"));
+        Assert.Equal(9, PokemonSpriteScale.GroundOffsetFor("trevenant"));
+        Assert.Equal(0, PokemonSpriteScale.GroundOffsetFor("pikachu"));
+    }
+
+    [Fact]
     public void Items_without_an_official_sprite_do_not_render_broken_image_urls()
     {
         Assert.Null(ItemDatabase.GeneralItems.Single(item => item.Name == "은밀망토").IconUrl);

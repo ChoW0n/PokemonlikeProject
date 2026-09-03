@@ -59,6 +59,16 @@ public static class PokemonSpriteScale
     public const double MinimumScale = 0.72;
     public const double MaximumScale = 1.35;
 
+    //일부 커뮤니티 애니메이션은 이미지 캔버스의 발 위치가 공식 스프라이트보다 위에 있다.
+    //전체 종에 일괄 보정하지 않고, 실제 오버라이드 종만 지면 쪽으로 조금 내린다.
+    private static readonly IReadOnlyDictionary<string, double> GroundOffsetPixels =
+        new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["braviary"] = 12,
+            ["trevenant"] = 9,
+            ["heliolisk"] = 8
+        };
+
     public static double ForHeight(int heightDecimeters)
     {
         if (heightDecimeters <= 0) return 1;
@@ -67,4 +77,7 @@ public static class PokemonSpriteScale
         double rawScale = Math.Sqrt(heightDecimeters / ReferenceHeightDecimeters);
         return Math.Clamp(rawScale, MinimumScale, MaximumScale);
     }
+
+    public static double GroundOffsetFor(string englishName) =>
+        GroundOffsetPixels.TryGetValue(englishName, out double offset) ? offset : 0;
 }
