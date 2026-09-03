@@ -618,6 +618,31 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public void UnlockedLegendaryTeamsContainAtMostOneLegendary()
+    {
+        var excluded = new HashSet<int>();
+
+        foreach (int teamSize in new[] { 5, 6 })
+        {
+            for (int attempt = 0; attempt < 200; attempt++)
+            {
+                var team = EnemyTeamProvider.GetRandomTeam(
+                    teamSize,
+                    721,
+                    firstStageOnly: false,
+                    excluded,
+                    legendaryUnlocked: true);
+
+                Assert.Equal(teamSize, team.Count);
+                Assert.InRange(
+                    team.Count(entry => EnemyTeamProvider.IsLegendary(entry.Key)),
+                    0,
+                    1);
+            }
+        }
+    }
+
+    [Fact]
     public async Task RunStorePersistsLegendaryProgressAcrossFreshDbContext()
     {
         await WithTemporarySchema(async schema =>

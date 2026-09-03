@@ -109,7 +109,45 @@ public static class EnemyTeamProvider
             if (firstStageOnly) pool = pool.Where(p => FirstStageIds.Contains(p.Key)).ToList();
         }
 
-        return pool.OrderBy(_ => rng.Next()).Take(count).ToList();
+        if (!legendaryUnlocked)
+        {
+            return pool.OrderBy(_ => rng.Next()).Take(count).ToList();
+        }
+
+        var legendaryPool = pool
+            .Where(entry => LegendaryIds.Contains(entry.Key))
+            .ToList();
+        var nonLegendaryPool = pool
+            .Where(entry => !LegendaryIds.Contains(entry.Key))
+            .ToList();
+        var team = nonLegendaryPool
+            .OrderBy(_ => rng.Next())
+            .Take(count)
+            .ToList();
+
+        if (legendaryPool.Count > 0)
+        {
+            if (team.Count < count)
+            {
+                //비전설 후보가 부족할 때만 빈자리를 전설 1마리로 채운다.
+                team.Add(legendaryPool[rng.Next(legendaryPool.Count)]);
+            }
+            else
+            {
+                //기존의 전체 후보 무작위 선택과 비슷한 등장 기회를 유지하되,
+                //전설 후보는 한 팀에서 최대 1마리만 허용한다.
+                double legendaryChance = Math.Min(
+                    1.0,
+                    count * legendaryPool.Count / (double)pool.Count);
+                if (rng.NextDouble() < legendaryChance)
+                {
+                    team[rng.Next(team.Count)] =
+                        legendaryPool[rng.Next(legendaryPool.Count)];
+                }
+            }
+        }
+
+        return team.OrderBy(_ => rng.Next()).ToList();
     }
 
     //프로급 기술 선택: 자속(STAB) 우선 + 서로 다른 속성으로 커버리지 확보 + 변화기 최소 1개 포함
