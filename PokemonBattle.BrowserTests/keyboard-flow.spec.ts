@@ -70,11 +70,18 @@ async function configureInitialStarters(page: Page) {
 
   const confirm = page.getByRole("button", { name: "이 3마리로 시작하기" });
   await expect(confirm).toBeEnabled();
-  await confirm.click({ force: true });
-  await page.waitForTimeout(300);
-  if (page.url().endsWith("/starter")) {
-    await confirm.click({ force: true });
-  }
+  await confirm.click();
+  await expect
+    .poll(
+      async () => {
+        if (page.url().endsWith("/preview")) return "preview";
+        const error = page.getByRole("alert", { name: "저장 중 문제가 발생했습니다. 다시 시도해주세요" });
+        if (await error.count()) return `error:${await error.innerText()}`;
+        return page.url();
+      },
+      { timeout: 15_000 },
+    )
+    .toBe("preview");
 }
 
 async function waitForBattleReadyOrResult(page: Page) {
@@ -139,6 +146,7 @@ test("completes the game flow with keyboard controls at mobile and desktop width
 
   const start = page.getByRole("button", { name: "시작하기" });
   await pressEnter(page, start);
+  await expect(page).toHaveURL(/\/(starter|preview)$/);
   if (page.url().endsWith("/starter")) {
     await expect(page.getByRole("heading", { name: "스타터 선택" })).toBeVisible();
     await configureInitialStarters(page);

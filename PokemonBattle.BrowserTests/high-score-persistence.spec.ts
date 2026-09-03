@@ -6,12 +6,6 @@ const starterMoves = [
   { pokemon: /꼬부기, 도감 번호 7/, move: /웨이브태클/ },
 ];
 
-const passiveStarterMoves = [
-  { pokemon: /이상해씨, 도감 번호 1/, move: /울음소리/, previousMove: /솔라빔/ },
-  { pokemon: /파이리, 도감 번호 4/, move: /울음소리/, previousMove: /플레어드라이브/ },
-  { pokemon: /꼬부기, 도감 번호 7/, move: /꼬리흔들기/, previousMove: /웨이브태클/ },
-];
-
 async function fillLogin(page: Page, username: string, password: string) {
   await page.goto("/login");
   await page.waitForTimeout(300);
@@ -60,6 +54,8 @@ async function configureStarter(
 }
 
 async function enterBattle(page: Page) {
+  await expect(page).toHaveURL(/\/(starter|preview)$/);
+
   if (page.url().endsWith("/starter")) {
     for (const starter of starterMoves) {
       const card = page.getByRole("button", { name: starter.pokemon });
@@ -69,11 +65,18 @@ async function enterBattle(page: Page) {
 
     const confirm = page.getByRole("button", { name: "이 3마리로 시작하기" });
     await expect(confirm).toBeEnabled();
-    await confirm.click({ force: true });
-    await page.waitForTimeout(300);
-    if (page.url().endsWith("/starter")) {
-      await confirm.click({ force: true });
-    }
+    await confirm.click();
+    await expect
+      .poll(
+        async () => {
+          if (page.url().endsWith("/preview")) return "preview";
+          const error = page.getByRole("alert", { name: "저장 중 문제가 발생했습니다. 다시 시도해주세요" });
+          if (await error.count()) return `error:${await error.innerText()}`;
+          return page.url();
+        },
+        { timeout: 15_000 },
+      )
+      .toBe("preview");
   }
 
   await expect(page).toHaveURL(/\/preview$/);
@@ -100,7 +103,7 @@ async function waitForBattleState(page: Page): Promise<"result" | "attack" | "sw
     if (await page.locator("button.action-attack:not(:disabled)").count()) return "attack";
     if (
       (await page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" }).count()) &&
-      (await page.locator(".move-button:not(:disabled)").count())
+      (await page.locator("button.team-choice-button:not(:disabled)").count())
     ) {
       return "switch";
     }
@@ -112,27 +115,67 @@ async function waitForBattleState(page: Page): Promise<"result" | "attack" | "sw
 
 async function playBattle(page: Page) {
   const speedToggle = page.getByRole("button", { name: "배틀 메시지 재생 속도 변경" });
-  await speedToggle.click();
-  await speedToggle.click();
-  await expect(speedToggle).toContainText("x2.4");
+  await page.waitForTimeout(1_000);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    if ((await speedToggle.innerText()).includes("x5")) break;
+    await speedToggle.click();
+    await page.waitForTimeout(500);
+  }
+  await expect(speedToggle).toContainText("x5");
 
   for (let turn = 0; turn < 60; turn += 1) {
     const state = await waitForBattleState(page);
     if (state === "result") return;
 
     if (state === "switch") {
-      await page.locator(".move-button:not(:disabled)").first().click({ force: true });
-      await expect(page.locator(".battle-log-panel .log-text").last()).toHaveAttribute(
-        "data-full",
-        "행동을 선택하세요.",
-        { timeout: 10_000 },
-      );
+      const availableMember = page.locator("button.team-choice-button:not(:disabled)").first();
+      await expect(availableMember).toBeEnabled();
+      await availableMember.scrollIntoViewIfNeeded();
+      await availableMember.click();
+      await expect
+        .poll(
+          async () => {
+            if (await page.locator("main.result-page").count()) return "result";
+            if (
+              !(await page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" }).count()) &&
+              (await page.locator("button.action-attack:not(:disabled)").count())
+            ) {
+              return "attack";
+            }
+            return "waiting";
+          },
+          { timeout: 45_000 },
+        )
+        .toMatch(/^(result|attack)$/);
       continue;
     }
 
     await page.locator("button.action-attack:not(:disabled)").click({ force: true });
+    await expect
+      .poll(
+        async () => {
+          if (await page.locator("main.result-page").count()) return "result";
+          if (
+            (await page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" }).count()) &&
+            (await page.locator("button.team-choice-button:not(:disabled)").count())
+          ) {
+            return "switch";
+          }
+          if (await page.locator(".move-name-button:not(:disabled)").count()) return "move";
+          return "waiting";
+        },
+        { timeout: 45_000 },
+      )
+      .toMatch(/^(result|switch|move)$/);
+    if (await page.locator("main.result-page").count()) return;
+    if (
+      (await page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" }).count()) &&
+      (await page.locator("button.team-choice-button:not(:disabled)").count())
+    ) {
+      continue;
+    }
+
     const move = page.locator(".move-name-button:not(:disabled)").first();
-    await expect(move).toBeEnabled();
     await move.click({ force: true });
     await page.locator(".move-confirm:not(:disabled)").click({ force: true });
   }
@@ -179,28 +222,13 @@ test("persists a personal high score after signing in to a fresh browser session
   }
   expect(wonSetupRound).toBe(true);
 
-  await page.getByRole("button", { name: "다음 상대와 계속하기" }).click();
-  await expect(page).toHaveURL(/\/preview$/);
-  await page.getByRole("button", { name: /이 상대 팀.*과 배틀 준비하기/ }).click();
-  await expect(page).toHaveURL(/\/continue$/);
-  await page.getByRole("button", { name: /포켓몬 변경/ }).click();
-  await expect(page).toHaveURL(/\/select$/);
-  for (const starter of passiveStarterMoves) {
-    await configureStarter(
-      page,
-      starter.pokemon,
-      starter.move,
-      starter.previousMove,
-    );
-  }
-  await page.getByRole("button", { name: "이 팀으로 배틀 시작" }).click();
-  await expect(page).toHaveURL(/\/battle$/);
-  await playBattle(page);
-
   const highScore = await readHighScore(page);
   expect(highScore).toBeGreaterThan(0);
 
-  await page.getByRole("button", { name: "처음부터 다시 시작" }).click();
+  await page.locator("details.result-secondary-actions > summary").click();
+  await page.getByRole("button", { name: "새 런 시작" }).click();
+  await expect(page).toHaveURL(/\/starter$/);
+  await page.getByRole("button", { name: "취소" }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.locator("main.start-page")).toContainText(new RegExp(`최고 기록\\s*${highScore}`));
 

@@ -623,6 +623,8 @@ public class GameState
         LegendaryProgressPercent = LegendaryProgression.AddProgress(progressBefore, progressReward);
         LastLegendaryProgressReward = LegendaryProgressPercent - progressBefore;
         CurrentScore++;
+        HighScore = Math.Max(HighScore, CurrentScore);
+        _scoreStore.SaveIfHigher(CurrentScore);
         LastBattleWon = true;
         EvolutionMessages = new List<string>();
         PrepareVictoryRewards();
