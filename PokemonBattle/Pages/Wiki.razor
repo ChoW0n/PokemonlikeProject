@@ -12,12 +12,12 @@
     <header class="page-header wiki-header">
         <p class="eyebrow">POKÉMON BATTLE / FIELD GUIDE</p>
         <h1 id="wiki-title">게임 위키</h1>
-        <p class="intro">런을 더 깊게 운영하기 위해 알아두면 좋은 고유 시스템을 한곳에 모았습니다.</p>
+        <p class="intro">모험을 더 깊게 즐기기 위해 알아두면 좋은 고유 시스템을 한곳에 모았습니다.</p>
     </header>
 
     <nav class="wiki-nav" aria-label="위키 목차">
         <a href="/wiki#rewards" data-enhance-nav="false" @onclick="ScrollToRewards">보상 시스템</a>
-        <a href="/wiki#run-systems" data-enhance-nav="false" @onclick="ScrollToRunSystems">런 시스템</a>
+        <a href="/wiki#run-systems" data-enhance-nav="false" @onclick="ScrollToRunSystems">모험 시스템</a>
         <a href="/wiki#progression" data-enhance-nav="false" @onclick="ScrollToProgression">성장과 진행</a>
     </nav>
 
@@ -50,14 +50,14 @@
 
     <section id="run-systems" class="wiki-section" aria-labelledby="run-systems-title">
         <div class="section-heading">
-            <p class="eyebrow">RUN SYSTEMS</p>
-            <h2 id="run-systems-title">런을 바꾸는 선택</h2>
+            <p class="eyebrow">ADVENTURE SYSTEMS</p>
+            <h2 id="run-systems-title">모험을 바꾸는 선택</h2>
         </div>
 
         <article class="wiki-card">
-            <p class="wiki-card-kicker">PERMANENT RUN BOOSTS</p>
+            <p class="wiki-card-kicker">PERMANENT ADVENTURE BOOSTS</p>
             <h3>관록의 유산</h3>
-            <p>승리할 때마다 3개의 후보 중 하나를 고르는 런 전체 강화입니다. 한 번 선택한 유산은 해당 런 동안 계속 적용됩니다.</p>
+            <p>승리할 때마다 3개의 후보 중 하나를 골라, 해당 모험 전체에 적용하는 강화입니다. 한 번 선택한 유산은 해당 모험 동안 계속 적용됩니다.</p>
             <div class="wiki-entry-grid">
                 @foreach (var legacy in RunMetaCatalog.Legacies)
                 {
@@ -118,13 +118,13 @@
             <article class="wiki-card wiki-entry">
                 <p class="wiki-card-kicker">SKILL-BASED DIFFICULTY</p>
                 <h3>실력 기반 난이도 자동 조절</h3>
-                <p>런이 끝날 때마다 클리어 라운드 수, 평균 남은 HP 비율, 턴 효율을 바탕으로 계정별 실력 평점이 갱신됩니다. 다음 런의 상대 레벨과 팀 구성 난이도에 반영됩니다.</p>
+                <p>모험이 끝날 때마다 클리어 라운드 수, 평균 남은 HP 비율, 턴 효율을 바탕으로 계정별 실력 평점이 갱신됩니다. 다음 모험의 상대 레벨과 팀 구성 난이도에 반영됩니다.</p>
             </article>
 
             <article class="wiki-card wiki-entry">
                 <p class="wiki-card-kicker">POKÉMON MASTERY</p>
                 <h3>포켓몬 숙련도</h3>
-                <p>같은 포켓몬을 팀에 꾸준히 기용해 승리에 기여시키면 계정에 영구 숙련도가 쌓입니다. 런이 끝나거나 패배해도 초기화되지 않는 계정 단위 성장입니다.</p>
+                <p>같은 포켓몬을 팀에 꾸준히 기용해 승리에 기여시키면 계정에 영구 숙련도가 쌓입니다. 모험이 끝나거나 패배해도 초기화되지 않는 계정 단위 성장입니다.</p>
                 <ul class="wiki-list">
                     <li>그 포켓몬이 팀에 있는 상태로 라운드에서 승리할 때마다 승리 기여 1회가 기록됩니다.</li>
                     <li>5회, 15회, 30회 달성 시 각각 전 종족 스탯에 +1%, +2%, +3%의 영구 보너스를 받습니다.</li>
@@ -135,13 +135,13 @@
             <article class="wiki-card wiki-entry">
                 <p class="wiki-card-kicker">CAPTURE REWARD</p>
                 <h3>포획 후보</h3>
-                <p>승리하면 방금 쓰러뜨린 상대 팀에서 1마리를 데려갈 수 있습니다. 이미 해금한 포켓몬은 이번 런 팀에 있을 때만 레벨이 오르고, 팀에 없으면 추가 효과가 없습니다. 미해금 포켓몬은 새로 해금됩니다.</p>
+                <p>승리하면 방금 쓰러뜨린 상대 팀에서 1마리를 데려갈 수 있습니다. 이미 해금한 포켓몬은 이번 모험 팀에 있을 때만 레벨이 오르고, 팀에 없으면 추가 효과가 없습니다. 미해금 포켓몬은 새로 해금됩니다.</p>
             </article>
 
             <article class="wiki-card wiki-entry">
                 <p class="wiki-card-kicker">POKÉDEX / COLLECTION</p>
                 <h3>도감과 보유 포켓몬</h3>
-                <p>한 번 해금한 포켓몬은 계정에 영구 보관됩니다. 런이 패배로 끝나도 해금 기록은 사라지지 않으며, 도감에서 다시 확인할 수 있습니다.</p>
+                <p>한 번 해금한 포켓몬은 계정에 영구 보관됩니다. 모험이 패배로 끝나도 해금 기록은 사라지지 않으며, 도감에서 다시 확인할 수 있습니다.</p>
             </article>
 
             <article class="wiki-card wiki-entry">

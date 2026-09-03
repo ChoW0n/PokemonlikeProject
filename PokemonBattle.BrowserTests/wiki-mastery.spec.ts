@@ -277,7 +277,7 @@ test("로그인된 사용자의 컬렉션에 숙련도와 다음 단계 안내�
   await winRound(page, true);
 
   await page.locator("details.result-secondary-actions summary").click();
-  await page.getByRole("button", { name: "새 런 시작" }).click();
+  await page.getByRole("button", { name: "새 모험 시작" }).click();
   await expect(page).toHaveURL(/\/starter$/);
   await page.getByRole("button", { name: "취소" }).click();
   await expect(page).toHaveURL(/\/$/);

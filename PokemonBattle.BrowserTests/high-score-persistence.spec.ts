@@ -226,7 +226,7 @@ test("persists a personal high score after signing in to a fresh browser session
   expect(highScore).toBeGreaterThan(0);
 
   await page.locator("details.result-secondary-actions > summary").click();
-  await page.getByRole("button", { name: "새 런 시작" }).click();
+  await page.getByRole("button", { name: "새 모험 시작" }).click();
   await expect(page).toHaveURL(/\/starter$/);
   await page.getByRole("button", { name: "취소" }).click();
   await expect(page).toHaveURL(/\/$/);
