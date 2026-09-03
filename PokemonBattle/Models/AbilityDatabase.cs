@@ -117,7 +117,7 @@ public static partial class AbilityDatabase
         All["모래날림"] = new AbilityInfo("모래날림", "배틀에서 모래바람을 일으킨다.");
         All["재생력"] = new AbilityInfo("재생력", "볼에 넣으면 HP가 조금 회복된다.");
         All["곡예"] = new AbilityInfo("곡예", "도구가 없어지면 스피드가 올라간다.");
-        All["바람타기"] = new AbilityInfo("바람타기", "");
+        All["바람타기"] = new AbilityInfo("바람타기", "바람 기술을 받으면 데미지를 받지 않고 공격이 올라간다.");
         All["잔비"] = new AbilityInfo("잔비", "배틀에 나가면 비를 내린다.");
         All["포이즌힐"] = new AbilityInfo("포이즌힐", "독 상태가 되면 HP를 회복한다.");
         All["게으름"] = new AbilityInfo("게으름", "연속으로 공격할 수 없다.");
@@ -149,7 +149,7 @@ public static partial class AbilityDatabase
         All["눈퍼뜨리기"] = new AbilityInfo("눈퍼뜨리기", "배틀에 나가면 싸라기눈을 내리게 한다.");
         All["나쁜손버릇"] = new AbilityInfo("나쁜손버릇", "닿은 상대로부터 도구를 훔친다.");
         All["전기엔진"] = new AbilityInfo("전기엔진", "전기를 받으면 스피드가 올라간다.");
-        All["예리함"] = new AbilityInfo("예리함", "");
+        All["예리함"] = new AbilityInfo("예리함", "예리함을 활용하는 기술의 위력이 올라간다.");
         All["슬로스타트"] = new AbilityInfo("슬로스타트", "공격과 스피드가 잠시 동안 절반이 된다.");
         All["나이트메어"] = new AbilityInfo("나이트메어", "잠들어 있는 상대의 HP를 줄인다.");
         All["멀티타입"] = new AbilityInfo("멀티타입", "지니고 있는 플레이트에 따라 타입이 바뀐다.");

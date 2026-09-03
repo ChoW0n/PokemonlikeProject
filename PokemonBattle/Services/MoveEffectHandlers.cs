@@ -102,7 +102,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         var attacker = context.Attacker;
         var defender = context.Defender;
         bool suppressSecondaryEffects = attacker.HasActiveAbility("우격다짐", defender)
-            || (defender.HasActiveHeldItem(attacker) && defender.HeldItem == "방호막")
+            || (defender.HasActiveHeldItem(attacker) && defender.HeldItem == "은밀망토")
             || (!move.IsStatus && defender.HasActiveAbility("인분", attacker))
             || defender.LastHitBlockedBySubstitute;
         int chanceMultiplier = attacker.HasActiveAbility("하늘의은총", defender) ? 2 : 1;

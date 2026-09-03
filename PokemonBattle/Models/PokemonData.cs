@@ -18,6 +18,7 @@ public class PokemonData
     public string[] LearnableMoveNames;
     // 모든 세대의 PokeAPI 습득 방법이 machine뿐인, 현재 구현된 기술 목록.
     public string[] MachineOnlyMoveNames;
+    public string? SpeciesNote;
     public string[] AbilityNames;
     public string ImageUrl;
     public string BackImageUrl;
@@ -26,7 +27,7 @@ public class PokemonData
     public int HeightDecimeters { get; internal set; } = 10;
     public double HeightMeters => HeightDecimeters / 10.0;
 
-    public PokemonData(string name, string englishName, PokemonType type1, PokemonType? type2, int hp, int atk, int def, int spAtk, int spDef, int spd, string[] moveNames, string[] abilityNames, string imageUrl, string backImageUrl, int? evolvesToId, int evolveLevel, string[]? learnableMoveNames = null, string[]? machineOnlyMoveNames = null)
+    public PokemonData(string name, string englishName, PokemonType type1, PokemonType? type2, int hp, int atk, int def, int spAtk, int spDef, int spd, string[] moveNames, string[] abilityNames, string imageUrl, string backImageUrl, int? evolvesToId, int evolveLevel, string[]? learnableMoveNames = null, string[]? machineOnlyMoveNames = null, string? speciesNote = null)
     {
         Name = name;
         EnglishName = englishName;
@@ -41,6 +42,7 @@ public class PokemonData
         MoveNames = moveNames;
         LearnableMoveNames = learnableMoveNames ?? moveNames;
         MachineOnlyMoveNames = machineOnlyMoveNames ?? Array.Empty<string>();
+        SpeciesNote = speciesNote;
         AbilityNames = abilityNames;
         ImageUrl = imageUrl;
         BackImageUrl = backImageUrl;

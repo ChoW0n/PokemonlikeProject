@@ -115,9 +115,14 @@ async function issueKeyboardBattleCommand(page: Page) {
   const forcedSwitch = page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" });
   const availableMember = page.locator(".move-button:not(:disabled)").first();
   if ((await forcedSwitch.count()) && (await forcedSwitch.isVisible()) && (await availableMember.count())) {
-    await availableMember.focus();
-    await page.keyboard.press("Enter");
-    return;
+    try {
+      await availableMember.focus({ timeout: 3_000 });
+      await page.keyboard.press("Enter");
+      return;
+    } catch {
+      // The battle can finish its forced-switch render between the state check and focus.
+      // Re-evaluate the current menu instead of waiting on a detached locator.
+    }
   }
 
   const attack = page.getByRole("button", { name: /공격/ });
@@ -221,7 +226,7 @@ test("completes the game flow with keyboard controls at mobile and desktop width
   } else {
     await expect(restart).toHaveCount(1);
     await pressEnter(page, restart);
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/starter$/);
   }
   await assertNoHorizontalOverflow(page);
 });

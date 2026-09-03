@@ -100,7 +100,7 @@ async function enterBattle(page: Page) {
 async function waitForBattleState(page: Page): Promise<"result" | "attack" | "switch"> {
   for (let attempt = 0; attempt < 225; attempt += 1) {
     if (await page.locator("main.result-page").count()) return "result";
-    if (await page.locator("button.action-attack:not(:disabled)").count()) return "attack";
+    if (await page.locator(".action-selection-slot:not(.is-hidden) button.action-attack:not(:disabled)").count()) return "attack";
     if (
       (await page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" }).count()) &&
       (await page.locator("button.team-choice-button:not(:disabled)").count())
@@ -138,7 +138,7 @@ async function playBattle(page: Page) {
             if (await page.locator("main.result-page").count()) return "result";
             if (
               !(await page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" }).count()) &&
-              (await page.locator("button.action-attack:not(:disabled)").count())
+              (await page.locator(".action-selection-slot:not(.is-hidden) button.action-attack:not(:disabled)").count())
             ) {
               return "attack";
             }
@@ -150,23 +150,26 @@ async function playBattle(page: Page) {
       continue;
     }
 
-    await page.locator("button.action-attack:not(:disabled)").click({ force: true });
-    await expect
-      .poll(
-        async () => {
-          if (await page.locator("main.result-page").count()) return "result";
-          if (
-            (await page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" }).count()) &&
-            (await page.locator("button.team-choice-button:not(:disabled)").count())
-          ) {
-            return "switch";
-          }
-          if (await page.locator(".move-name-button:not(:disabled)").count()) return "move";
-          return "waiting";
-        },
-        { timeout: 45_000 },
-      )
-      .toMatch(/^(result|switch|move)$/);
+    await page.waitForTimeout(250);
+    await page.locator(".action-selection-slot:not(.is-hidden) button.action-attack:not(:disabled)").first().press("Enter");
+    let nextState: "result" | "switch" | "move" | "waiting" = "waiting";
+    for (let retry = 0; retry < 6 && nextState === "waiting"; retry += 1) {
+      if (retry > 0) {
+        const attack = page.locator(".action-selection-slot:not(.is-hidden) button.action-attack:not(:disabled)").first();
+        if (await attack.count()) {
+          await attack.press("Enter").catch(() => undefined);
+        }
+      }
+      nextState = await Promise.race([
+        page.locator("main.result-page").waitFor({ state: "attached", timeout: 10_000 }).then(() => "result" as const),
+        page
+          .getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" })
+          .waitFor({ state: "attached", timeout: 10_000 })
+          .then(() => "switch" as const),
+        page.locator(".move-name-grid").waitFor({ state: "attached", timeout: 10_000 }).then(() => "move" as const),
+      ]).catch(() => "waiting" as const);
+    }
+    expect(nextState).toMatch(/^(result|switch|move)$/);
     if (await page.locator("main.result-page").count()) return;
     if (
       (await page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" }).count()) &&
@@ -212,10 +215,11 @@ test("persists a personal high score after signing in to a fresh browser session
   for (let attempt = 0; attempt < 3 && !wonSetupRound; attempt += 1) {
     if (attempt > 0) {
       await page.getByRole("button", { name: "처음부터 다시 시작" }).click();
-      await expect(page).toHaveURL(/\/$/);
+      await expect(page).toHaveURL(/\/starter$/);
+    } else {
+      await page.getByRole("button", { name: "시작하기" }).click();
     }
 
-    await page.getByRole("button", { name: "시작하기" }).click();
     await enterBattle(page);
     await playBattle(page);
     wonSetupRound = await page.getByRole("heading", { name: "승리!" }).count() > 0;
@@ -226,7 +230,7 @@ test("persists a personal high score after signing in to a fresh browser session
   expect(highScore).toBeGreaterThan(0);
 
   await page.locator("details.result-secondary-actions > summary").click();
-  await page.getByRole("button", { name: "새 런 시작" }).click();
+  await page.getByRole("button", { name: "새 모험 시작" }).click();
   await expect(page).toHaveURL(/\/starter$/);
   await page.getByRole("button", { name: "취소" }).click();
   await expect(page).toHaveURL(/\/$/);

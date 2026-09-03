@@ -40,4 +40,21 @@ public class SpriteRegressionTests
             PokemonSpriteScale.ForHeight(PokemonDatabase.All[321].HeightDecimeters)
             > PokemonSpriteScale.ForHeight(PokemonDatabase.All[1].HeightDecimeters));
     }
+
+    [Fact]
+    public void Species_notes_explain_nonstandard_pokemon_stats_and_moves()
+    {
+        Assert.Contains("체력이 항상 1로 고정", PokemonDatabase.All[292].SpeciesNote);
+        Assert.Contains("모든 종족값이 48", PokemonDatabase.All[132].SpeciesNote);
+        Assert.Contains("하일덴파워 하나", PokemonDatabase.All[201].SpeciesNote);
+        Assert.Equal(PokemonDatabase.All[202].SpeciesNote, PokemonDatabase.All[360].SpeciesNote);
+        Assert.Contains("카운터/미러코트", PokemonDatabase.All[202].SpeciesNote);
+    }
+
+    [Fact]
+    public void Items_without_an_official_sprite_do_not_render_broken_image_urls()
+    {
+        Assert.Null(ItemDatabase.GeneralItems.Single(item => item.Name == "은밀망토").IconUrl);
+        Assert.Null(ItemDatabase.GeneralItems.Single(item => item.Name == "클리어참").IconUrl);
+    }
 }
