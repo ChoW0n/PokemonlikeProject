@@ -643,6 +643,37 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public void Enemy_species_selection_pressure_increases_with_round_and_skill()
+    {
+        var pool = PokemonDatabase.All
+            .Where(entry => entry.Key <= 300 && !EnemyTeamProvider.IsLegendary(entry.Key))
+            .Select(entry => entry.Value)
+            .ToList();
+        int minimum = pool.Min(EnemyTeamProvider.GetBaseStatTotal);
+        int maximum = pool.Max(EnemyTeamProvider.GetBaseStatTotal);
+        var early = pool
+            .OrderByDescending(data => EnemyTeamProvider.GetSpeciesSelectionWeight(data, minimum, maximum, 1, -3))
+            .First();
+        var late = pool
+            .OrderByDescending(data => EnemyTeamProvider.GetSpeciesSelectionWeight(data, minimum, maximum, 12, 5))
+            .First();
+
+        Assert.Equal(maximum, EnemyTeamProvider.GetBaseStatTotal(late));
+        Assert.Equal(maximum, EnemyTeamProvider.GetBaseStatTotal(early));
+        Assert.True(
+            EnemyTeamProvider.GetSpeciesSelectionWeight(late, minimum, maximum, 12, 5)
+            > EnemyTeamProvider.GetSpeciesSelectionWeight(late, minimum, maximum, 1, -3));
+        Assert.True(
+            EnemyTeamProvider.GetSpeciesSelectionWeight(
+                pool.OrderBy(EnemyTeamProvider.GetBaseStatTotal).First(),
+                minimum,
+                maximum,
+                12,
+                5)
+            < EnemyTeamProvider.GetSpeciesSelectionWeight(late, minimum, maximum, 12, 5));
+    }
+
+    [Fact]
     public async Task RunStorePersistsLegendaryProgressAcrossFreshDbContext()
     {
         await WithTemporarySchema(async schema =>
