@@ -5,6 +5,7 @@
 @inject UnlockService Unlocks
 @inject CurrentUserService CurrentUser
 @inject NavigationManager Nav
+@inject ILogger<StarterSelect> Logger
 
 <PageTitle>스타터 선택</PageTitle>
 
@@ -122,6 +123,11 @@
                 </div>
             }
 
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <p class="form-message is-error" role="alert" aria-live="assertive">@ErrorMessage</p>
+            }
+
             <p class="starter-hint" aria-live="polite">
                 @(SelectedIds.Count == 3
                     ? "선택이 완료되었습니다."
@@ -130,7 +136,8 @@
 
             <div class="starter-actions">
                 <button type="button" @onclick="GoHome">취소</button>
-                <button type="button" class="primary-action" disabled="@(SelectedIds.Count != 3 || IsSubmitting)" @onclick="ConfirmSelection">
+                <button type="button" class="primary-action" disabled="@(SelectedIds.Count != 3 || IsSubmitting)"
+                        @onclick:preventDefault="true" @onclick="() => ConfirmSelection()">
                     @(IsSubmitting ? "저장 중..." : "이 3마리로 시작하기")
                 </button>
             </div>
@@ -144,6 +151,7 @@
     private string SearchText = "";
     private string SelectedType = "all";
     private bool IsSubmitting;
+    private string ErrorMessage = "";
 
     private static readonly IReadOnlyList<(PokemonType Type, string Label)> PokemonTypes =
         new[]
@@ -215,35 +223,47 @@
     {
         if (IsSubmitting || SelectedIds.Count != 3) return;
 
-        var loadouts = SelectedIds
-            .Where(PokemonDatabase.All.ContainsKey)
-            .Select(id =>
-            {
-                var data = PokemonDatabase.All[id];
-                return new PokemonLoadout
-                {
-                    PokemonId = id,
-                    ChosenMoveNames = data.MoveNames
-                        .Where(MoveDatabase.All.ContainsKey)
-                        .Take(4)
-                        .ToList(),
-                    ChosenAbility = data.AbilityNames.FirstOrDefault() ?? "",
-                    ChosenItem = TeamLoadoutRules.NoItem,
-                    Level = State.CurrentRunLevel
-                };
-            })
-            .ToList();
-
-        if (loadouts.Count != 3) return;
-
         IsSubmitting = true;
+        ErrorMessage = "";
         try
         {
+            var loadouts = SelectedIds
+                .Where(PokemonDatabase.All.ContainsKey)
+                .Select(id =>
+                {
+                    var data = PokemonDatabase.All[id];
+                    return new PokemonLoadout
+                    {
+                        PokemonId = id,
+                        ChosenMoveNames = data.MoveNames
+                            .Where(MoveDatabase.All.ContainsKey)
+                            .Take(4)
+                            .ToList(),
+                        ChosenAbility = data.AbilityNames.FirstOrDefault() ?? "",
+                        ChosenItem = TeamLoadoutRules.NoItem,
+                        Level = State.CurrentRunLevel
+                    };
+                })
+                .ToList();
+
+            if (loadouts.Count != 3)
+            {
+                throw new InvalidOperationException("Starter selection did not produce exactly three loadouts.");
+            }
+
             await State.SetPlayerLoadouts(loadouts);
             State.GoTo(GameScreen.EnemyPreview);
             Nav.NavigateTo("/preview");
         }
-        catch
+        catch (Exception exception)
+        {
+            Logger.LogError(
+                exception,
+                "스타터 선택 저장에 실패했습니다. Username: {Username}",
+                CurrentUser.Username ?? "(unknown)");
+            ErrorMessage = "저장 중 문제가 발생했습니다. 다시 시도해주세요";
+        }
+        finally
         {
             IsSubmitting = false;
         }

@@ -85,7 +85,9 @@
             <div class="platform-shadow"
                  style="@SpriteStyle(Hero.Data)"
                  aria-hidden="true"></div>
-            <div class="hud-plate hud-hero" aria-label="@($"{Hero.Data.Name} 상태: HP {Hero.CurrentHp}/{Hero.MaxHp}{(StatusText(Hero) == "" ? "" : $", {StatusText(Hero)}")}")">
+            <div class="hud-plate hud-hero"
+                 aria-label="@($"{Hero.Data.Name} 상태: HP {Hero.CurrentHp}/{Hero.MaxHp}{(StatusText(Hero) == "" ? "" : $", {StatusText(Hero)}")}, 숙련도 보너스 +{HeroMasteryBonusPercent}%")"
+                 data-mastery-bonus-percent="@HeroMasteryBonusPercent">
                 <div class="hud-heading">
                     <span class="hud-name">@Hero.Data.Name</span>
                     <span class="hud-level">Lv.@Hero.Level</span>
@@ -350,6 +352,12 @@
 
     private Pokemon Hero => PlayerTeam[PlayerTeamIndex];
     private Pokemon Enemy => EnemyTeam[EnemyTeamIndex];
+    private int HeroMasteryBonusPercent =>
+        State.PlayerLoadouts.Count > PlayerTeamIndex
+            ? State.GetPokemonMasteryBonusPercent(State.PlayerLoadouts[PlayerTeamIndex].PokemonId)
+            : State.PlayerTeamIds.Count > PlayerTeamIndex
+                ? State.GetPokemonMasteryBonusPercent(State.PlayerTeamIds[PlayerTeamIndex])
+                : State.GetPokemonMasteryBonusPercent(State.SelectedPokemonId);
 
     private List<string> HeroMoveKeys = null!;
     private List<string> EnemyMoveKeys = null!;
