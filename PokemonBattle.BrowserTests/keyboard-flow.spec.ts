@@ -179,6 +179,22 @@ test("completes the game flow with keyboard controls at mobile and desktop width
     const startTeam = page.getByRole("button", { name: "이 팀으로 배틀 시작" });
     await expect(startTeam).toBeDisabled();
 
+    const revisitOpponents = page.getByRole("button", { name: "상대 팀 다시 보기" });
+    await expect(revisitOpponents).toBeVisible();
+    await pressEnter(page, revisitOpponents);
+
+    const revisitDialog = page.getByRole("dialog", { name: "직전 상대 팀" });
+    await expect(revisitDialog).toBeVisible();
+    await expect(revisitDialog.locator(".enemy-card")).not.toHaveCount(0);
+    const revisitOpponent = revisitDialog.locator(".enemy-card-toggle").first();
+    await expect(revisitOpponent).toHaveAttribute("aria-expanded", "false");
+    await pressEnter(page, revisitOpponent);
+    await expect(revisitOpponent).toHaveAttribute("aria-expanded", "true");
+    await expect(revisitDialog.locator(".enemy-detail")).toBeVisible();
+    await expect(revisitDialog).toContainText(/Lv\.\d+/);
+    await pressEnter(page, revisitDialog.getByRole("button", { name: "상대 팀 다시 보기 닫기" }));
+    await expect(revisitDialog).toBeHidden();
+
     for (const starterName of starterNames) {
       await configureStarter(page, starterName);
     }
