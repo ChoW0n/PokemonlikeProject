@@ -21,6 +21,19 @@
         </div>
 
         <div class="pokedex-screen">
+            @if (!IsLoading && State.EnemyLoadouts.Count > 0)
+            {
+                <div class="enemy-revisit-toolbar" aria-label="직전 상대 팀 다시 보기">
+                    <div>
+                        <strong>직전 상대 팀 확인</strong>
+                        <span>방금 확인한 상대의 구성과 전투 정보를 다시 열람할 수 있습니다.</span>
+                    </div>
+                    <button type="button" class="enemy-revisit-button" @onclick="OpenEnemyPreview">
+                        상대 팀 다시 보기
+                    </button>
+                </div>
+            }
+
             @if (IsLoading || !string.IsNullOrWhiteSpace(LoadMessage))
             {
                 <p class="form-message" role="status" aria-live="polite">
@@ -384,6 +397,34 @@
             </div>
         }
     </div>
+
+    @if (IsEnemyPreviewOpen)
+    {
+        <div class="enemy-revisit-modal"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="enemy-revisit-title"
+             @onclick="CloseEnemyPreview">
+            <section class="enemy-revisit-dialog" @onclick:stopPropagation>
+                <div class="enemy-revisit-dialog-heading">
+                    <div>
+                        <p class="eyebrow">OPPONENT SCOUT / LAST ROUND</p>
+                        <h2 id="enemy-revisit-title">직전 상대 팀</h2>
+                        <p>미리보기에서 확정된 포켓몬, 레벨, 타입과 상세 정보를 표시합니다.</p>
+                    </div>
+                    <button type="button"
+                            class="enemy-revisit-close"
+                            aria-label="상대 팀 다시 보기 닫기"
+                            @onclick="CloseEnemyPreview">닫기</button>
+                </div>
+                <EnemyTeamGrid Loadouts="State.EnemyLoadouts" AriaLabel="직전 상대 포켓몬 목록" />
+                <div class="enemy-revisit-dialog-footer">
+                    <span>현재 팀 구성은 그대로 유지됩니다.</span>
+                    <button type="button" class="enemy-revisit-button" @onclick="CloseEnemyPreview">팀 구성으로 돌아가기</button>
+                </div>
+            </section>
+        </div>
+    }
 </main>
 
 @code {
@@ -395,6 +436,7 @@
     private bool IsOperationBusy;
     private bool IsLoading;
     private string LoadMessage = "";
+    private bool IsEnemyPreviewOpen;
 
     private string ItemSearchText = "";
     private string PresetName = "";
@@ -417,6 +459,19 @@
     private int? PendingItemOwnerId;
 
     private bool CanStart => TeamLoadouts.Count is >= 1 and <= 6;
+
+    private void OpenEnemyPreview()
+    {
+        if (State.EnemyLoadouts.Count > 0)
+        {
+            IsEnemyPreviewOpen = true;
+        }
+    }
+
+    private void CloseEnemyPreview()
+    {
+        IsEnemyPreviewOpen = false;
+    }
 
     protected override async Task OnInitializedAsync()
     {
