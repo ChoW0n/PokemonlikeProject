@@ -231,7 +231,7 @@
                         bool isMachineOnly = IsMachineOnlyMove(picked, moveKey);
                         bool isMachineLocked = IsMachineOnlyMoveLocked(picked, moveKey);
                         <button type="button" class="dex-entry dex-entry-button move-tile @(DraftMoves.Contains(moveKey) ? "is-selected" : string.Empty) @(ViewingMoveKey == moveKey ? "is-viewing" : "") @(isMachineLocked ? "is-unavailable" : "")"
-                             aria-label="@($"{move.Name}, {(move.IsStatus ? "변화기" : "공격기")}{(DraftMoves.Contains(moveKey) ? ", 선택됨" : "")}{(isMachineLocked ? ", 기술머신 필요" : "")}")"
+                             aria-label="@($"{move.Name}, {(move.IsStatus ? "변화" : move.IsSpecial ? "특수" : "물리")}{(DraftMoves.Contains(moveKey) ? ", 선택됨" : "")}{(isMachineLocked ? ", 기술머신 필요" : "")}")"
                              aria-disabled="@(isMachineLocked ? "true" : "false")"
                              aria-pressed="@(DraftMoves.Contains(moveKey) ? "true" : "false")"
                              aria-expanded="@(ViewingMoveKey == moveKey ? "true" : "false")"
@@ -243,7 +243,7 @@
                             <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
                               <span class="dex-name">@move.Name @(move.Priority > 0 ? "· 우선" : "") @(IsTechnicalMachineMove(picked, moveKey) ? "· TM" : "") @(IsRunStolenMove(picked, moveKey) ? "· 강탈" : "")</span>
                               <span class="card-state @(DraftMoves.Contains(moveKey) ? "is-selected" : "")">@(isMachineLocked ? "기술머신 필요" : DraftMoves.Contains(moveKey) ? "선택됨" : ViewingMoveKey == moveKey ? "상세 확인 중" : "선택하기")</span>
-                             <span class="dex-type">@(isMachineOnly ? "TM 전용 · " : "")@(move.IsStatus ? "변화기" : "공격기")</span>
+                              <span class="dex-type">@(isMachineOnly ? "TM 전용 · " : "")@(move.IsStatus ? "변화" : move.IsSpecial ? "특수" : "물리")</span>
                         </button>
                     }
                 </div>

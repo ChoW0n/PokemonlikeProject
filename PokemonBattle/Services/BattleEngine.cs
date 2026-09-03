@@ -705,6 +705,26 @@ public sealed class BattleEngine
             attackerIsHero ? heroSide : enemySide,
             attackerIsHero ? enemySide : heroSide);
 
+        foreach (var handler in effectHandlers) await handler.BeforeMoveAsync(context);
+        if (context.MoveFailed)
+        {
+            await emit(BattleEvent.MoveStep(
+                BattleEventPhase.Impact,
+                attacker,
+                defender,
+                attackerIsHero,
+                move,
+                moveKey,
+                attackType,
+                "miss",
+                target: "opponent",
+                presentationKey: presentationKey,
+                hpBefore: defender.CurrentHp,
+                hpAfter: defender.CurrentHp,
+                statusResult: defender.Status.ToString()));
+            return;
+        }
+
         if (!isReflected && move.IsStatus && TargetsOpponent(move)
             && defender.HasActiveAbility("매직미러", attacker))
         {

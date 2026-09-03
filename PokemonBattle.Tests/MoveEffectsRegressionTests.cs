@@ -96,6 +96,56 @@ public sealed class MoveEffectsRegressionTests
     }
 
     [Fact]
+    public async Task Dream_eater_is_selectable_awake_but_only_damages_and_heals_against_sleep()
+    {
+        var attacker = CreatePokemon(96, "dream-eater");
+        var awakeDefender = CreatePokemon(202, "tackle");
+        attacker.CurrentHp = attacker.MaxHp - 20;
+        int awakeAttackerHp = attacker.CurrentHp;
+        int awakeDefenderHp = awakeDefender.CurrentHp;
+        var awakeEvents = new List<BattleEvent>();
+
+        Assert.True(attacker.CanUseMove("dream-eater"));
+        await CreateEngine().TakeTurnAsync(
+            attacker,
+            awakeDefender,
+            "dream-eater",
+            true,
+            Capture(awakeEvents));
+
+        Assert.Equal(awakeAttackerHp, attacker.CurrentHp);
+        Assert.Equal(awakeDefenderHp, awakeDefender.CurrentHp);
+        Assert.Contains(awakeEvents, battleEvent =>
+            battleEvent.Message?.Contains("실패했다", StringComparison.Ordinal) == true);
+
+        var sleepingAttacker = CreatePokemon(96, "dream-eater");
+        var sleepingDefender = CreatePokemon(202, "tackle");
+        sleepingAttacker.CurrentHp = sleepingAttacker.MaxHp - 20;
+        sleepingDefender.Status = StatusCondition.Sleep;
+        int sleepingAttackerHp = sleepingAttacker.CurrentHp;
+        int sleepingDefenderHp = sleepingDefender.CurrentHp;
+
+        await CreateEngine().TakeTurnAsync(
+            sleepingAttacker,
+            sleepingDefender,
+            "dream-eater",
+            true,
+            _ => Task.CompletedTask);
+
+        Assert.True(sleepingDefender.CurrentHp < sleepingDefenderHp);
+        Assert.True(sleepingAttacker.CurrentHp > sleepingAttackerHp);
+    }
+
+    [Fact]
+    public void Dig_is_a_charge_move()
+    {
+        Assert.True(MoveRuleMetadata.IsChargeMove("dig"));
+        Assert.Equal(
+            MoveRuleKind.Charge,
+            MoveRuleMetadata.GetRule("dig", MoveDatabase.All["dig"]).Kind);
+    }
+
+    [Fact]
     public async Task Persistent_move_effects_apply_damage_and_recovery_at_turn_end()
     {
         var attacker = CreatePokemon(1, "leech-seed");

@@ -120,7 +120,7 @@ public static class MoveRuleMetadata
     private static readonly HashSet<string> ChargeMoves = new()
     {
         "solar-beam", "skull-bash", "razor-wind", "sky-attack", "bounce", "dive",
-        "fly", "sky-drop", "phantom-force", "shadow-force", "geomancy"
+        "fly", "sky-drop", "phantom-force", "shadow-force", "geomancy", "dig"
     };
 
     private static readonly HashSet<string> DelayedDamageMoves = new()

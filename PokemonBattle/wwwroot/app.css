@@ -4644,6 +4644,41 @@ p {
     font-weight: 800;
 }
 
+.move-detail-badges {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.move-category-badge {
+    flex: 0 0 auto;
+    padding: 3px 6px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 0.56rem;
+    font-weight: 800;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.move-category-badge.is-physical {
+    color: #f0a35b;
+    background: rgba(240, 163, 91, 0.1);
+}
+
+.move-category-badge.is-special {
+    color: #c7a5ff;
+    background: rgba(199, 165, 255, 0.1);
+}
+
+.move-category-badge.is-status {
+    color: var(--ash);
+    background: rgba(166, 172, 184, 0.1);
+}
+
 .move-detail-desc {
     max-height: 7.5em;
     overflow-y: auto;

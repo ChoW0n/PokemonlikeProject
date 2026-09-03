@@ -154,6 +154,7 @@ public sealed class BattleEffectContext
     public int LastHitDamage { get; set; }
     public int ActualHits { get; set; }
     public bool WasAbsorbed { get; set; }
+    public bool MoveFailed { get; set; }
     public bool RequestSwitch { get; set; }
     public Pokemon? SwitchPokemon { get; set; }
     public string? SwitchReason { get; set; }
@@ -281,6 +282,7 @@ public interface IBattleEffectHandler
 {
     int Order => 0;
     void ModifyPower(BattlePowerContext context) { }
+    Task BeforeMoveAsync(BattleEffectContext context) => Task.CompletedTask;
     Task AfterHitAsync(BattleEffectContext context) => Task.CompletedTask;
     Task AfterDamageAsync(BattleEffectContext context) => Task.CompletedTask;
     Task AfterDamageResultAsync(BattleEffectContext context) => Task.CompletedTask;
