@@ -115,7 +115,55 @@ public class AdminDashboardRegressionTests
                     .Select(item => item.PokemonId)
                     .Distinct()
                     .ToListAsync();
-                Assert.Equal(new[] { 1, 4, 7 }, unlockedIds.OrderBy(id => id));
+                Assert.Equal(
+                    StarterCatalog.PokemonIds.OrderBy(id => id),
+                    unlockedIds.OrderBy(id => id));
+
+                var operations = new AdminOperationsService(adminDb, adminUser);
+                Assert.True((await operations.ResetUnlocksToStartersAsync("player-b")).Success);
+                unlockedIds = await adminDb.UnlockedPokemons
+                    .Where(item => item.Username == "player-b")
+                    .Select(item => item.PokemonId)
+                    .Distinct()
+                    .ToListAsync();
+                Assert.Equal(
+                    StarterCatalog.PokemonIds.OrderBy(id => id),
+                    unlockedIds.OrderBy(id => id));
+            }
+        });
+    }
+
+    [Fact]
+    public async Task NewUsersReceiveEveryGenerationStarter()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreateTables(schema);
+            const string username = "starter-user";
+
+            await using (var seedDb = CreateDbContext(schema))
+            {
+                seedDb.Users.Add(new UserAccount
+                {
+                    Username = username,
+                    PasswordHash = PasswordHasher.Hash("starter"),
+                    IsAdmin = false
+                });
+                await seedDb.SaveChangesAsync();
+            }
+
+            var currentUser = new CurrentUserService();
+            currentUser.SignIn(username, isAdmin: false);
+            await using (var db = CreateDbContext(schema))
+            {
+                var unlockedIds = await new UnlockService(db, currentUser).GetUnlockedIds();
+
+                Assert.Equal(
+                    StarterCatalog.PokemonIds.OrderBy(id => id),
+                    unlockedIds.OrderBy(id => id));
+                Assert.Equal(
+                    StarterCatalog.PokemonIds.Count,
+                    await db.UnlockedPokemons.CountAsync(item => item.Username == username));
             }
         });
     }

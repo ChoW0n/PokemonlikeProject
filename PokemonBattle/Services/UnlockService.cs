@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PokemonBattle.Data;
+using PokemonBattle.Models;
 
 namespace PokemonBattle.Services;
 
@@ -9,9 +10,6 @@ public class UnlockService
 {
     private readonly DatabaseContextExecutor _database;
     private readonly CurrentUserService _currentUser;
-
-    //처음 가입한 유저에게 기본으로 쥐어줄 스타터 3마리 (이상해씨/파이리/꼬부기 도감번호)
-    private static readonly int[] StarterIds = { 1, 4, 7 };
 
     [ActivatorUtilitiesConstructor]
     public UnlockService(DatabaseContextExecutor database, CurrentUserService currentUser)
@@ -36,11 +34,11 @@ public class UnlockService
                 .Select(u => u.PokemonId)
                 .ToListAsync();
 
-            if (owned.Count < StarterIds.Length) //해금한 포켓몬이 3마리 미만인 신규 유저에게 스타터 보충
+            if (owned.Count < StarterCatalog.PokemonIds.Count) //해금한 포켓몬이 스타터 목록보다 적은 유저에게 스타터 보충
             {
                 await EnsureStarters(db, _currentUser.Username!, owned);
                 owned = owned
-                    .Concat(StarterIds)
+                    .Concat(StarterCatalog.PokemonIds)
                     .Distinct()
                     .ToList();
             }
@@ -55,7 +53,7 @@ public class UnlockService
         IEnumerable<int> ownedIds)
     {
         var owned = ownedIds.ToHashSet();
-        foreach (var id in StarterIds)
+        foreach (var id in StarterCatalog.PokemonIds)
         {
             if (!owned.Contains(id))
             {

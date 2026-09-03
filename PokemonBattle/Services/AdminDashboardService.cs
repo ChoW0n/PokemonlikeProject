@@ -546,11 +546,11 @@ public sealed class AdminDashboardService
             await using var transaction = await db.Database.BeginTransactionAsync();
             await db.UnlockedPokemons.Where(item => item.Username == username).ExecuteDeleteAsync();
             db.UnlockedPokemons.AddRange(
-                new[] { 1, 4, 7 }.Select(id =>
+                StarterCatalog.PokemonIds.Select(id =>
                     new UnlockedPokemon { Username = username, PokemonId = id }));
             await db.SaveChangesAsync();
             await transaction.CommitAsync();
-            return Success($"{username} 계정의 해금을 스타터 3종으로 초기화했습니다.");
+            return Success($"{username} 계정의 해금을 스타터 {StarterCatalog.PokemonIds.Count}종으로 초기화했습니다.");
         });
 
     public async Task<AdminOperationResult> ResetRunAsync(string username) =>

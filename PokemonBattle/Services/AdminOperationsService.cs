@@ -9,7 +9,6 @@ public sealed class AdminOperationsService
 {
     private readonly DatabaseContextExecutor _database;
     private readonly CurrentUserService _currentUser;
-    private static readonly int[] StarterIds = { 1, 4, 7 };
     [ActivatorUtilitiesConstructor]
     public AdminOperationsService(
         DatabaseContextExecutor database,
@@ -135,10 +134,10 @@ public sealed class AdminOperationsService
                 .Where(unlock => unlock.Username == username)
                 .ToListAsync();
             db.UnlockedPokemons.RemoveRange(
-                unlocks.Where(unlock => !StarterIds.Contains(unlock.PokemonId)));
+                unlocks.Where(unlock => !StarterCatalog.PokemonIds.Contains(unlock.PokemonId)));
 
             var existingIds = unlocks.Select(unlock => unlock.PokemonId).ToHashSet();
-            foreach (int starterId in StarterIds)
+            foreach (int starterId in StarterCatalog.PokemonIds)
             {
                 if (!existingIds.Contains(starterId) && PokemonDatabase.All.ContainsKey(starterId))
                 {
