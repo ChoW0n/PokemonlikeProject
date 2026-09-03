@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 var http = new HttpClient();
+http.DefaultRequestHeaders.UserAgent.ParseAdd("PokemonBattle-DataGen/1.0 (https://github.com/ChoW0n/PokemonlikeProject)");
 var pokemonSb = new StringBuilder();
 var moveSb = new StringBuilder();
 var abilitySb = new StringBuilder();
@@ -99,7 +100,7 @@ for (int id = 1; id <= 721; id++)
             .ToList();
         var generatedMoveKeys = pokemon.moves
             .Where(moveSlot => moveSlot.version_group_details.Any(v =>
-                v.move_learn_method.name == "level-up"))
+                v.move_learn_method.name is "level-up" or "machine"))
             .Select(moveSlot => moveSlot.move.name)
             .Distinct(StringComparer.Ordinal)
             .ToList();
@@ -176,8 +177,19 @@ for (int id = 1; id <= 721; id++)
 
         if (learnableMoveKeys.Count == 0) learnableMoveKeys.Add("tackle");
 
+        var machineOnlyMoveKeys = pokemon.moves
+            .Where(moveSlot => learnableMoveKeys.Contains(moveSlot.move.name, StringComparer.Ordinal))
+            .Where(moveSlot => moveSlot.version_group_details.Count > 0
+                && moveSlot.version_group_details.All(v => v.move_learn_method.name == "machine"))
+            .Select(moveSlot => moveSlot.move.name)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
         string moveList = string.Join(", ", learnableMoveKeys.Distinct().Select(m => $"\"{m}\""));
         string apiLearnableMoveList = string.Join(", ", apiLearnableMoveKeys.Select(m => $"\"{m}\""));
+        string machineOnlyMoveList = machineOnlyMoveKeys.Count == 0
+            ? "Array.Empty<string>()"
+            : $"new[] {{ {string.Join(", ", machineOnlyMoveKeys.Select(m => $"\"{m}\""))} }}";
 
         var abilityNames = new List<string>();
         foreach (var slot in pokemon.abilities.Take(2))
@@ -223,7 +235,7 @@ for (int id = 1; id <= 721; id++)
             evolvesToLine = nextId.ToString();
         }
 
-        pokemonSb.AppendLine($"        All[{id}] = new PokemonData(\"{korName}\", \"{pokemon.name}\", PokemonType.{type1}, {type2Line}, {hp}, {atk}, {def}, {spAtk}, {spDef}, {spd}, new[] {{ {moveList} }}, new[] {{ {abilityList} }}, \"{imageUrl}\", \"{backImageUrl}\", {evolvesToLine}, 5, new[] {{ {apiLearnableMoveList} }});");
+        pokemonSb.AppendLine($"        All[{id}] = new PokemonData(\"{korName}\", \"{pokemon.name}\", PokemonType.{type1}, {type2Line}, {hp}, {atk}, {def}, {spAtk}, {spDef}, {spd}, new[] {{ {moveList} }}, new[] {{ {abilityList} }}, \"{imageUrl}\", \"{backImageUrl}\", {evolvesToLine}, 5, new[] {{ {apiLearnableMoveList} }}, {machineOnlyMoveList});");
 
         Console.WriteLine($"[{id}/721] {korName} 완료");
     }

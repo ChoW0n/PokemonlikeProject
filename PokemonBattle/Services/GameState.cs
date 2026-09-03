@@ -534,7 +534,9 @@ public class GameState
     public IReadOnlyList<string> TechnicalMachineMovesFor(int pokemonId)
     {
         if (!PokemonDatabase.All.TryGetValue(pokemonId, out var data)) return Array.Empty<string>();
-        var compatible = data.MoveNames.ToHashSet(StringComparer.Ordinal);
+        var compatible = data.MoveNames
+            .Concat(data.MachineOnlyMoveNames)
+            .ToHashSet(StringComparer.Ordinal);
         return TechnicalMachines
             .Where(machine => machine.Quantity > 0 && MoveDatabase.All.ContainsKey(machine.MoveKey))
             .Where(machine => compatible.Contains(machine.MoveKey))

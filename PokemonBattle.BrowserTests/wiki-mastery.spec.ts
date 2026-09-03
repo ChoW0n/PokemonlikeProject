@@ -172,8 +172,31 @@ async function playBattle(page: Page) {
     }
 
     await page.locator("button.action-attack:not(:disabled)").click({ force: true });
+    await expect
+      .poll(
+        async () => {
+          if (await page.locator("main.result-page").count()) return "result";
+          if (
+            (await page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" }).count()) &&
+            (await page.locator("button.team-choice-button:not(:disabled)").count())
+          ) {
+            return "forced-switch";
+          }
+          if (await page.locator(".move-name-button:not(:disabled)").count()) return "move";
+          return "waiting";
+        },
+        { timeout: 45_000 },
+      )
+      .toMatch(/^(result|forced-switch|move)$/);
+    if (await page.locator("main.result-page").count()) return;
+    if (
+      (await page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" }).count()) &&
+      (await page.locator("button.team-choice-button:not(:disabled)").count())
+    ) {
+      continue;
+    }
+
     const move = page.locator(".move-name-button:not(:disabled)").first();
-    await expect(move).toBeEnabled();
     await move.click({ force: true });
     await page.locator(".move-confirm:not(:disabled)").click({ force: true });
   }

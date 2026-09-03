@@ -221,8 +221,11 @@
                 @foreach (var moveKey in CompatibleMoveKeys(picked))
                     {
                         var move = MoveDatabase.All[moveKey];
-                        <button type="button" class="dex-entry dex-entry-button move-tile @(DraftMoves.Contains(moveKey) ? "is-selected" : string.Empty) @(ViewingMoveKey == moveKey ? "is-viewing" : "")"
-                             aria-label="@($"{move.Name}, {(move.IsStatus ? "변화기" : "공격기")}{(DraftMoves.Contains(moveKey) ? ", 선택됨" : "")}")"
+                        bool isMachineOnly = IsMachineOnlyMove(picked, moveKey);
+                        bool isMachineLocked = IsMachineOnlyMoveLocked(picked, moveKey);
+                        <button type="button" class="dex-entry dex-entry-button move-tile @(DraftMoves.Contains(moveKey) ? "is-selected" : string.Empty) @(ViewingMoveKey == moveKey ? "is-viewing" : "") @(isMachineLocked ? "is-unavailable" : "")"
+                             aria-label="@($"{move.Name}, {(move.IsStatus ? "변화기" : "공격기")}{(DraftMoves.Contains(moveKey) ? ", 선택됨" : "")}{(isMachineLocked ? ", 기술머신 필요" : "")}")"
+                             aria-disabled="@(isMachineLocked ? "true" : "false")"
                              aria-pressed="@(DraftMoves.Contains(moveKey) ? "true" : "false")"
                              aria-expanded="@(ViewingMoveKey == moveKey ? "true" : "false")"
                              aria-controls="@(ViewingMoveKey == moveKey ? "selected-move-info" : null)"
@@ -231,9 +234,9 @@
                               @ondblclick="() => ToggleMove(moveKey)"
                              @ondblclick:preventDefault>
                             <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
-                             <span class="dex-name">@move.Name @(move.Priority > 0 ? "우선" : "") @(IsTechnicalMachineMove(picked, moveKey) ? "· TM" : "") @(IsRunStolenMove(picked, moveKey) ? "· 강탈" : "")</span>
-                             <span class="card-state @(DraftMoves.Contains(moveKey) ? "is-selected" : "")">@(DraftMoves.Contains(moveKey) ? "선택됨" : ViewingMoveKey == moveKey ? "상세 확인 중" : "선택하기")</span>
-                            <span class="dex-type">@(move.IsStatus ? "변화기" : "공격기")</span>
+                              <span class="dex-name">@move.Name @(move.Priority > 0 ? "우선" : "") @(IsTechnicalMachineMove(picked, moveKey) ? "· TM" : "") @(IsRunStolenMove(picked, moveKey) ? "· 강탈" : "")</span>
+                              <span class="card-state @(DraftMoves.Contains(moveKey) ? "is-selected" : "")">@(isMachineLocked ? "기술머신 필요" : DraftMoves.Contains(moveKey) ? "선택됨" : ViewingMoveKey == moveKey ? "상세 확인 중" : "선택하기")</span>
+                             <span class="dex-type">@(isMachineOnly ? "TM 전용 · " : "")@(move.IsStatus ? "변화기" : "공격기")</span>
                         </button>
                     }
                 </div>
@@ -247,8 +250,8 @@
                         }
                         <GaugeBar Label="명중" Percent="@(vmove.AlwaysHits ? 100 : StatBarHelper.AccuracyPercent(vmove.Accuracy))" ColorClass="@(vmove.AlwaysHits ? "gauge-vhigh" : StatBarHelper.AccuracyColor(vmove.Accuracy))" DisplayText="@(vmove.AlwaysHits ? "필중" : $"{vmove.Accuracy}%")" />
                         <p class="info-desc">@(string.IsNullOrWhiteSpace(vmove.Description) ? "설명 없음" : vmove.Description)</p>
-                             <button type="button" class="info-select-btn @(DraftMoves.Contains(ViewingMoveKey) ? "is-active" : "")" aria-pressed="@(DraftMoves.Contains(ViewingMoveKey) ? "true" : "false")" @onclick="() => ToggleMove(ViewingMoveKey)">
-                            @(DraftMoves.Contains(ViewingMoveKey) ? "선택 해제" : "이 기술 선택")
+                             <button type="button" class="info-select-btn @(DraftMoves.Contains(ViewingMoveKey) ? "is-active" : "")" disabled="@IsMachineOnlyMoveLocked(picked, ViewingMoveKey)" aria-pressed="@(DraftMoves.Contains(ViewingMoveKey) ? "true" : "false")" @onclick="() => ToggleMove(ViewingMoveKey)">
+                            @(IsMachineOnlyMoveLocked(picked, ViewingMoveKey) ? "기술머신 필요" : DraftMoves.Contains(ViewingMoveKey) ? "선택 해제" : "이 기술 선택")
                         </button>
                     </div>
                 }
@@ -428,7 +431,9 @@
                 TeamLoadouts = State.PlayerLoadouts.Select(l =>
                 {
                     var validKeys = PokemonDatabase.All.ContainsKey(l.PokemonId)
-                        ? PokemonDatabase.All[l.PokemonId].MoveNames.ToHashSet()
+                        ? PokemonDatabase.All[l.PokemonId].MoveNames
+                            .Concat(PokemonDatabase.All[l.PokemonId].MachineOnlyMoveNames)
+                            .ToHashSet()
                         : new HashSet<string>();
 
                     return new PokemonLoadout
@@ -596,6 +601,13 @@
 
     private void ToggleMove(string moveKey)
     {
+        if (ConfiguringId != null
+            && PokemonDatabase.All.TryGetValue(ConfiguringId.Value, out var data)
+            && IsMachineOnlyMoveLocked(data, moveKey))
+        {
+            return;
+        }
+
         if (DraftMoves.Contains(moveKey))
         {
             if (ConfiguringId != null
@@ -628,6 +640,14 @@
         }
 
         var existing = TeamLoadouts.FirstOrDefault(l => l.PokemonId == ConfiguringId.Value);
+        var configuredData = PokemonDatabase.All[ConfiguringId.Value];
+        if (DraftMoves.Any(moveKey => IsMachineOnlyMoveLocked(configuredData, moveKey)))
+        {
+            PresetMessage = "기술머신 전용 기술은 기술머신을 보유해야 선택할 수 있습니다.";
+            PresetMessageIsError = true;
+            return;
+        }
+
         var availableMachineMoves = State.TechnicalMachines
             .Where(machine => machine.Quantity > 0)
             .Select(machine => machine.MoveKey)
@@ -742,6 +762,7 @@
                 .Select(l =>
                 {
                     var validKeys = PokemonDatabase.All[l.PokemonId].MoveNames.ToHashSet();
+                    validKeys.UnionWith(PokemonDatabase.All[l.PokemonId].MachineOnlyMoveNames);
                     return new PokemonLoadout
                     {
                         PokemonId = l.PokemonId,
@@ -824,6 +845,7 @@
 
     private List<string> CompatibleMoveKeys(PokemonData data) =>
         data.MoveNames
+            .Concat(data.MachineOnlyMoveNames)
             .Concat(State.TechnicalMachineMovesFor(
                 PokemonDatabase.All.First(entry => ReferenceEquals(entry.Value, data)).Key))
             .Concat(State.RunStolenMoveKeysFor(
@@ -839,6 +861,14 @@
     private bool IsTechnicalMachineMove(PokemonData data, string moveKey) =>
         State.TechnicalMachines.Any(machine =>
             machine.MoveKey == moveKey && machine.Quantity > 0);
+
+    private bool IsMachineOnlyMove(PokemonData data, string moveKey) =>
+        data.MachineOnlyMoveNames.Contains(moveKey, StringComparer.Ordinal);
+
+    private bool IsMachineOnlyMoveLocked(PokemonData data, string moveKey) =>
+        IsMachineOnlyMove(data, moveKey)
+        && !DraftMoves.Contains(moveKey)
+        && !IsTechnicalMachineMove(data, moveKey);
 
     private bool IsRunStolenMove(PokemonData data, string moveKey) =>
         State.IsRunStolenMove(
