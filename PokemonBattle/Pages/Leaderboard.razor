@@ -27,7 +27,7 @@
             <div>
                 <p class="eyebrow">SKILL RATING / RANKING</p>
                 <h1>유저 랭킹</h1>
-                <p class="intro">완료한 런을 바탕으로 누적된 실력 평점 순위입니다.</p>
+                <p class="intro">완료한 모험을 바탕으로 누적된 실력 평점 순위입니다.</p>
             </div>
             <button type="button" class="leaderboard-back" @onclick="GoHome">게임으로</button>
         </header>
@@ -45,7 +45,7 @@
                     <strong>@me.Rating.ToString("0")</strong>
                 </div>
                 <div class="leaderboard-self-stat">
-                    <span>완료 런</span>
+                    <span>완료한 모험</span>
                     <strong>@($"{me.CompletedRuns}회")</strong>
                 </div>
             </section>
@@ -84,7 +84,7 @@
                                 <th scope="col">순위</th>
                                 <th scope="col">유저</th>
                                 <th scope="col">레이팅</th>
-                                <th scope="col">완료 런</th>
+                                <th scope="col">완료한 모험</th>
                             </tr>
                         </thead>
                         <tbody>
