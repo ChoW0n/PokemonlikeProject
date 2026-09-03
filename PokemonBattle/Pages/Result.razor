@@ -8,7 +8,7 @@
 <PageTitle>배틀 결과</PageTitle>
 
 <main class="result-page">
-    <p class="eyebrow result-kicker">BATTLE REPORT / RUN STATUS</p>
+    <p class="eyebrow result-kicker">BATTLE REPORT / ADVENTURE STATUS</p>
     <p class="result-context">이번 전투가 끝났습니다. 보상과 다음 행동을 확인하세요.</p>
     <section class="result-skill-summary" aria-label="실력 평점 결과">
         <h2>실력 평점</h2>
@@ -19,10 +19,10 @@
                 (@RatingChangeText(State.LastSkillRatingChange))
             </span>
         </p>
-        <p>다음 런 상대 레벨 보정: <strong>@DifficultyText(State.NextRunDifficultyAdjustment)</strong></p>
+        <p>다음 모험 상대 레벨 보정: <strong>@DifficultyText(State.NextRunDifficultyAdjustment)</strong></p>
         @if (State.HasPendingSkillRatingUpdate)
         {
-            <small>이번 승리의 평점은 새 런을 시작할 때 확정됩니다.</small>
+            <small>이번 승리의 평점은 새 모험을 시작할 때 확정됩니다.</small>
         }
     </section>
 
@@ -58,7 +58,7 @@
         {
             <section class="info-panel" aria-label="관록의 유산 선택">
                 <strong>관록의 유산 선택 · @(State.LegacyClaimsRemaining)개 남음</strong>
-                <p class="info-desc">이번 런 동안 유지됩니다. 선택하지 않고 계속하면 후보가 사라집니다.</p>
+                <p class="info-desc">이번 모험 동안 유지됩니다. 선택하지 않고 계속하면 후보가 사라집니다.</p>
                 <div class="enemy-grid" role="list" aria-label="관록의 유산 후보">
                     @foreach (var legacyId in State.PendingLegacyChoices)
                     {
@@ -185,7 +185,7 @@
         </div>
         <details class="result-secondary-actions">
             <summary>추가 메뉴</summary>
-            <button type="button" disabled="@IsSubmitting" @onclick="RestartGame">새 런 시작</button>
+            <button type="button" disabled="@IsSubmitting" @onclick="RestartGame">새 모험 시작</button>
         </details>
     }
     else
@@ -318,7 +318,7 @@
                 SelectedStolenMoveKey,
                 SelectedStolenReplacementKey);
             StolenMoveMessage = claimed
-                ? "기술을 이번 런의 팀에 추가했습니다."
+                ? "기술을 이번 모험의 팀에 추가했습니다."
                 : "대상이 이미 배운 기술이거나 교체할 기술을 선택하지 않았습니다.";
             if (claimed)
             {
@@ -371,7 +371,7 @@
         }
         catch
         {
-            StolenMoveMessage = "새 런을 준비하지 못했습니다. 다시 시도해주세요.";
+            StolenMoveMessage = "새 모험을 준비하지 못했습니다. 다시 시도해주세요.";
             IsSubmitting = false;
         }
     }
