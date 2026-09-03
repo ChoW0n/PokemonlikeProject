@@ -210,6 +210,13 @@
                         <GaugeBar Label="특방" Percent="@StatBarHelper.StatPercent(picked.BaseSpDef)" ColorClass="@StatBarHelper.StatColor(picked.BaseSpDef)" DisplayText="@picked.BaseSpDef.ToString()" />
                         <GaugeBar Label="속도" Percent="@StatBarHelper.StatPercent(picked.BaseSpd)" ColorClass="@StatBarHelper.StatColor(picked.BaseSpd)" DisplayText="@picked.BaseSpd.ToString()" />
                     </div>
+                    @if (!string.IsNullOrWhiteSpace(picked.SpeciesNote))
+                    {
+                        <aside class="species-note" aria-label="포켓몬 설정">
+                            <span class="species-note-label">ℹ️ 설정</span>
+                            <p>@picked.SpeciesNote</p>
+                        </aside>
+                    }
                 </div>
 
                 <p class="config-label">기술 선택 (@DraftMoves.Count / 4) — 눌러서 자세히 볼 수 있습니다</p>

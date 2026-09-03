@@ -112,7 +112,7 @@ async function waitForBattleState(page: Page): Promise<"result" | "battle" | "fo
     .poll(
       async () => {
         if (await page.locator("main.result-page").count()) return "result";
-        if (await page.locator("button.action-attack:not(:disabled)").count()) return "battle";
+        if (await page.locator(".action-selection-slot:not(.is-hidden) button.action-attack:not(:disabled)").count()) return "battle";
         if (
           (await page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" }).count()) &&
           (await page.locator(".move-button:not(:disabled)").count())
@@ -126,7 +126,7 @@ async function waitForBattleState(page: Page): Promise<"result" | "battle" | "fo
     .toMatch(/^(result|battle|forced-switch)$/);
 
   if (await page.locator("main.result-page").count()) return "result";
-  if (await page.locator("button.action-attack:not(:disabled)").count()) return "battle";
+  if (await page.locator(".action-selection-slot:not(.is-hidden) button.action-attack:not(:disabled)").count()) return "battle";
   return "forced-switch";
 }
 
@@ -159,7 +159,7 @@ async function playBattle(page: Page) {
             if (await page.locator("main.result-page").count()) return "result";
             if (
               !(await page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" }).count()) &&
-              (await page.locator("button.action-attack:not(:disabled)").count())
+              (await page.locator(".action-selection-slot:not(.is-hidden) button.action-attack:not(:disabled)").count())
             ) {
               return "battle";
             }
@@ -171,23 +171,26 @@ async function playBattle(page: Page) {
       continue;
     }
 
-    await page.locator("button.action-attack:not(:disabled)").click({ force: true });
-    await expect
-      .poll(
-        async () => {
-          if (await page.locator("main.result-page").count()) return "result";
-          if (
-            (await page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" }).count()) &&
-            (await page.locator("button.team-choice-button:not(:disabled)").count())
-          ) {
-            return "forced-switch";
-          }
-          if (await page.locator(".move-name-button:not(:disabled)").count()) return "move";
-          return "waiting";
-        },
-        { timeout: 45_000 },
-      )
-      .toMatch(/^(result|forced-switch|move)$/);
+    await page.waitForTimeout(250);
+    await page.locator(".action-selection-slot:not(.is-hidden) button.action-attack:not(:disabled)").first().press("Enter");
+    let nextState: "result" | "forced-switch" | "move" | "waiting" = "waiting";
+    for (let retry = 0; retry < 6 && nextState === "waiting"; retry += 1) {
+      if (retry > 0) {
+        const attack = page.locator(".action-selection-slot:not(.is-hidden) button.action-attack:not(:disabled)").first();
+        if (await attack.count()) {
+          await attack.press("Enter").catch(() => undefined);
+        }
+      }
+      nextState = await Promise.race([
+        page.locator("main.result-page").waitFor({ state: "attached", timeout: 10_000 }).then(() => "result" as const),
+        page
+          .getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" })
+          .waitFor({ state: "attached", timeout: 10_000 })
+          .then(() => "forced-switch" as const),
+        page.locator(".move-name-grid").waitFor({ state: "attached", timeout: 10_000 }).then(() => "move" as const),
+      ]).catch(() => "waiting" as const);
+    }
+    expect(nextState).toMatch(/^(result|forced-switch|move)$/);
     if (await page.locator("main.result-page").count()) return;
     if (
       (await page.getByRole("heading", { name: "내보낼 포켓몬을 선택하세요" }).count()) &&

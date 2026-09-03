@@ -226,7 +226,7 @@ test("completes the game flow with keyboard controls at mobile and desktop width
   } else {
     await expect(restart).toHaveCount(1);
     await pressEnter(page, restart);
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/starter$/);
   }
   await assertNoHorizontalOverflow(page);
 });
