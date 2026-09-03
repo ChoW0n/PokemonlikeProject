@@ -137,7 +137,7 @@ public static class MoveRuleMetadata
     private static readonly HashSet<string> ProtectMoves = new()
     {
         "protect", "detect", "endure", "kings-shield", "baneful-bunker",
-        "spiky-shield", "obstruct", "silk-guard"
+        "spiky-shield", "obstruct"
     };
 
     private static readonly HashSet<string> RampageMoves = new()

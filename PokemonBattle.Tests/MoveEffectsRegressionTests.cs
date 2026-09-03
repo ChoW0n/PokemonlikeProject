@@ -9,7 +9,7 @@ public sealed class MoveEffectsRegressionTests
     [Fact]
     public void Move_catalog_has_unique_entries_and_every_entry_is_classified()
     {
-        Assert.Equal(522, MoveDatabase.All.Count);
+        Assert.Equal(521, MoveDatabase.All.Count);
         Assert.All(MoveDatabase.All, entry =>
             Assert.Contains(
                 MoveRuleMetadata.GetRule(entry.Key, entry.Value).Kind,

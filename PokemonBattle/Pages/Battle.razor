@@ -183,7 +183,7 @@
                                  @ondblclick:preventDefault>
                             <span class="type-dot" style="background:@TypeColors.GetHex(move.Type)"></span>
                             <span class="move-type-label">@TypeKor(move.Type)</span>
-                            <span class="move-name-text">@move.Name @(move.Priority > 0 ? "우선" : "") @(Hero.ChoiceLockedMove != null && Hero.ChoiceLockedMove != moveKey ? "고정" : "")</span>
+                            <span class="move-name-text">@move.Name @(move.Priority > 0 ? "· 우선" : "") @(Hero.ChoiceLockedMove != null && Hero.ChoiceLockedMove != moveKey ? "· 고정" : "")</span>
                             <span class="move-pp-num">PP @ppLoop/@move.MaxPP</span>
                         </button>
                     }
