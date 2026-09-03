@@ -186,24 +186,24 @@ public class ProgressionRegressionTests
             50,
             50,
             new[] { "tackle" },
-            new[] { "근성", "유연" },
+            new[] { "근성", "도주" },
             "",
             "",
             null,
             1);
 
-        int highSkillOffensiveAbilities = Enumerable.Range(0, 400)
+        int highSkillSynergyAbilities = Enumerable.Range(0, 400)
             .Count(_ => EnemyTeamProvider.PickProAbility(
                 data,
                 new[] { "tackle", "take-down" },
                 skillAdjustment: 5) == "근성");
-        int lowSkillOffensiveAbilities = Enumerable.Range(0, 400)
+        int lowSkillSynergyAbilities = Enumerable.Range(0, 400)
             .Count(_ => EnemyTeamProvider.PickProAbility(
                 data,
                 new[] { "tackle", "take-down" },
                 skillAdjustment: -3) == "근성");
 
-        Assert.True(highSkillOffensiveAbilities > lowSkillOffensiveAbilities + 40);
+        Assert.True(highSkillSynergyAbilities > lowSkillSynergyAbilities + 40);
     }
 
     [Fact]

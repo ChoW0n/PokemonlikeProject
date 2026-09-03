@@ -425,7 +425,7 @@ public class Pokemon
             && MoveDatabase.All.TryGetValue(moveName, out var moveForItem)
             && moveForItem.IsStatus) return false;
         if (moveName == "belch" && !HasConsumedBerry) return false;
-        if (moveName is "snore" or "dream-eater" && Status != StatusCondition.Sleep) return false;
+        if (moveName == "snore" && Status != StatusCondition.Sleep) return false;
         if (moveName == "fake-out" && TurnsOnField > 0) return false;
         if (moveName == "last-resort"
             && CurrentPP.Keys.Any(key => key != "last-resort" && !UsedMoveKeys.Contains(key))) return false;

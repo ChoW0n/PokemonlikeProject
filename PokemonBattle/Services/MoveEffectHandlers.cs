@@ -11,6 +11,17 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
 {
     public int Order => 100;
 
+    public async Task BeforeMoveAsync(BattleEffectContext context)
+    {
+        if (context.MoveKey == "dream-eater"
+            && context.Defender.Status != StatusCondition.Sleep)
+        {
+            context.MoveFailed = true;
+            await context.ShowMessage(
+                $"{context.Attacker.Data.Name}의 꿈먹기는 실패했다!");
+        }
+    }
+
     public async Task AfterDamageResultAsync(BattleEffectContext context)
     {
         if (context.Move.DrainPercent > 0 && !context.Attacker.IsFainted)
