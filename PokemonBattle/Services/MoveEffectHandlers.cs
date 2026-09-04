@@ -156,29 +156,44 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         {
             if (move.AilmentName == "confusion")
             {
-                if (!defender.IsConfused && !defender.IsImmuneToConfusion(attacker))
+                if (!defender.IsConfused)
                 {
-                    defender.ApplyConfusion(context.Random, attacker);
-                    await context.ShowMessage($"{defender.Data.Name}은(는) 혼란에 빠졌다!");
+                    string? fieldMessage = defender.GetFieldConfusionImmunityMessage(attacker);
+                    if (fieldMessage != null)
+                    {
+                        await context.ShowMessage(fieldMessage);
+                    }
+                    else if (!defender.IsImmuneToConfusion(attacker))
+                    {
+                        defender.ApplyConfusion(context.Random, attacker);
+                        await context.ShowMessage($"{defender.Data.Name}은(는) 혼란에 빠졌다!");
+                    }
                 }
             }
             else if (defender.Status == StatusCondition.None
                 && !(defender.HasActiveHeldItem(attacker)
                     && defender.HeldItem == "방진고글"
-                    && MoveRuleMetadata.IsPowderMove(context.MoveKey))
-                && !defender.IsImmuneToAilment(move.AilmentName, attacker))
+                    && MoveRuleMetadata.IsPowderMove(context.MoveKey)))
             {
                 string ailment = context.MoveKey == "toxic" ? "toxic" : move.AilmentName;
-                defender.ApplyAilment(ailment, context.Random, attacker);
-                await context.ShowMessage($"{defender.Data.Name}은(는) {AilmentKor(ailment)} 상태가 되었다!");
-
-                if (defender.HasActiveAbility("싱크로", attacker)
-                    && move.AilmentName is "paralysis" or "poison" or "burn"
-                    && attacker.Status == StatusCondition.None
-                    && !attacker.IsImmuneToAilment(move.AilmentName, defender))
+                string? fieldMessage = defender.GetFieldAilmentImmunityMessage(ailment, attacker);
+                if (fieldMessage != null)
                 {
-                    attacker.ApplyAilment(move.AilmentName, opponent: defender);
-                    await context.ShowMessage($"{defender.Data.Name}의 싱크로가 {attacker.Data.Name}에게 상태 이상을 옮겼다!");
+                    await context.ShowMessage(fieldMessage);
+                }
+                else if (!defender.IsImmuneToAilment(ailment, attacker))
+                {
+                    defender.ApplyAilment(ailment, context.Random, attacker);
+                    await context.ShowMessage($"{defender.Data.Name}은(는) {AilmentKor(ailment)} 상태가 되었다!");
+
+                    if (defender.HasActiveAbility("싱크로", attacker)
+                        && move.AilmentName is "paralysis" or "poison" or "burn"
+                        && attacker.Status == StatusCondition.None
+                        && !attacker.IsImmuneToAilment(move.AilmentName, defender))
+                    {
+                        attacker.ApplyAilment(move.AilmentName, opponent: defender);
+                        await context.ShowMessage($"{defender.Data.Name}의 싱크로가 {attacker.Data.Name}에게 상태 이상을 옮겼다!");
+                    }
                 }
             }
         }
@@ -269,7 +284,15 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         if (!pokemon.IsFainted && pokemon.YawnTurnsRemaining == 1
             && pokemon.Status == StatusCondition.None && !pokemon.UproarActive)
         {
-            pokemon.ApplyAilment("sleep");
+            string? fieldMessage = pokemon.GetFieldAilmentImmunityMessage("sleep", context.Opponent);
+            if (fieldMessage != null)
+            {
+                await context.ShowMessage(fieldMessage, 900);
+            }
+            else if (!pokemon.IsImmuneToAilment("sleep", context.Opponent))
+            {
+                pokemon.ApplyAilment("sleep", opponent: context.Opponent);
+            }
             if (pokemon.Status == StatusCondition.Sleep)
                 await context.ShowMessage($"{pokemon.Data.Name}은(는) 하품 때문에 잠들었다!", 900);
         }
