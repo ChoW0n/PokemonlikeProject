@@ -169,7 +169,15 @@ public sealed class DamageModifierEffectHandler : IBattleEffectHandler
             && pokemon.Status == StatusCondition.None)
         {
             string ailment = pokemon.HeldItem == "화염구슬" ? "burn" : "toxic";
-            pokemon.ApplyAilment(ailment, context.Random, context.Opponent);
+            string? immunityMessage = pokemon.GetAilmentImmunityMessage(ailment, context.Opponent);
+            if (immunityMessage != null)
+            {
+                await context.ShowMessage(immunityMessage, 1100);
+            }
+            else
+            {
+                pokemon.ApplyAilment(ailment, context.Random, context.Opponent);
+            }
             if (pokemon.Status != StatusCondition.None)
                 await context.ShowMessage(
                     $"{pokemon.Data.Name}은(는) {pokemon.HeldItem} 때문에 상태 이상이 되었다!", 1100);
@@ -553,23 +561,27 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
 
         if (context.Attacker.Status != StatusCondition.None) return;
         string? reaction = null;
+        string? immunityMessage = null;
         if (context.Defender.HasActiveAbility("정전기", context.Attacker)
             && context.Random.Next(100) < 30)
         {
             context.Attacker.ApplyAilment("paralysis", opponent: context.Defender);
             if (context.Attacker.Status == StatusCondition.Paralysis) reaction = "정전기에 마비됐다";
+            else immunityMessage = context.Attacker.GetAilmentImmunityMessage("paralysis", context.Defender);
         }
         else if (context.Defender.HasActiveAbility("독가시", context.Attacker)
             && context.Random.Next(100) < 30)
         {
             context.Attacker.ApplyAilment("poison", opponent: context.Defender);
             if (context.Attacker.Status == StatusCondition.Poison) reaction = "독가시에 찔려 독 상태가 되었다";
+            else immunityMessage = context.Attacker.GetAilmentImmunityMessage("poison", context.Defender);
         }
         else if (context.Defender.HasActiveAbility("불꽃몸", context.Attacker)
             && context.Random.Next(100) < 30)
         {
             context.Attacker.ApplyAilment("burn", opponent: context.Defender);
             if (context.Attacker.Status == StatusCondition.Burn) reaction = "불꽃몸에 닿아 화상을 입었다";
+            else immunityMessage = context.Attacker.GetAilmentImmunityMessage("burn", context.Defender);
         }
         else if (context.Defender.HasActiveAbility("포자", context.Attacker)
             && context.Random.Next(100) < 30)
@@ -577,14 +589,17 @@ public sealed class ContactReactionEffectHandler : IBattleEffectHandler
             string ailment = context.Random.Next(3) switch { 0 => "poison", 1 => "paralysis", _ => "sleep" };
             context.Attacker.ApplyAilment(ailment, opponent: context.Defender);
             if (context.Attacker.Status != StatusCondition.None) reaction = $"포자 때문에 {AilmentKor(ailment)} 상태가 되었다";
+            else immunityMessage = context.Attacker.GetAilmentImmunityMessage(ailment, context.Defender);
         }
         else if (context.Defender.HasActiveAbility("독수", context.Attacker)
             && context.Random.Next(100) < 30)
         {
             context.Attacker.ApplyAilment("poison", opponent: context.Defender);
             if (context.Attacker.Status == StatusCondition.Poison) reaction = "독수에 중독되었다";
+            else immunityMessage = context.Attacker.GetAilmentImmunityMessage("poison", context.Defender);
         }
         if (reaction != null) await context.ShowMessage($"{context.Attacker.Data.Name}은(는) {reaction}!");
+        else if (immunityMessage != null) await context.ShowMessage(immunityMessage);
     }
 
     public async Task AfterMoveAsync(BattleEffectContext context)

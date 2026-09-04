@@ -664,34 +664,66 @@ public class Pokemon
         return null;
     }
 
-    public bool IsImmuneToAilment(string ailmentName, Pokemon? opponent = null)
+    public bool IsImmuneToAilment(string ailmentName, Pokemon? opponent = null) =>
+        GetAilmentImmunityMessage(ailmentName, opponent) != null;
+
+    public string? GetAilmentImmunityMessage(string ailmentName, Pokemon? opponent = null)
     {
         if (ailmentName == "toxic") ailmentName = "poison";
-        if (ailmentName == "sleep" && UproarActive) return true;
-        if (BattleField.Current is BattleField.Electric or BattleField.Misty)
-        {
-            if (ailmentName is "sleep" or "poison" or "paralysis" or "burn" or "freeze")
-            {
-                return true;
-            }
-        }
+        string? fieldMessage = GetFieldAilmentImmunityMessage(ailmentName, opponent);
+        if (fieldMessage != null) return fieldMessage;
+        if (ailmentName == "sleep" && UproarActive)
+            return $"{Data.Name}은(는) 소란 때문에 잠들 수 없다!";
         if (!IsAbilitySuppressedBy(opponent))
         {
-            if (ailmentName == "sleep" && HasActiveAbility("불면", opponent)) return true;
-            if (ailmentName == "sleep" && HasActiveAbility("의기양양", opponent)) return true;
-            if (ailmentName == "sleep" && HasActiveAbility("스위트베일", opponent)) return true;
-            if (ailmentName == "poison" && HasActiveAbility("면역", opponent)) return true;
-            if (ailmentName == "paralysis" && HasActiveAbility("유연", opponent)) return true;
-            if (ailmentName == "burn" && HasActiveAbility("수의베일", opponent)) return true;
-            if (ailmentName == "freeze" && HasActiveAbility("마그마의무장", opponent)) return true;
+            string? ability = ailmentName switch
+            {
+                "sleep" when HasActiveAbility("불면", opponent) => "불면",
+                "sleep" when HasActiveAbility("의기양양", opponent) => "의기양양",
+                "sleep" when HasActiveAbility("스위트베일", opponent) => "스위트베일",
+                "poison" when HasActiveAbility("면역", opponent) => "면역",
+                "paralysis" when HasActiveAbility("유연", opponent) => "유연",
+                "burn" when HasActiveAbility("수의베일", opponent) => "수의베일",
+                "freeze" when HasActiveAbility("마그마의무장", opponent) => "마그마의무장",
+                _ => null
+            };
+            if (ability != null)
+                return $"{Data.Name}의 {ability} 특성 때문에 상태 이상에 걸리지 않았다!";
         }
         if (!BattleWeather.AreEffectsSuppressed(this, opponent)
-            && BattleWeather.Current == "쾌청" && HasActiveAbility("리프가드", opponent)) return true;
-        return false;
+            && BattleWeather.Current == "쾌청" && HasActiveAbility("리프가드", opponent))
+        {
+            return $"{Data.Name}의 리프가드 특성 때문에 상태 이상에 걸리지 않았다!";
+        }
+        return null;
     }
+    public string? GetFieldAilmentImmunityMessage(string ailmentName, Pokemon? opponent = null)
+    {
+        if (!IsGrounded(opponent)) return null;
+        return BattleField.Current switch
+        {
+            BattleField.Electric when ailmentName == "sleep"
+                => $"{Data.Name}은(는) 일렉트릭필드의 보호를 받아 잠들지 않았다!",
+            BattleField.Misty when ailmentName
+                is "sleep" or "poison" or "paralysis" or "burn" or "freeze"
+                => $"{Data.Name}은(는) 미스트필드의 보호를 받아 상태 이상에 걸리지 않았다!",
+            _ => null
+        };
+    }
+
     public bool IsImmuneToConfusion(Pokemon? opponent = null) =>
-        HasActiveAbility("마이페이스", opponent)
-        || BattleField.Current == BattleField.Misty;
+        GetConfusionImmunityMessage(opponent) != null;
+
+    public string? GetFieldConfusionImmunityMessage(Pokemon? opponent = null) =>
+        IsGrounded(opponent) && BattleField.Current == BattleField.Misty
+            ? $"{Data.Name}은(는) 미스트필드의 보호를 받아 혼란에 빠지지 않았다!"
+            : null;
+
+    public string? GetConfusionImmunityMessage(Pokemon? opponent = null) =>
+        GetFieldConfusionImmunityMessage(opponent)
+        ?? (HasActiveAbility("마이페이스", opponent)
+            ? $"{Data.Name}의 마이페이스 특성 때문에 혼란에 빠지지 않았다!"
+            : null);
 
     public bool IsImmuneToMentalEffect(string effectName, Pokemon? opponent = null) =>
         (HasActiveAbility("둔감", opponent)

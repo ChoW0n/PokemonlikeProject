@@ -12,6 +12,8 @@ public sealed class BattleEngine
     private readonly IReadOnlyList<IBattleEffectHandler> effectHandlers;
     private readonly BattleSideState heroSide = new();
     private readonly BattleSideState enemySide = new();
+    private readonly HashSet<Pokemon> knownPokemon = new();
+    private readonly Dictionary<Pokemon, bool> pokemonSides = new();
     private readonly BattleEnvironment environment;
     public RunMetaState? ActiveRunMeta { get; private set; }
 
@@ -130,6 +132,10 @@ public sealed class BattleEngine
         BattleField.Reset();
         heroSide.Reset();
         enemySide.Reset();
+        knownPokemon.Clear();
+        pokemonSides.Clear();
+        RegisterPokemon(hero, isHero: true);
+        RegisterPokemon(enemy, isHero: false);
         var messages = new List<string>();
         if (initialWeather != null && initialWeather != BattleWeather.Clear)
         {
@@ -173,6 +179,8 @@ public sealed class BattleEngine
     {
         ActivateEnvironment();
         var messages = new List<string>();
+        RegisterPokemon(entrant, isHeroSide);
+        RegisterPokemon(opponent, !isHeroSide);
         entrant.ResetFieldCounter();
         var side = isHeroSide ? heroSide : enemySide;
         messages.AddRange(ApplyEntryHazards(entrant, opponent, side));
@@ -365,6 +373,7 @@ public sealed class BattleEngine
         for (int index = 0; index < active.Length; index++)
         {
             var pokemon = active[index];
+            RegisterPokemon(pokemon, index == 0);
             if (pokemon.IsFainted) continue;
 
             var statusMessage = pokemon.ApplyEndOfTurnStatusDamage();
@@ -385,6 +394,42 @@ public sealed class BattleEngine
         if (BattleField.AdvanceTurn())
         {
             await emit(BattleEvent.TurnEnd("필드의 효과가 사라졌다!", 900));
+        }
+
+        // 시한 공격은 시전자의 행동과 무관하게 턴 종료에 처리한다.
+        foreach (var attacker in knownPokemon.ToArray())
+        {
+            if (attacker.PendingDelayedAttackKey == null
+                || attacker.PendingDelayedAttackTurns > 0) continue;
+
+            string? delayedKey = attacker.ConsumePendingDelayedAttack(out Pokemon? recordedTarget);
+            if (delayedKey == null) continue;
+
+            Pokemon? target = recordedTarget is { IsFainted: false }
+                ? recordedTarget
+                : FindCurrentOpponent(attacker, active);
+            if (target == null || target.IsFainted)
+            {
+                await emit(BattleEvent.MessageLine(
+                    $"{attacker.Data.Name}의 {MoveDatabase.All[delayedKey].Name}의 시한 공격은 대상이 없어 사라졌다!"));
+                continue;
+            }
+
+            bool attackerIsHero = pokemonSides.TryGetValue(attacker, out bool isHero) && isHero;
+            var delayedResult = new BattleTurnResult();
+            var delayedMove = MoveDatabase.All[delayedKey];
+            await emit(BattleEvent.MessageLine(
+                $"{attacker.Data.Name}의 {delayedMove.Name}의 시한 공격이 떨어졌다!"));
+            await ExecuteMoveAsync(
+                attacker,
+                target,
+                delayedMove,
+                delayedKey,
+                attackerIsHero,
+                emit,
+                delayedResult,
+                isContinuation: true);
+            await EmitFaintEventsAsync(delayedResult, attacker, attackerIsHero, emit);
         }
     }
 
@@ -411,6 +456,8 @@ public sealed class BattleEngine
         bool? attackerMovedFirst = null)
     {
         ActivateEnvironment();
+        RegisterPokemon(attacker, attackerIsHero);
+        RegisterPokemon(defender, !attackerIsHero);
         var result = new BattleTurnResult();
 
         if (attacker.MustRecharge)
@@ -444,18 +491,6 @@ public sealed class BattleEngine
         {
             if (attacker.IsFainted) result.FaintedPokemon = attacker;
             return result;
-        }
-
-        string? pendingDelayedKey = attacker.ConsumePendingDelayedAttack(out Pokemon? delayedTarget);
-        if (pendingDelayedKey != null && delayedTarget != null && !delayedTarget.IsFainted)
-        {
-            var delayedMove = MoveDatabase.All[pendingDelayedKey];
-            await emit(BattleEvent.MessageLine(
-                $"{attacker.Data.Name}의 {delayedMove.Name}의 시한 공격이 떨어졌다!"));
-            await ExecuteMoveAsync(attacker, delayedTarget, delayedMove, pendingDelayedKey,
-                attackerIsHero, emit, result, isContinuation: true, attackerMovedFirst);
-            if (moveKey == null || attacker.IsFainted || defender.IsFainted)
-                return result;
         }
 
         string? executingMoveKey = attacker.RampageMoveKey ?? attacker.ConsumePendingMove();
@@ -595,6 +630,44 @@ public sealed class BattleEngine
                 ReferenceEquals(result.OtherFaintedPokemon, attacker) ? attackerIsHero : !attackerIsHero));
         }
         return result;
+    }
+
+    private void RegisterPokemon(Pokemon pokemon, bool isHero)
+    {
+        knownPokemon.Add(pokemon);
+        pokemonSides[pokemon] = isHero;
+    }
+
+    private Pokemon? FindCurrentOpponent(Pokemon attacker, IReadOnlyList<Pokemon> active)
+    {
+        bool attackerIsHero = pokemonSides.TryGetValue(attacker, out bool isHero) && isHero;
+        return active.FirstOrDefault(candidate =>
+            !ReferenceEquals(candidate, attacker)
+            && !candidate.IsFainted
+            && (!pokemonSides.TryGetValue(candidate, out bool candidateIsHero)
+                || candidateIsHero != attackerIsHero));
+    }
+
+    private static async Task EmitFaintEventsAsync(
+        BattleTurnResult result,
+        Pokemon attacker,
+        bool attackerIsHero,
+        Func<BattleEvent, Task> emit)
+    {
+        if (result.FaintedPokemon != null)
+        {
+            await emit(BattleEvent.ActorStep(
+                BattleEventPhase.Faint,
+                result.FaintedPokemon,
+                ReferenceEquals(result.FaintedPokemon, attacker) ? attackerIsHero : !attackerIsHero));
+        }
+        if (result.OtherFaintedPokemon != null)
+        {
+            await emit(BattleEvent.ActorStep(
+                BattleEventPhase.Faint,
+                result.OtherFaintedPokemon,
+                ReferenceEquals(result.OtherFaintedPokemon, attacker) ? attackerIsHero : !attackerIsHero));
+        }
     }
 
     private async Task AdvanceRampageAfterAttemptAsync(
@@ -837,7 +910,15 @@ public sealed class BattleEngine
                     case ProtectionEffect.BanefulBunker:
                         if (attacker.Status == StatusCondition.None)
                         {
-                            attacker.ApplyAilment("poison", rng, defender);
+                            string? immunityMessage = attacker.GetAilmentImmunityMessage("poison", defender);
+                            if (immunityMessage != null)
+                            {
+                                await emit(BattleEvent.MessageLine(immunityMessage));
+                            }
+                            else
+                            {
+                                attacker.ApplyAilment("poison", rng, defender);
+                            }
                             if (attacker.Status == StatusCondition.Poison)
                                 await emit(BattleEvent.MessageLine(
                                     $"{attacker.Data.Name}은(는) 독가시방벽 때문에 독 상태가 되었다!"));
@@ -1103,13 +1184,23 @@ public sealed class BattleEngine
                 side.ClearToxicSpikes();
                 messages.Add($"{entrant.Data.Name}이(가) 독압정을 제거했다!");
             }
-            else if (entrant.Status == StatusCondition.None
-                && !entrant.IsImmuneToAilment("poison", opponent))
+            else if (entrant.Status == StatusCondition.None)
             {
                 string ailment = side.ToxicSpikesLayers >= 2 ? "toxic" : "poison";
-                entrant.ApplyAilment(ailment, opponent: opponent);
-                messages.Add($"{entrant.Data.Name}은(는) 독압정 때문에 {(
-                    ailment == "toxic" ? "맹독" : "독")} 상태가 되었다!");
+                string? immunityMessage = entrant.GetAilmentImmunityMessage(ailment, opponent);
+                if (immunityMessage != null)
+                {
+                    messages.Add(immunityMessage);
+                }
+                else
+                {
+                    entrant.ApplyAilment(ailment, opponent: opponent);
+                    if (entrant.Status != StatusCondition.None)
+                    {
+                        messages.Add($"{entrant.Data.Name}은(는) 독압정 때문에 {(
+                            ailment == "toxic" ? "맹독" : "독")} 상태가 되었다!");
+                    }
+                }
             }
         }
 

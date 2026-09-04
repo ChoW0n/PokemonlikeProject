@@ -112,13 +112,23 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         var move = context.Move;
         var attacker = context.Attacker;
         var defender = context.Defender;
-        bool suppressSecondaryEffects = attacker.HasActiveAbility("우격다짐", defender)
-            || (!move.IsStatus
-                && defender.HasActiveHeldItem(attacker)
-                && defender.HeldItem == "은밀망토")
-            || (MoveRuleMetadata.IsPowderMove(context.MoveKey)
-                && defender.HasActiveAbility("인분", attacker))
-            || defender.LastHitBlockedBySubstitute;
+        var suppressionReasons = new List<string>();
+        if (!move.IsStatus && attacker.HasActiveAbility("우격다짐", defender))
+            suppressionReasons.Add($"{attacker.Data.Name}의 우격다짐이 공격의 부가효과를 없앴다!");
+        if (defender.LastHitBlockedBySubstitute)
+            suppressionReasons.Add($"{defender.Data.Name}의 대타출동이 기술의 효과를 막았다!");
+        if (!move.IsStatus
+            && defender.HasActiveHeldItem(attacker)
+            && defender.HeldItem == "은밀망토")
+        {
+            suppressionReasons.Add($"{defender.Data.Name}의 은밀망토가 부가효과를 막았다!");
+        }
+        if (MoveRuleMetadata.IsPowderMove(context.MoveKey)
+            && defender.HasActiveAbility("인분", attacker))
+        {
+            suppressionReasons.Add($"{defender.Data.Name}의 인분 특성이 가루 효과를 막았다!");
+        }
+        bool suppressSecondaryEffects = suppressionReasons.Count > 0;
         int chanceMultiplier = attacker.HasActiveAbility("하늘의은총", defender) ? 2 : 1;
 
         await ApplyMoveSpecificEffectAsync(context);
@@ -151,48 +161,82 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
             await context.ShowMessage($"{attacker.Data.Name}은(는) HP를 회복했다!");
         }
 
-        if (!suppressSecondaryEffects && IsSupportedAilment(move.AilmentName) && !defender.IsFainted
-            && context.Random.Next(100) < Math.Min(100, move.AilmentChance * chanceMultiplier))
+        if (IsSupportedAilment(move.AilmentName) && !defender.IsFainted)
         {
-            if (move.AilmentName == "confusion")
+            if (suppressSecondaryEffects)
             {
-                if (!defender.IsConfused)
+                foreach (string reason in suppressionReasons)
+                    await context.ShowMessage(reason);
+            }
+            else if (context.Random.Next(100) >= Math.Min(100, move.AilmentChance * chanceMultiplier))
+            {
+                await context.ShowMessage(
+                    $"{defender.Data.Name}에게 {AilmentKor(move.AilmentName)} 효과가 발생하지 않았다!");
+            }
+            else if (move.AilmentName == "confusion")
+            {
+                if (defender.IsConfused)
                 {
-                    string? fieldMessage = defender.GetFieldConfusionImmunityMessage(attacker);
-                    if (fieldMessage != null)
+                    await context.ShowMessage($"{defender.Data.Name}은(는) 이미 혼란 상태다!");
+                }
+                else
+                {
+                    string? immunityMessage = defender.GetConfusionImmunityMessage(attacker);
+                    if (immunityMessage != null)
                     {
-                        await context.ShowMessage(fieldMessage);
+                        await context.ShowMessage(immunityMessage);
                     }
-                    else if (!defender.IsImmuneToConfusion(attacker))
+                    else
                     {
                         defender.ApplyConfusion(context.Random, attacker);
                         await context.ShowMessage($"{defender.Data.Name}은(는) 혼란에 빠졌다!");
                     }
                 }
             }
-            else if (defender.Status == StatusCondition.None
-                && !(defender.HasActiveHeldItem(attacker)
-                    && defender.HeldItem == "방진고글"
-                    && MoveRuleMetadata.IsPowderMove(context.MoveKey)))
+            else
             {
                 string ailment = context.MoveKey == "toxic" ? "toxic" : move.AilmentName;
-                string? fieldMessage = defender.GetFieldAilmentImmunityMessage(ailment, attacker);
-                if (fieldMessage != null)
+                if (defender.Status != StatusCondition.None)
                 {
-                    await context.ShowMessage(fieldMessage);
+                    await context.ShowMessage(
+                        $"{defender.Data.Name}은(는) 이미 {StatusKor(defender.Status)} 상태라 새로운 상태 이상에 걸리지 않았다!");
                 }
-                else if (!defender.IsImmuneToAilment(ailment, attacker))
+                else if (MoveRuleMetadata.IsPowderMove(context.MoveKey)
+                    && defender.HasActiveHeldItem(attacker)
+                    && defender.HeldItem == "방진고글")
                 {
-                    defender.ApplyAilment(ailment, context.Random, attacker);
-                    await context.ShowMessage($"{defender.Data.Name}은(는) {AilmentKor(ailment)} 상태가 되었다!");
-
-                    if (defender.HasActiveAbility("싱크로", attacker)
-                        && move.AilmentName is "paralysis" or "poison" or "burn"
-                        && attacker.Status == StatusCondition.None
-                        && !attacker.IsImmuneToAilment(move.AilmentName, defender))
+                    await context.ShowMessage($"{defender.Data.Name}의 방진고글이 가루 효과를 막았다!");
+                }
+                else
+                {
+                    string? immunityMessage = defender.GetAilmentImmunityMessage(ailment, attacker);
+                    if (immunityMessage != null)
                     {
-                        attacker.ApplyAilment(move.AilmentName, opponent: defender);
-                        await context.ShowMessage($"{defender.Data.Name}의 싱크로가 {attacker.Data.Name}에게 상태 이상을 옮겼다!");
+                        await context.ShowMessage(immunityMessage);
+                    }
+                    else
+                    {
+                        defender.ApplyAilment(ailment, context.Random, attacker);
+                        if (defender.Status != StatusCondition.None)
+                        {
+                            await context.ShowMessage(
+                                $"{defender.Data.Name}은(는) {AilmentKor(ailment)} 상태가 되었다!");
+                        }
+                        else
+                        {
+                            await context.ShowMessage(
+                                $"{defender.Data.Name}에게 {AilmentKor(ailment)} 상태 이상이 적용되지 않았다!");
+                        }
+
+                        if (defender.Status != StatusCondition.None
+                            && defender.HasActiveAbility("싱크로", attacker)
+                            && move.AilmentName is "paralysis" or "poison" or "burn"
+                            && attacker.Status == StatusCondition.None
+                            && !attacker.IsImmuneToAilment(move.AilmentName, defender))
+                        {
+                            attacker.ApplyAilment(move.AilmentName, opponent: defender);
+                            await context.ShowMessage($"{defender.Data.Name}의 싱크로가 {attacker.Data.Name}에게 상태 이상을 옮겼다!");
+                        }
                     }
                 }
             }
@@ -282,19 +326,19 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         }
 
         if (!pokemon.IsFainted && pokemon.YawnTurnsRemaining == 1
-            && pokemon.Status == StatusCondition.None && !pokemon.UproarActive)
+            && pokemon.Status == StatusCondition.None)
         {
-            string? fieldMessage = pokemon.GetFieldAilmentImmunityMessage("sleep", context.Opponent);
-            if (fieldMessage != null)
+            string? immunityMessage = pokemon.GetAilmentImmunityMessage("sleep", context.Opponent);
+            if (immunityMessage != null)
             {
-                await context.ShowMessage(fieldMessage, 900);
+                await context.ShowMessage(immunityMessage, 900);
             }
-            else if (!pokemon.IsImmuneToAilment("sleep", context.Opponent))
+            else
             {
                 pokemon.ApplyAilment("sleep", opponent: context.Opponent);
+                if (pokemon.Status == StatusCondition.Sleep)
+                    await context.ShowMessage($"{pokemon.Data.Name}은(는) 하품 때문에 잠들었다!", 900);
             }
-            if (pokemon.Status == StatusCondition.Sleep)
-                await context.ShowMessage($"{pokemon.Data.Name}은(는) 하품 때문에 잠들었다!", 900);
         }
 
         if (!pokemon.IsFainted && pokemon.PerishTurnsRemaining > 0)
@@ -687,6 +731,16 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         "confusion" => "혼란",
         "toxic" => "맹독",
         _ => ailment
+    };
+
+    private static string StatusKor(StatusCondition status) => status switch
+    {
+        StatusCondition.Burn => "화상",
+        StatusCondition.Poison => "독",
+        StatusCondition.Paralysis => "마비",
+        StatusCondition.Sleep => "잠듦",
+        StatusCondition.Freeze => "얼음",
+        _ => "상태 이상"
     };
 
     private static string StatKor(string stat) => stat switch
