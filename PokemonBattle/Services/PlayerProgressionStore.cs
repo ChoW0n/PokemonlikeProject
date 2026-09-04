@@ -115,6 +115,7 @@ public sealed class PlayerProgressionStore
         int turns = 0,
         double playerHpRatio = 0,
         double enemyHpRatio = 0,
+        bool isLegendaryBattle = false,
         int difficultyAdjustment = 0,
         double? skillRating = null)
     {
@@ -127,6 +128,7 @@ public sealed class PlayerProgressionStore
             turns,
             playerHpRatio,
             enemyHpRatio,
+            isLegendaryBattle,
             difficultyAdjustment,
             skillRating);
         await _database.ExecuteAsync("progression.complete-battle", async db =>
@@ -202,6 +204,7 @@ public sealed class PlayerProgressionStore
         int turns,
         double playerHpRatio,
         double enemyHpRatio,
+        bool isLegendaryBattle,
         int difficultyAdjustment,
         double? skillRating)
     {
@@ -215,18 +218,30 @@ public sealed class PlayerProgressionStore
                         .Select(profile => profile.RivalNumber)
                         .FirstOrDefaultAsync()
                     : 0;
-                double recordedRating = skillRating
-                    ?? await db.PlayerSkillRatings
+                // 종료 시점의 계정 지표를 스냅샷한다.
+                var ratingRecord = await db.PlayerSkillRatings
                         .Where(rating => rating.Username == username)
-                        .Select(rating => rating.Rating)
+                        .Select(rating => new
+                        {
+                            rating.Rating,
+                            rating.CompletedRuns
+                        })
                         .FirstOrDefaultAsync();
+                double recordedRating = skillRating ?? ratingRecord?.Rating ?? 0;
+                int unlockedCount = await db.UnlockedPokemons
+                    .Where(unlock => unlock.Username == username)
+                    .Select(unlock => unlock.PokemonId)
+                    .Distinct()
+                    .CountAsync();
 
                 db.BattleResults.Add(new BattleResult
                 {
                     Username = username,
                     IsRivalBattle = isRivalBattle,
+                    IsLegendaryBattle = isLegendaryBattle,
                     RivalNumber = Math.Max(0, rivalNumber),
                     Won = won,
+                    EndReason = won ? "win" : "team-wipe",
                     Round = Math.Max(1, round),
                     Turns = Math.Max(0, turns),
                     PlayerHpRatio = Math.Clamp(playerHpRatio, 0, 1),
@@ -234,7 +249,9 @@ public sealed class PlayerProgressionStore
                     DifficultyAdjustment = difficultyAdjustment,
                     SkillRating = recordedRating <= 0
                         ? SkillRatingCalculator.DefaultRating
-                        : recordedRating
+                        : recordedRating,
+                    UnlockedCount = Math.Max(0, unlockedCount),
+                    RunSeq = Math.Max(0, ratingRecord?.CompletedRuns ?? 0)
                 });
                 await db.SaveChangesAsync();
             });

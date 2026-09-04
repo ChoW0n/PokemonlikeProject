@@ -640,6 +640,7 @@ public class GameState
         int battleRound = CurrentRunLevel;
         int battleDifficultyAdjustment = CurrentRunDifficultyAdjustment;
         double battleSkillRating = SkillRating;
+        bool isLegendaryBattle = EnemyTeamProvider.ContainsLegendary(EnemyTeamIds);
         double playerHpRatio = RecordRoundPerformance(turns, playerTeam, cleared: true);
         double enemyHpRatio = CalculateTeamHpRatio(enemyTeam);
         ResultSkillRating = SkillRatingCalculator.PreviewRating(
@@ -705,6 +706,7 @@ public class GameState
                 turns: turns,
                 playerHpRatio: playerHpRatio,
                 enemyHpRatio: enemyHpRatio,
+                isLegendaryBattle: isLegendaryBattle,
                 difficultyAdjustment: battleDifficultyAdjustment,
                 skillRating: battleSkillRating);
             await RefreshAccountProgress();
@@ -749,6 +751,7 @@ public class GameState
         int battleRound = CurrentRunLevel;
         int battleDifficultyAdjustment = CurrentRunDifficultyAdjustment;
         double battleSkillRating = SkillRating;
+        bool isLegendaryBattle = EnemyTeamProvider.ContainsLegendary(EnemyTeamIds);
         var latestLoadouts = PlayerLoadouts.Select(loadout => loadout.Clone()).ToList();
         double playerHpRatio = RecordRoundPerformance(turns, playerTeam, cleared: false);
         double enemyHpRatio = CalculateTeamHpRatio(enemyTeam);
@@ -773,6 +776,7 @@ public class GameState
                 turns: turns,
                 playerHpRatio: playerHpRatio,
                 enemyHpRatio: enemyHpRatio,
+                isLegendaryBattle: isLegendaryBattle,
                 difficultyAdjustment: battleDifficultyAdjustment,
                 skillRating: battleSkillRating);
             await RefreshAccountProgress();
