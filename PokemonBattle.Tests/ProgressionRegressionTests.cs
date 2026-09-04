@@ -1242,6 +1242,54 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public async Task Technical_machine_reward_count_includes_available_machines_duplicates_and_apples()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreatePlayerRunsTable(schema);
+            await CreateProgressionTables(schema);
+            const string username = "technical-machine-reward-count";
+            var loadouts = new List<PokemonLoadout>
+            {
+                new()
+                {
+                    PokemonId = 1,
+                    ChosenMoveNames = new List<string> { "tackle" },
+                    ChosenAbility = "심록",
+                    ChosenItem = TeamLoadoutRules.NoItem,
+                    Level = 4
+                }
+            };
+
+            await using (var db = CreateDbContext(schema))
+            {
+                var store = new PlayerProgressionStore(db);
+                await store.SaveLatestLoadoutsAsync(username, loadouts);
+                db.TechnicalMachines.AddRange(
+                    new TechnicalMachineInventory
+                    {
+                        Username = username,
+                        MoveKey = "cut",
+                        Quantity = 1
+                    },
+                    new TechnicalMachineInventory
+                    {
+                        Username = username,
+                        MoveKey = "toxic",
+                        Quantity = 3
+                    });
+                await db.SaveChangesAsync();
+            }
+
+            await using var verifyDb = CreateDbContext(schema);
+            int count = await new PlayerProgressionStore(verifyDb)
+                .CountTechnicalMachineRewardsAsync(username);
+
+            Assert.Equal(5, count);
+        });
+    }
+
+    [Fact]
     public async Task Technical_machine_fallback_excludes_owned_moves()
     {
         await WithTemporarySchema(async schema =>

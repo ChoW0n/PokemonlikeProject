@@ -65,6 +65,30 @@ public sealed class PlayerProgressionStore
         });
     }
 
+    public async Task<int> CountTechnicalMachineRewardsAsync(string username) =>
+        await _database.ExecuteAsync("progression.count-machine-rewards", async db =>
+        {
+            var profile = await GetOrCreateAsync(db, username);
+            var latestLoadouts = DeserializeLoadouts(profile.LatestLoadoutsJson);
+            if (latestLoadouts.Count == 0) return 0;
+
+            // 팀에서 바로 고를 수 있는 일반 기술을 합친다.
+            var generallyAvailableMoves = latestLoadouts
+                .Where(loadout => PokemonDatabase.All.ContainsKey(loadout.PokemonId))
+                .SelectMany(loadout => PokemonDatabase.All[loadout.PokemonId].MoveNames)
+                .ToHashSet(StringComparer.Ordinal);
+
+            var machines = await db.TechnicalMachines
+                .AsNoTracking()
+                .Where(machine => machine.Username == username && machine.Quantity > 0)
+                .ToListAsync();
+
+            return 2 + machines.Sum(machine =>
+                generallyAvailableMoves.Contains(machine.MoveKey)
+                    ? machine.Quantity
+                    : machine.Quantity - 1);
+        });
+
     public async Task RecordMoveSelectionAsync(string username, string moveKey)
     {
         await _database.ExecuteAsync("progression.record-move", async db =>
