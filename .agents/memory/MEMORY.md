@@ -17,6 +17,7 @@
 - [Enemy evolution scaling](enemy-evolution-scaling.md) — evolution-stage pressure stays mild when layered on top of BST weighting.
 - [Deployment UBB suspension](deployment-ubb-suspension.md) — successful builds can still be suspended by a usage-based billing hold.
 - [GitHub change control](github-change-control.md) — never commit or push unless the user explicitly asks for it.
+- [GitHub HTTPS publishing](github-https-publishing.md) — connect stored GitHub CLI auth with `gh auth setup-git` before pushing through the HTTPS origin.
 - [Gimmick scope](gimmick-scope.md) — gimmick work is paused and the active scope ends at Mega Evolution.
 - [DI constructor ambiguity](di-constructor-ambiguity.md) — legacy test constructors need explicit production DI factory registrations.
 - [Production app URL](production-app-url.md) — public Render URL for deployed-site checks and verification.
