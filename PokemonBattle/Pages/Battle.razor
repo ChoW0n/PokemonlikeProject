@@ -910,7 +910,7 @@
                 return true;
             }
             await ShowMessage("내 포켓몬이 모두 쓰러졌다... 패배...");
-            await State.LoseBattle(Turn, PlayerTeam);
+            await State.LoseBattle(Turn, PlayerTeam, EnemyTeam);
             Nav.NavigateTo("/result");
             return true;
         }
@@ -933,7 +933,7 @@
             }
             await Rules.ApplyEndOfBattleEffectsAsync(PlayerTeam, PlayBattleEvent);
             await ShowMessage("상대 포켓몬을 모두 쓰러뜨렸다! 승리!");
-            await State.WinRound(Turn, PlayerTeam);
+            await State.WinRound(Turn, PlayerTeam, EnemyTeam);
             Nav.NavigateTo("/result");
             return true;
         }

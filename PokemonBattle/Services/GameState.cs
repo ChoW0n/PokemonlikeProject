@@ -614,12 +614,15 @@ public class GameState
         TechnicalMachines = accountProgress.machines;
     }
 
-    public async Task WinRound(int turns = 0, IEnumerable<Pokemon>? playerTeam = null)
+    public async Task WinRound(
+        int turns = 0,
+        IEnumerable<Pokemon>? playerTeam = null,
+        IEnumerable<Pokemon>? enemyTeam = null)
     {
         await _outcomeGate.WaitAsync();
         try
         {
-            await WinRoundCore(turns, playerTeam);
+            await WinRoundCore(turns, playerTeam, enemyTeam);
         }
         finally
         {
@@ -627,7 +630,10 @@ public class GameState
         }
     }
 
-    private async Task WinRoundCore(int turns, IEnumerable<Pokemon>? playerTeam)
+    private async Task WinRoundCore(
+        int turns,
+        IEnumerable<Pokemon>? playerTeam,
+        IEnumerable<Pokemon>? enemyTeam)
     {
         if (_battleOutcomeProcessed) return;
         _battleOutcomeProcessed = true;
@@ -635,6 +641,7 @@ public class GameState
         int battleDifficultyAdjustment = CurrentRunDifficultyAdjustment;
         double battleSkillRating = SkillRating;
         double playerHpRatio = RecordRoundPerformance(turns, playerTeam, cleared: true);
+        double enemyHpRatio = CalculateTeamHpRatio(enemyTeam);
         ResultSkillRating = SkillRatingCalculator.PreviewRating(
             SkillRating,
             _roundPerformances,
@@ -697,6 +704,7 @@ public class GameState
                 round: battleRound,
                 turns: turns,
                 playerHpRatio: playerHpRatio,
+                enemyHpRatio: enemyHpRatio,
                 difficultyAdjustment: battleDifficultyAdjustment,
                 skillRating: battleSkillRating);
             await RefreshAccountProgress();
@@ -715,12 +723,15 @@ public class GameState
     public int GetPokemonMasteryBonusPercent(int pokemonId) =>
         PokemonMasteryRules.GetBonusPercent(_masteryWins.GetValueOrDefault(pokemonId));
 
-    public async Task LoseBattle(int turns = 0, IEnumerable<Pokemon>? playerTeam = null)
+    public async Task LoseBattle(
+        int turns = 0,
+        IEnumerable<Pokemon>? playerTeam = null,
+        IEnumerable<Pokemon>? enemyTeam = null)
     {
         await _outcomeGate.WaitAsync();
         try
         {
-            await LoseBattleCore(turns, playerTeam);
+            await LoseBattleCore(turns, playerTeam, enemyTeam);
         }
         finally
         {
@@ -728,7 +739,10 @@ public class GameState
         }
     }
 
-    private async Task LoseBattleCore(int turns, IEnumerable<Pokemon>? playerTeam)
+    private async Task LoseBattleCore(
+        int turns,
+        IEnumerable<Pokemon>? playerTeam,
+        IEnumerable<Pokemon>? enemyTeam)
     {
         if (_battleOutcomeProcessed) return;
         _battleOutcomeProcessed = true;
@@ -737,6 +751,7 @@ public class GameState
         double battleSkillRating = SkillRating;
         var latestLoadouts = PlayerLoadouts.Select(loadout => loadout.Clone()).ToList();
         double playerHpRatio = RecordRoundPerformance(turns, playerTeam, cleared: false);
+        double enemyHpRatio = CalculateTeamHpRatio(enemyTeam);
         await UpdateSkillRatingForCurrentRun();
         _scoreStore.SaveIfHigher(CurrentScore);
         HighScore = Math.Max(HighScore, _scoreStore.GetHighScore());
@@ -757,6 +772,7 @@ public class GameState
                 round: battleRound,
                 turns: turns,
                 playerHpRatio: playerHpRatio,
+                enemyHpRatio: enemyHpRatio,
                 difficultyAdjustment: battleDifficultyAdjustment,
                 skillRating: battleSkillRating);
             await RefreshAccountProgress();
@@ -840,9 +856,7 @@ public class GameState
         var team = playerTeam?.ToList() ?? new List<Pokemon>();
         double hpRatio = team.Count == 0
             ? (cleared ? 1 : 0)
-            : team.Average(pokemon => pokemon.MaxHp <= 0
-                ? 0
-                : Math.Clamp((double)pokemon.CurrentHp / pokemon.MaxHp, 0, 1));
+            : CalculateTeamHpRatio(team);
 
         _roundPerformances.Add(new RunRoundPerformance
         {
@@ -851,6 +865,16 @@ public class GameState
             Turns = Math.Max(0, turns)
         });
         return hpRatio;
+    }
+
+    private static double CalculateTeamHpRatio(IEnumerable<Pokemon>? team)
+    {
+        var members = team?.ToList() ?? new List<Pokemon>();
+        return members.Count == 0
+            ? 0
+            : members.Average(pokemon => pokemon.MaxHp <= 0
+                ? 0
+                : Math.Clamp((double)pokemon.CurrentHp / pokemon.MaxHp, 0, 1));
     }
 
     private async Task UpdateSkillRatingForCurrentRun(bool won = false)

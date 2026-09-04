@@ -114,6 +114,7 @@ public sealed class PlayerProgressionStore
         int round = 1,
         int turns = 0,
         double playerHpRatio = 0,
+        double enemyHpRatio = 0,
         int difficultyAdjustment = 0,
         double? skillRating = null)
     {
@@ -125,6 +126,7 @@ public sealed class PlayerProgressionStore
             round,
             turns,
             playerHpRatio,
+            enemyHpRatio,
             difficultyAdjustment,
             skillRating);
         await _database.ExecuteAsync("progression.complete-battle", async db =>
@@ -199,6 +201,7 @@ public sealed class PlayerProgressionStore
         int round,
         int turns,
         double playerHpRatio,
+        double enemyHpRatio,
         int difficultyAdjustment,
         double? skillRating)
     {
@@ -227,6 +230,7 @@ public sealed class PlayerProgressionStore
                     Round = Math.Max(1, round),
                     Turns = Math.Max(0, turns),
                     PlayerHpRatio = Math.Clamp(playerHpRatio, 0, 1),
+                    EnemyHpRatio = Math.Clamp(enemyHpRatio, 0, 1),
                     DifficultyAdjustment = difficultyAdjustment,
                     SkillRating = recordedRating <= 0
                         ? SkillRatingCalculator.DefaultRating

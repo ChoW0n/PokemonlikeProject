@@ -11,6 +11,7 @@ public class BattleResult
     public int Round { get; set; } = 1;
     public int Turns { get; set; }
     public double PlayerHpRatio { get; set; }
+    public double EnemyHpRatio { get; set; }
     public int DifficultyAdjustment { get; set; }
     public double SkillRating { get; set; } = 1000;
 }

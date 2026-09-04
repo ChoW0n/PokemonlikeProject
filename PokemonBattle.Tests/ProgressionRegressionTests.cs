@@ -557,7 +557,15 @@ public class ProgressionRegressionTests
                     new List<string> { "tackle" },
                     level: 10);
                 player.CurrentHp = player.MaxHp / 2;
-                await state.LoseBattle(turns: 4, playerTeam: new[] { player });
+                var enemy = new Pokemon(
+                    PokemonDatabase.All[4],
+                    new List<string> { "tackle" },
+                    level: 10);
+                enemy.CurrentHp = enemy.MaxHp / 2;
+                await state.LoseBattle(
+                    turns: 4,
+                    playerTeam: new[] { player },
+                    enemyTeam: new[] { enemy });
             }
 
             await using var verifyDb = CreateDbContext(schema);
@@ -569,6 +577,7 @@ public class ProgressionRegressionTests
             Assert.Equal(1, result.Round);
             Assert.Equal(4, result.Turns);
             Assert.Equal(0.5, result.PlayerHpRatio, 6);
+            Assert.True(result.EnemyHpRatio > 0);
             Assert.Equal(0, result.DifficultyAdjustment);
             Assert.Equal(SkillRatingCalculator.DefaultRating, result.SkillRating);
         });
@@ -1525,6 +1534,7 @@ public class ProgressionRegressionTests
                 "Round" INTEGER NOT NULL DEFAULT 1,
                 "Turns" INTEGER NOT NULL DEFAULT 0,
                 "PlayerHpRatio" DOUBLE PRECISION NOT NULL DEFAULT 0,
+                "EnemyHpRatio" DOUBLE PRECISION NOT NULL DEFAULT 0,
                 "DifficultyAdjustment" INTEGER NOT NULL DEFAULT 0,
                 "SkillRating" DOUBLE PRECISION NOT NULL DEFAULT 1000
             );
