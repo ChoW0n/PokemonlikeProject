@@ -309,6 +309,80 @@ public class AdminDashboardRegressionTests
         });
     }
 
+    // 승률 집계가 유형·라운드·라이벌 회차별로 나뉘는지 확인한다.
+    [Fact]
+    public async Task WinRateAnalyticsGroupsBattleResultsByTypeRoundAndRivalNumber()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreateTables(schema);
+            await using (var seedDb = CreateDbContext(schema))
+            {
+                seedDb.Users.Add(new UserAccount
+                {
+                    Username = "admin",
+                    PasswordHash = "x",
+                    IsAdmin = true
+                });
+                seedDb.BattleResults.AddRange(
+                    new BattleResult { Username = "player", Won = true, Round = 1 },
+                    new BattleResult { Username = "player", Won = false, Round = 1 },
+                    new BattleResult
+                    {
+                        Username = "player",
+                        Won = true,
+                        IsRivalBattle = true,
+                        RivalNumber = 1,
+                        Round = 2
+                    },
+                    new BattleResult
+                    {
+                        Username = "player",
+                        Won = false,
+                        IsRivalBattle = true,
+                        RivalNumber = 1,
+                        Round = 2
+                    },
+                    new BattleResult
+                    {
+                        Username = "player",
+                        Won = true,
+                        IsRivalBattle = true,
+                        RivalNumber = 2,
+                        IsLegendaryBattle = true,
+                        Round = 20
+                    },
+                    new BattleResult
+                    {
+                        Username = "player",
+                        Won = false,
+                        IsLegendaryBattle = true,
+                        Round = 25
+                    });
+                await seedDb.SaveChangesAsync();
+            }
+
+            var admin = new CurrentUserService();
+            admin.SignIn("admin", isAdmin: true);
+            await using var db = CreateDbContext(schema);
+            var snapshot = await new WinRateAnalyticsService(db, admin).LoadAsync();
+
+            Assert.NotNull(snapshot);
+            Assert.Equal(new WinRateSummary(6, 3, 50), snapshot!.Overall);
+            Assert.Equal(new WinRateSummary(3, 2, 200d / 3), snapshot.Rival);
+            Assert.Equal(new WinRateSummary(3, 1, 100d / 3), snapshot.Normal);
+            Assert.Equal(new WinRateSummary(2, 1, 50), snapshot.Legendary);
+
+            var lateRounds = Assert.Single(snapshot.ByRound, row => row.Label == "20+");
+            Assert.Equal(2, lateRounds.BattleCount);
+            Assert.Equal(1, lateRounds.WinCount);
+            var firstRival = Assert.Single(
+                snapshot.ByRivalNumber, row => row.Label == "1회차");
+            Assert.Equal(2, firstRival.BattleCount);
+            Assert.Equal(1, firstRival.WinCount);
+        });
+    }
+
     private static AppDbContext CreateDbContext(string schema)
     {
         var rawConnectionString = Environment.GetEnvironmentVariable("DATABASE_URL");
@@ -393,6 +467,24 @@ public class AdminDashboardRegressionTests
                 "MovePreferencesJson" TEXT NOT NULL DEFAULT '{{}}',
                 "UpdatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 CONSTRAINT "UX_PlayerProgressions_Username" UNIQUE ("Username")
+            );
+            CREATE TABLE "BattleResults" (
+                "Id" SERIAL PRIMARY KEY,
+                "Username" TEXT NOT NULL,
+                "CreatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                "IsRivalBattle" BOOLEAN NOT NULL DEFAULT FALSE,
+                "IsLegendaryBattle" BOOLEAN NOT NULL DEFAULT FALSE,
+                "RivalNumber" INTEGER NOT NULL DEFAULT 0,
+                "Won" BOOLEAN NOT NULL,
+                "EndReason" TEXT NOT NULL DEFAULT '',
+                "Round" INTEGER NOT NULL DEFAULT 1,
+                "Turns" INTEGER NOT NULL DEFAULT 0,
+                "PlayerHpRatio" DOUBLE PRECISION NOT NULL DEFAULT 0,
+                "EnemyHpRatio" DOUBLE PRECISION NOT NULL DEFAULT 0,
+                "DifficultyAdjustment" INTEGER NOT NULL DEFAULT 0,
+                "SkillRating" DOUBLE PRECISION NOT NULL DEFAULT 1000,
+                "UnlockedCount" INTEGER NOT NULL DEFAULT 0,
+                "RunSeq" INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE "AdminAuditLogs" (
                 "Id" SERIAL PRIMARY KEY,

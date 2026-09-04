@@ -60,6 +60,10 @@ builder.Services.AddScoped<AdminDashboardService>(serviceProvider =>
     new AdminDashboardService(
         serviceProvider.GetRequiredService<DatabaseContextExecutor>(),
         serviceProvider.GetRequiredService<CurrentUserService>()));
+builder.Services.AddScoped<WinRateAnalyticsService>(serviceProvider =>
+    new WinRateAnalyticsService(
+        serviceProvider.GetRequiredService<DatabaseContextExecutor>(),
+        serviceProvider.GetRequiredService<CurrentUserService>()));
 builder.Services.AddScoped<AdminOperationsService>(serviceProvider =>
     new AdminOperationsService(
         serviceProvider.GetRequiredService<DatabaseContextExecutor>(),

@@ -2,6 +2,7 @@
 @using PokemonBattle.Services
 @inject CurrentUserService CurrentUser
 @inject AdminDashboardService Dashboard
+@inject WinRateAnalyticsService WinRateAnalytics
 @inject AdminOperationsService Operations
 @inject GameState State
 @inject NavigationManager Nav
@@ -43,6 +44,149 @@
             <button type="button" class="admin-refresh" disabled="@IsRefreshing" aria-busy="@(IsRefreshing ? "true" : "false")" @onclick="Refresh">@(IsRefreshing ? "불러오는 중..." : "새로고침")</button>
         </header>
 
+        <nav class="admin-tabs" role="tablist" aria-label="관리자 분석 탭">
+            <button type="button"
+                    class="admin-tab @(ActiveTab == OperationsTab ? "is-active" : "")"
+                    role="tab"
+                    aria-selected="@(ActiveTab == OperationsTab ? "true" : "false")"
+                    @onclick="ShowOperationsTab">
+                운영
+            </button>
+            <button type="button"
+                    class="admin-tab @(ActiveTab == WinRateTab ? "is-active" : "")"
+                    role="tab"
+                    aria-selected="@(ActiveTab == WinRateTab ? "true" : "false")"
+                    @onclick="ShowWinRateTab">
+                승률
+            </button>
+        </nav>
+
+        @if (ActiveTab == WinRateTab)
+        {
+            <section class="admin-panel admin-winrate-panel" aria-labelledby="win-rate-title">
+                <div class="admin-panel-heading">
+                    <div>
+                        <p class="eyebrow">BATTLE OUTCOMES</p>
+                        <h2 id="win-rate-title">승률 분석</h2>
+                    </div>
+                    <span class="admin-generated">BattleResults 기준</span>
+                </div>
+                <p class="admin-analytics-intro">전투 기록 집계 시작: 2026-09-04</p>
+
+                @if (WinRateSnapshot == null)
+                {
+                    <p class="admin-muted" role="status">승률 집계 데이터를 불러오는 중...</p>
+                }
+                else if (!WinRateSnapshot.HasBattleResults)
+                {
+                    <p class="admin-winrate-empty" role="status">아직 집계된 전투가 없습니다</p>
+                }
+                else
+                {
+                    <div class="admin-winrate-summary-grid">
+                        <article class="admin-metric">
+                            <span>전체 승률</span>
+                            <strong>@WinRateText(WinRateSnapshot.Overall)</strong>
+                            <small>@WinRateSnapshot.Overall.BattleCount 전투 · @WinRateSnapshot.Overall.WinCount 승리</small>
+                        </article>
+                        <article class="admin-metric">
+                            <span>라이벌전 승률</span>
+                            <strong>@WinRateText(WinRateSnapshot.Rival)</strong>
+                            <small>@WinRateSnapshot.Rival.BattleCount 전투 · @WinRateSnapshot.Rival.WinCount 승리</small>
+                        </article>
+                        <article class="admin-metric">
+                            <span>일반전 승률</span>
+                            <strong>@WinRateText(WinRateSnapshot.Normal)</strong>
+                            <small>@WinRateSnapshot.Normal.BattleCount 전투 · @WinRateSnapshot.Normal.WinCount 승리</small>
+                        </article>
+                        <article class="admin-metric">
+                            <span>전설 전투 승률</span>
+                            <strong>@WinRateText(WinRateSnapshot.Legendary)</strong>
+                            <small>@WinRateSnapshot.Legendary.BattleCount 전투 · @WinRateSnapshot.Legendary.WinCount 승리</small>
+                        </article>
+                    </div>
+
+                    <div class="admin-winrate-table-grid">
+                        <section class="admin-chart-card" aria-labelledby="round-win-rate-title">
+                            <div class="admin-chart-heading">
+                                <div>
+                                    <h3 id="round-win-rate-title">라운드별 승률</h3>
+                                    <small>20라운드 이상은 20+로 묶음</small>
+                                </div>
+                                <span class="admin-chart-icon">ROUND</span>
+                            </div>
+                            <div class="admin-table-wrap">
+                                <table class="admin-table admin-winrate-table">
+                                    <thead>
+                                        <tr><th>라운드</th><th>전투 수</th><th>승리 수</th><th>승률</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var row in WinRateSnapshot.ByRound)
+                                        {
+                                            <tr class="@SampleClass(row)">
+                                                <th scope="row">@row.Label</th>
+                                                <td>@row.BattleCount</td>
+                                                <td>@row.WinCount</td>
+                                                <td>
+                                                    @WinRateText(row)
+                                                    @if (row.BattleCount < 10)
+                                                    {
+                                                        <span class="admin-sample-warning">표본 부족</span>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section class="admin-chart-card" aria-labelledby="rival-win-rate-title">
+                            <div class="admin-chart-heading">
+                                <div>
+                                    <h3 id="rival-win-rate-title">라이벌 회차별 승률</h3>
+                                    <small>라이벌전 기록만 집계</small>
+                                </div>
+                                <span class="admin-chart-icon">RIVAL</span>
+                            </div>
+                            @if (WinRateSnapshot.ByRivalNumber.Count == 0)
+                            {
+                                <p class="admin-muted">집계된 라이벌전이 없습니다.</p>
+                            }
+                            else
+                            {
+                                <div class="admin-table-wrap">
+                                    <table class="admin-table admin-winrate-table">
+                                        <thead>
+                                            <tr><th>라이벌 회차</th><th>전투 수</th><th>승리 수</th><th>승률</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var row in WinRateSnapshot.ByRivalNumber)
+                                            {
+                                                <tr class="@SampleClass(row)">
+                                                    <th scope="row">@row.Label</th>
+                                                    <td>@row.BattleCount</td>
+                                                    <td>@row.WinCount</td>
+                                                    <td>
+                                                        @WinRateText(row)
+                                                        @if (row.BattleCount < 10)
+                                                        {
+                                                            <span class="admin-sample-warning">표본 부족</span>
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </section>
+                    </div>
+                }
+            </section>
+        }
+        else
+        {
         <section class="admin-overview" aria-labelledby="overview-title">
             <div class="admin-section-heading">
                 <div>
@@ -563,13 +707,18 @@
         }
 
         <button type="button" class="admin-back" @onclick="GoHome">게임으로 돌아가기</button>
+        }
     }
 </main>
 
 @code {
     private AdminDashboardSnapshot? Snapshot;
+    private WinRateAnalyticsSnapshot? WinRateSnapshot;
     private AdminUserDetails? SelectedDetails;
     private string? SelectedUsername;
+    private const string OperationsTab = "operations";
+    private const string WinRateTab = "win-rate";
+    private string ActiveTab = OperationsTab;
     private string UserSearch = "";
     private string NewPassword = "";
     private string DeleteConfirmation = "";
@@ -618,11 +767,13 @@
         if (Snapshot == null)
         {
             IsAuthorized = false;
+            WinRateSnapshot = null;
             SelectedUsername = null;
             SelectedDetails = null;
             return;
         }
 
+        WinRateSnapshot = await WinRateAnalytics.LoadAsync();
         if (SelectedUsername != null && Snapshot.Users.All(user => user.Username != SelectedUsername))
         {
             SelectedUsername = null;
@@ -826,6 +977,24 @@
         ActionSucceeded = success;
         ActionMessage = message;
     }
+
+    // 운영 탭을 연다.
+    private void ShowOperationsTab() => ActiveTab = OperationsTab;
+
+    // 승률 탭을 연다.
+    private void ShowWinRateTab() => ActiveTab = WinRateTab;
+
+    // 요약 승률을 표본 수와 함께 표시한다.
+    private static string WinRateText(WinRateSummary summary) =>
+        $"{summary.WinRatePercent:0.#}% (n={summary.BattleCount})";
+
+    // 그룹 승률을 표본 수와 함께 표시한다.
+    private static string WinRateText(WinRateGroup group) =>
+        $"{group.WinRatePercent:0.#}% (n={group.BattleCount})";
+
+    // 표본이 적은 행을 흐리게 표시한다.
+    private static string SampleClass(WinRateGroup group) =>
+        group.BattleCount < 10 ? "is-low-sample" : "";
 
     private void GoLogin() => Nav.NavigateTo("/login");
     private void GoHome() => Nav.NavigateTo("/");
