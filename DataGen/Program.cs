@@ -4,6 +4,13 @@ using System.Text.RegularExpressions;
 
 var http = new HttpClient();
 http.DefaultRequestHeaders.UserAgent.ParseAdd("PokemonBattle-DataGen/1.0 (https://github.com/ChoW0n/PokemonlikeProject)");
+
+if (args.Contains("--measure-sprites", StringComparer.Ordinal))
+{
+    await SpriteGroundCatalogGenerator.GenerateAsync(http, "../PokemonBattle/Models/PokemonSpriteGroundCatalog.cs");
+    return;
+}
+
 var pokemonSb = new StringBuilder();
 var moveSb = new StringBuilder();
 var abilitySb = new StringBuilder();
@@ -72,6 +79,7 @@ for (int id = 1; id <= 721; id++)
     catch { }
 }
 Console.WriteLine("1차 패스(이름-번호 매핑) 완료");
+await SpriteGroundCatalogGenerator.GenerateAsync(http, "../PokemonBattle/Models/PokemonSpriteGroundCatalog.cs");
 
 for (int id = 1; id <= 721; id++)
 {

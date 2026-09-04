@@ -103,12 +103,12 @@
                 </div>
             </div>
             <div class="platform-shadow"
-                 style="@SpriteStyle(Enemy.Data, true)"
+                 style="@SpriteStyle(Enemy.Data, true, false)"
                  aria-hidden="true"></div>
             <img id="sprite-enemy" src="@Enemy.Data.EffectiveImageUrl" alt="@Enemy.Data.Name"
                  @key="Enemy.ActorId"
                   class="fighter-sprite enemy-sprite @(Enemy.IsFainted ? "is-fainted" : "")"
-                 style="@SpriteStyle(Enemy.Data)"
+                  style="@SpriteStyle(Enemy.Data, false, false)"
                  data-slot="enemy" data-actor-id="@Enemy.ActorId" data-species="@Enemy.Data.EnglishName"
                   data-form="@Enemy.FormKey" data-height-m="@Enemy.Data.HeightMeters.ToString("0.0", CultureInfo.InvariantCulture)"
                   data-state="@(Enemy.IsFainted ? "fainted" : "idle")" />
@@ -118,12 +118,12 @@
             <img id="sprite-hero" src="@Hero.Data.EffectiveBackImageUrl" alt="@Hero.Data.Name"
                  @key="Hero.ActorId"
                  class="fighter-sprite @(Hero.IsFainted ? "is-fainted" : "")"
-                 style="@SpriteStyle(Hero.Data)"
+                  style="@SpriteStyle(Hero.Data, false, true)"
                  data-slot="hero" data-actor-id="@Hero.ActorId" data-species="@Hero.Data.EnglishName"
                   data-form="@Hero.FormKey" data-height-m="@Hero.Data.HeightMeters.ToString("0.0", CultureInfo.InvariantCulture)"
                   data-state="@(Hero.IsFainted ? "fainted" : "idle")" />
             <div class="platform-shadow"
-                 style="@SpriteStyle(Hero.Data, true)"
+                 style="@SpriteStyle(Hero.Data, true, true)"
                  aria-hidden="true"></div>
             <div class="hud-plate hud-hero"
                  aria-label="@($"{Hero.Data.Name} 상태: HP {Hero.CurrentHp}/{Hero.MaxHp}{(StatusText(Hero) == "" ? "" : $", {StatusText(Hero)}")}, 숙련도 보너스 +{HeroMasteryBonusPercent}%")"
@@ -512,14 +512,15 @@
 
     private string HpClass(int percent) => percent <= 20 ? "hp-low" : percent <= 50 ? "hp-mid" : "hp-high";
 
-    private static string SpriteStyle(PokemonData data, bool shadow = false)
+    private static string SpriteStyle(PokemonData data, bool shadow, bool back)
     {
         double scale = PokemonSpriteScale.ForHeight(data.HeightDecimeters);
+        double groundOffsetRatio = PokemonSpriteGroundCatalog.GroundOffsetRatioFor(data.EnglishName, back);
         return string.Join(
             " ",
             $"--species-scale:{scale.ToString("0.###", CultureInfo.InvariantCulture)};",
             $"--species-height-m:{data.HeightMeters.ToString("0.0", CultureInfo.InvariantCulture)};",
-            $"--species-ground-offset:{(shadow ? 0 : PokemonSpriteScale.GroundOffsetFor(data.EnglishName)).ToString("0.###", CultureInfo.InvariantCulture)}px;");
+            $"--species-ground-offset:{(groundOffsetRatio * 100).ToString("0.###", CultureInfo.InvariantCulture)}%;");
     }
 
     private string StatusText(Pokemon p)

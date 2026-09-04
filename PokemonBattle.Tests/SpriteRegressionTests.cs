@@ -52,11 +52,24 @@ public class SpriteRegressionTests
     }
 
     [Fact]
-    public void Community_sprites_get_only_their_species_specific_grounding_offset()
+    public void Sprite_grounding_uses_separate_generated_front_and_back_ratios()
     {
-        Assert.Equal(12, PokemonSpriteScale.GroundOffsetFor("braviary"));
-        Assert.Equal(9, PokemonSpriteScale.GroundOffsetFor("trevenant"));
-        Assert.Equal(0, PokemonSpriteScale.GroundOffsetFor("pikachu"));
+        double braviaryFront = PokemonSpriteGroundCatalog.GroundOffsetRatioFor("braviary", back: false);
+        double braviaryBack = PokemonSpriteGroundCatalog.GroundOffsetRatioFor("braviary", back: true);
+
+        Assert.True(braviaryFront > 0);
+        Assert.True(braviaryBack > 0);
+        Assert.NotEqual(braviaryFront, braviaryBack);
+        Assert.True(PokemonSpriteGroundCatalog.GroundOffsetRatioFor("trevenant", back: false) > 0);
+        Assert.Equal(0, PokemonSpriteGroundCatalog.GroundOffsetRatioFor("not-a-pokemon", back: false));
+        Assert.Empty(PokemonSpriteGroundCatalog.MeasurementFailures);
+    }
+
+    [Fact]
+    public void Greninja_is_present_in_both_generated_grounding_measurements()
+    {
+        Assert.True(PokemonSpriteGroundCatalog.HasMeasurementFor("greninja", back: false));
+        Assert.True(PokemonSpriteGroundCatalog.HasMeasurementFor("greninja", back: true));
     }
 
     [Fact]
