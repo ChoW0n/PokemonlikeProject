@@ -12,6 +12,7 @@ public static class MoveDatabase
         All["take-down"] = new Move("돌진", 90, PokemonType.Normal, 20, 85, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "굉장한 기세로 상대에게 부딪쳐 공격한다. 자신도 조금 데미지를 입는다.", 0, -25, 1, 1);
         All["double-edge"] = new Move("이판사판태클", 120, PokemonType.Normal, 15, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "목숨을 걸고 상대에게 돌진하여 공격을 한다. 자신도 상당한 데미지를 입는다.", 0, -33, 1, 1);
         All["growl"] = new Move("울음소리", 0, PokemonType.Normal, 40, 100, false, 0, true, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "attack", Change = -1, TargetsSelf = false } }, 100, "귀여운 울음소리를 들려주고 관심을 끌어 방심한 사이에 상대의 공격을 떨어뜨린다.", 0, 0, 1, 1);
+        All["haze"] = new Move("흑안개", 0, PokemonType.Ice, 30, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "흑안개를 뿜어 모든 포켓몬의 능력 변화를 원래대로 되돌린다.", 0, 0, 1, 1);
         All["leech-seed"] = new Move("씨뿌리기", 0, PokemonType.Grass, 10, 90, false, 0, true, false, "leech-seed", 100, 0, new List<StatChangeEntry>(), 0, "씨가 뿌려진 상대의 HP를 매 턴 조금씩 흡수하여 자신의 HP를 회복한다.", 0, 0, 1, 1);
         All["growth"] = new Move("성장", 0, PokemonType.Normal, 20, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "attack", Change = 1, TargetsSelf = true }, new StatChangeEntry { Stat = "special-attack", Change = 1, TargetsSelf = true } }, 100, "몸을 일시에 크게 성장시켜 공격과 특수공격을 올린다.", 0, 0, 1, 1);
         All["razor-leaf"] = new Move("잎날가르기", 55, PokemonType.Grass, 25, 95, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "잎사귀를 날려 상대를 베어 공격한다. 급소에 맞기 쉽다.", 0, 0, 1, 1);
@@ -217,6 +218,7 @@ public static class MoveDatabase
         All["karate-chop"] = new Move("태권당수", 50, PokemonType.Fighting, 25, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "날카로운 당수로 상대를 때려서 공격한다. 급소에 맞기 쉽다.", 0, 0, 1, 1);
         All["cross-chop"] = new Move("크로스촙", 100, PokemonType.Fighting, 5, 80, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "양손으로 당수를 상대에게 힘껏 쳐서 공격한다. 급소에 맞기 쉽다.", 0, 0, 1, 1);
         All["u-turn"] = new Move("유턴", 70, PokemonType.Bug, 20, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "공격한 뒤 굉장한 스피드로 돌아와서 교대 포켓몬과 교체한다.", 0, 0, 1, 1);
+        All["roar"] = new Move("울부짖기", 0, PokemonType.Normal, 20, 100, true, -6, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "큰 소리로 울부짖어 상대를 강제로 교체시킨다.", 0, 0, 1, 1);
         All["close-combat"] = new Move("인파이트", 120, PokemonType.Fighting, 5, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry> { new StatChangeEntry { Stat = "defense", Change = -1, TargetsSelf = true }, new StatChangeEntry { Stat = "special-defense", Change = -1, TargetsSelf = true } }, 100, "방어를 포기하고 상대 깊숙이 돌격한다. 자신의 방어와 특수방어가 떨어진다.", 0, 0, 1, 1);
         All["retaliate"] = new Move("원수갚기", 70, PokemonType.Normal, 5, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "쓰러진 같은 편의 원수를 갚는다. 앞 턴에서 같은 편이 쓰러졌다면 위력이 올라간다.", 0, 0, 1, 1);
         All["stomping-tantrum"] = new Move("분함의발구르기", 75, PokemonType.Ground, 10, 100, false, 0, false, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "분함을 발판삼아 공격한다. 앞 턴에서 기술이 빗나갔다면 위력이 배가 된다.", 0, 0, 1, 1);
@@ -513,6 +515,7 @@ public static class MoveDatabase
         All["switcheroo"] = new Move("바꿔치기", 0, PokemonType.Dark, 10, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "자신과 상대의 도구를 바꾼다.", 0, 0, 1, 1);
         All["stealth-rock"] = new Move("스텔스록", 0, PokemonType.Rock, 20, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "상대 진영에 뾰족한 돌을 설치해 교체해 나온 포켓몬을 공격한다.", 0, 0, 1, 1);
         All["spikes"] = new Move("압정뿌리기", 0, PokemonType.Ground, 20, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "상대 진영에 압정을 설치한다. 최대 3번까지 겹칠 수 있다.", 0, 0, 1, 1);
+        All["whirlwind"] = new Move("날려버리기", 0, PokemonType.Normal, 20, 100, true, -6, true, false, "none", 0, 0, new List<StatChangeEntry>(), 0, "큰 소용돌이를 일으켜 상대를 강제로 교체시킨다.", 0, 0, 1, 1);
         All["toxic-spikes"] = new Move("독압정", 0, PokemonType.Poison, 20, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "상대 진영에 독압정을 설치한다. 최대 2번까지 겹칠 수 있다.", 0, 0, 1, 1);
         All["sticky-web"] = new Move("끈적끈적네트", 0, PokemonType.Bug, 20, 100, true, 0, true, false, "none", 0, 0, new List<StatChangeEntry>(), 100, "상대 진영에 끈적한 거미줄을 설치해 교체해 나온 포켓몬의 스피드를 낮춘다.", 0, 0, 1, 1);
         All["baneful-bunker"] = new Move("독가시방벽", 0, PokemonType.Poison, 10, 100, true, 4, true, false, "protect", 100, 0, new List<StatChangeEntry>(), 0, "상대의 공격을 막고 접촉한 상대를 독 상태로 만든다.", 0, 0, 1, 1);

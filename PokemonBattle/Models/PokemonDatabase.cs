@@ -739,7 +739,8 @@ public static class PokemonDatabase
 
     private static readonly string[] BackfillableImplementedMoveKeys =
     {
-        "counter", "mirror-coat", "kings-shield", "spiky-shield", "sticky-web", "switcheroo"
+        "counter", "mirror-coat", "kings-shield", "spiky-shield", "sticky-web", "switcheroo",
+        "haze", "roar", "whirlwind"
     };
 
     private static void BackfillImplementedLearnableMoves()

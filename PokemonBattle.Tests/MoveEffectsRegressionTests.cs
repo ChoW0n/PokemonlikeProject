@@ -9,11 +9,42 @@ public sealed class MoveEffectsRegressionTests
     [Fact]
     public void Move_catalog_has_unique_entries_and_every_entry_is_classified()
     {
-        Assert.Equal(521, MoveDatabase.All.Count);
+        Assert.Equal(524, MoveDatabase.All.Count);
         Assert.All(MoveDatabase.All, entry =>
             Assert.Contains(
                 MoveRuleMetadata.GetRule(entry.Key, entry.Value).Kind,
                 Enum.GetValues<MoveRuleKind>()));
+    }
+
+    [Fact]
+    public async Task Haze_resets_both_sides_stat_stages()
+    {
+        var user = CreatePokemon(94, "haze");
+        var target = CreatePokemon(1, "tackle");
+        user.ChangeStage("attack", 2);
+        target.ChangeStage("defense", 3);
+        var engine = CreateEngine();
+
+        await engine.TakeTurnAsync(user, target, "haze", true, _ => Task.CompletedTask);
+
+        Assert.All(user.StatStages.Values, stage => Assert.Equal(0, stage));
+        Assert.All(target.StatStages.Values, stage => Assert.Equal(0, stage));
+    }
+
+    [Fact]
+    public async Task Roar_forces_out_the_ranked_up_target_and_switch_reset_clears_stages()
+    {
+        var user = CreatePokemon(25, "roar");
+        var target = CreatePokemon(1, "tackle");
+        target.ChangeStage("attack", 3);
+        target.ChangeStage("speed", 2);
+        var engine = CreateEngine();
+
+        var result = await engine.TakeTurnAsync(user, target, "roar", true, _ => Task.CompletedTask);
+
+        Assert.Same(target, result.ForcedSwitchPokemon);
+        engine.PrepareSwitchOut(target);
+        Assert.All(target.StatStages.Values, stage => Assert.Equal(0, stage));
     }
 
     [Fact]
