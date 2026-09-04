@@ -755,7 +755,7 @@ public class GameState
         var latestLoadouts = PlayerLoadouts.Select(loadout => loadout.Clone()).ToList();
         double playerHpRatio = RecordRoundPerformance(turns, playerTeam, cleared: false);
         double enemyHpRatio = CalculateTeamHpRatio(enemyTeam);
-        await UpdateSkillRatingForCurrentRun();
+        await UpdateSkillRatingForCurrentRun(peakRound: CurrentRunLevel);
         _scoreStore.SaveIfHigher(CurrentScore);
         HighScore = Math.Max(HighScore, _scoreStore.GetHighScore());
         LastBattleWon = false;
@@ -792,7 +792,9 @@ public class GameState
         //승리한 런을 사용자가 새 런으로 넘길 때도 같은 집계 경로로 평점을 갱신한다.
         if (_roundPerformances.Count > 0)
         {
-            await UpdateSkillRatingForCurrentRun(won: true);
+            await UpdateSkillRatingForCurrentRun(
+                won: true,
+                peakRound: Math.Max(1, CurrentScore));
         }
 
         CurrentScore = 0;
@@ -881,7 +883,9 @@ public class GameState
                 : Math.Clamp((double)pokemon.CurrentHp / pokemon.MaxHp, 0, 1));
     }
 
-    private async Task UpdateSkillRatingForCurrentRun(bool won = false)
+    private async Task UpdateSkillRatingForCurrentRun(
+        bool won = false,
+        int? peakRound = null)
     {
         if (!_currentUser.IsLoggedIn || _roundPerformances.Count == 0) return;
 
@@ -889,7 +893,8 @@ public class GameState
         double previousRating = SkillRating;
         SkillRating = await _skillRatings.UpdateForRunAsync(
             _currentUser.Username!,
-            summary);
+            summary,
+            peakRound ?? CurrentRunLevel);
         ResultSkillRating = SkillRating;
         LastSkillRatingChange = SkillRating - previousRating;
         _roundPerformances.Clear();

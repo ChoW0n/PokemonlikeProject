@@ -7,5 +7,8 @@ public class PlayerSkillRating
     public string Username { get; set; } = "";
     public double Rating { get; set; } = 1000;
     public int CompletedRuns { get; set; }
+    public double PeakRating { get; set; } = 1000;
+    public int PeakRound { get; set; }
+    public DateTimeOffset? PeakAchievedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 }

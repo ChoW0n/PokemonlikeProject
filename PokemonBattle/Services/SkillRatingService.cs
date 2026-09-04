@@ -58,7 +58,8 @@ public class SkillRatingService
 
     public async Task<double> UpdateForRunAsync(
         string username,
-        RunPerformanceSummary summary)
+        RunPerformanceSummary summary,
+        int peakRound = 0)
     {
         return await _database.ExecuteAsync("skill-rating.update", async db =>
         {
@@ -80,6 +81,13 @@ public class SkillRatingService
                 Math.Clamp(rating.Rating, 400, 2000),
                 summary);
             rating.CompletedRuns++;
+            if (rating.Rating > rating.PeakRating)
+            {
+                // 새 최고 레이팅과 도달 시점을 함께 기록한다.
+                rating.PeakRating = rating.Rating;
+                rating.PeakRound = Math.Max(0, peakRound);
+                rating.PeakAchievedAtUtc = DateTimeOffset.UtcNow;
+            }
             rating.UpdatedAtUtc = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync();
             return rating.Rating;

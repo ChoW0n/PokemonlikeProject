@@ -334,6 +334,40 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public async Task SkillRatingPeakRisesAndSurvivesALaterDrop()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreatePlayerRunsTable(schema);
+            const string username = "skill-rating-peak";
+            double risingRating;
+            double fallingRating;
+
+            await using (var db = CreateDbContext(schema))
+            {
+                var service = new SkillRatingService(db);
+                risingRating = await service.UpdateForRunAsync(
+                    username,
+                    new RunPerformanceSummary(3, 3, 0.8, 7, true),
+                    peakRound: 3);
+                fallingRating = await service.UpdateForRunAsync(
+                    username,
+                    new RunPerformanceSummary(0, 1, 0, 30, false),
+                    peakRound: 4);
+            }
+
+            await using var verifyDb = CreateDbContext(schema);
+            var rating = await verifyDb.PlayerSkillRatings
+                .SingleAsync(item => item.Username == username);
+            Assert.True(risingRating > SkillRatingCalculator.DefaultRating);
+            Assert.True(fallingRating < risingRating);
+            Assert.Equal(risingRating, rating.PeakRating);
+            Assert.Equal(3, rating.PeakRound);
+            Assert.NotNull(rating.PeakAchievedAtUtc);
+        });
+    }
+
+    [Fact]
     public async Task RunStorePersistsRunMetaAcrossFreshDbContext()
     {
         await WithTemporarySchema(async schema =>
@@ -1467,6 +1501,9 @@ public class ProgressionRegressionTests
                 "Username" TEXT NOT NULL,
                 "Rating" DOUBLE PRECISION NOT NULL DEFAULT 1000,
                 "CompletedRuns" INTEGER NOT NULL DEFAULT 0,
+                "PeakRating" DOUBLE PRECISION NOT NULL DEFAULT 1000,
+                "PeakRound" INTEGER NOT NULL DEFAULT 0,
+                "PeakAchievedAtUtc" TIMESTAMPTZ NULL,
                 "UpdatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             CREATE UNIQUE INDEX "IX_PlayerSkillRatings_Username"

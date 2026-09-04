@@ -190,6 +190,9 @@ public class PokemonMasteryRegressionTests
                 "Username" TEXT NOT NULL,
                 "Rating" DOUBLE PRECISION NOT NULL DEFAULT 1000,
                 "CompletedRuns" INTEGER NOT NULL DEFAULT 0,
+                "PeakRating" DOUBLE PRECISION NOT NULL DEFAULT 1000,
+                "PeakRound" INTEGER NOT NULL DEFAULT 0,
+                "PeakAchievedAtUtc" TIMESTAMPTZ NULL,
                 "UpdatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             CREATE UNIQUE INDEX "IX_PlayerSkillRatings_Username"

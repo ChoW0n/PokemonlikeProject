@@ -132,6 +132,9 @@ using (var scope = app.Services.CreateScope())
             ""Username"" TEXT NOT NULL,
             ""Rating"" DOUBLE PRECISION NOT NULL DEFAULT 1000,
             ""CompletedRuns"" INTEGER NOT NULL DEFAULT 0,
+            ""PeakRating"" DOUBLE PRECISION NOT NULL DEFAULT 1000,
+            ""PeakRound"" INTEGER NOT NULL DEFAULT 0,
+            ""PeakAchievedAtUtc"" TIMESTAMPTZ NULL,
             ""UpdatedAtUtc"" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS ""UserPresets"" (
@@ -163,6 +166,12 @@ using (var scope = app.Services.CreateScope())
             ADD COLUMN IF NOT EXISTS ""RoundPerformancesJson"" TEXT NOT NULL DEFAULT '[]';
         ALTER TABLE ""PlayerRuns""
             ADD COLUMN IF NOT EXISTS ""RunMetaStateJson"" TEXT NOT NULL DEFAULT '{{}}';
+        ALTER TABLE ""PlayerSkillRatings""
+            ADD COLUMN IF NOT EXISTS ""PeakRating"" DOUBLE PRECISION NOT NULL DEFAULT 1000;
+        ALTER TABLE ""PlayerSkillRatings""
+            ADD COLUMN IF NOT EXISTS ""PeakRound"" INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE ""PlayerSkillRatings""
+            ADD COLUMN IF NOT EXISTS ""PeakAchievedAtUtc"" TIMESTAMPTZ NULL;
         CREATE UNIQUE INDEX IF NOT EXISTS ""IX_PlayerSkillRatings_Username""
             ON ""PlayerSkillRatings"" (""Username"");
         CREATE TABLE IF NOT EXISTS ""PlayerProgressions"" (
@@ -255,6 +264,20 @@ using (var scope = app.Services.CreateScope())
         SELECT "Username" FROM "Users"
         ON CONFLICT ("Username") DO NOTHING;
         """);
+
+    const string peakRatingInitializationMarker = "player-skill-ratings-peak-initialized";
+    if (db.Database.ExecuteSqlRaw($"""
+        INSERT INTO "AppMaintenanceMarkers" ("Key", "AppliedAtUtc", "Details")
+        VALUES ('{peakRatingInitializationMarker}', CURRENT_TIMESTAMP, 'running')
+        ON CONFLICT ("Key") DO NOTHING;
+        """) > 0)
+    {
+        db.Database.ExecuteSqlRaw("""
+            UPDATE "PlayerSkillRatings"
+            SET "PeakRating" = "Rating"
+            WHERE "PeakRating" = 1000;
+            """);
+    }
 
     await PlayerRunItemCleanup.ApplyOnceAsync(
         db,
