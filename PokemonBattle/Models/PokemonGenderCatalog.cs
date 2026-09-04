@@ -34,7 +34,7 @@ public static class PokemonGenderCatalog
     4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,1
     1,1,1,1,4,4,-1,4,4,4,4,4,4,4,4,4,4,4,4,-1,-1,-1,-1,-1
     -1
-    """.Split(',', StringSplitOptions.RemoveEmptyEntries)
+    """.Split(new[] { ',', ' ', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries)
       .Select(static value => int.Parse(value.Trim()))
       .ToArray();
 
