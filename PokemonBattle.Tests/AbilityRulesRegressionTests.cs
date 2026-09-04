@@ -692,9 +692,12 @@ public sealed class AbilityRulesRegressionTests
         var rates = Enumerable.Range(1, 721)
             .Select(PokemonGenderCatalog.GetGenderRate)
             .ToList();
+        int unknownGenderCount = rates.Count(rate => rate == -1);
+
         Assert.Equal(721, rates.Count);
         Assert.All(rates, rate => Assert.InRange(rate, -1, 8));
-        Assert.Equal(77, rates.Count(rate => rate == -1));
+        Assert.Equal(77, unknownGenderCount);
+        Assert.Equal(77d / 721d, unknownGenderCount / (double)rates.Count, 10);
         Assert.Equal(0, PokemonGenderCatalog.GetGenderRate(32));
         Assert.Equal(8, PokemonGenderCatalog.GetGenderRate(29));
         Assert.Equal(-1, PokemonGenderCatalog.GetGenderRate(132));
@@ -731,6 +734,38 @@ public sealed class AbilityRulesRegressionTests
         await CreateFullEngine(new FixedRandom(1)).TakeTurnAsync(
             sameGenderAttacker, sameGenderCuteCharm, "tackle", true, _ => Task.CompletedTask);
         Assert.False(sameGenderAttacker.IsInfatuated);
+
+        var unknownGenderAttacker = CreatePokemon(
+            132, "tackle", gender: PokemonGender.Unknown);
+        var unknownGenderCuteCharm = CreatePokemon(
+            700, "tackle", ability: "헤롱헤롱바디", gender: PokemonGender.Female);
+        await CreateFullEngine(new FixedRandom(1)).TakeTurnAsync(
+            unknownGenderAttacker, unknownGenderCuteCharm, "tackle", true, _ => Task.CompletedTask);
+        Assert.False(unknownGenderAttacker.IsInfatuated);
+    }
+
+    [Fact]
+    public async Task Attract_requires_opposite_known_gender()
+    {
+        var maleAttractor = CreatePokemon(
+            668, "attract", gender: PokemonGender.Male);
+        var oppositeGenderTarget = CreatePokemon(
+            132, "tackle", gender: PokemonGender.Female);
+        await CreateFullEngine(new FixedRandom(1)).TakeTurnAsync(
+            maleAttractor, oppositeGenderTarget, "attract", true, _ => Task.CompletedTask);
+        Assert.True(oppositeGenderTarget.IsInfatuated);
+
+        var sameGenderTarget = CreatePokemon(
+            132, "tackle", gender: PokemonGender.Male);
+        await CreateFullEngine(new FixedRandom(1)).TakeTurnAsync(
+            maleAttractor, sameGenderTarget, "attract", true, _ => Task.CompletedTask);
+        Assert.False(sameGenderTarget.IsInfatuated);
+
+        var unknownGenderTarget = CreatePokemon(
+            132, "tackle", gender: PokemonGender.Unknown);
+        await CreateFullEngine(new FixedRandom(1)).TakeTurnAsync(
+            maleAttractor, unknownGenderTarget, "attract", true, _ => Task.CompletedTask);
+        Assert.False(unknownGenderTarget.IsInfatuated);
     }
 
     [Fact]

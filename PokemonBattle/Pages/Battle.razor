@@ -71,7 +71,10 @@
         <div class="stage-slot slot-top">
             <div class="hud-plate hud-enemy" aria-label="@($"{Enemy.Data.Name} 상태: HP {Enemy.CurrentHp}/{Enemy.MaxHp}{(StatusText(Enemy) == "" ? "" : $", {StatusText(Enemy)}")}")">
                 <div class="hud-heading">
-                    <span class="hud-name">@Enemy.Data.Name</span>
+                    <span class="hud-name">
+                        @Enemy.Data.Name
+                        <GenderMark Gender="Enemy.Gender" />
+                    </span>
                     <span class="hud-level">Lv.@Enemy.Level</span>
                 </div>
                 <div class="hud-types">
@@ -120,7 +123,10 @@
                  aria-label="@($"{Hero.Data.Name} 상태: HP {Hero.CurrentHp}/{Hero.MaxHp}{(StatusText(Hero) == "" ? "" : $", {StatusText(Hero)}")}, 숙련도 보너스 +{HeroMasteryBonusPercent}%")"
                  data-mastery-bonus-percent="@HeroMasteryBonusPercent">
                 <div class="hud-heading">
-                    <span class="hud-name">@Hero.Data.Name</span>
+                    <span class="hud-name">
+                        @Hero.Data.Name
+                        <GenderMark Gender="Hero.Gender" />
+                    </span>
                     <span class="hud-level">Lv.@Hero.Level</span>
                 </div>
                 <div class="hud-types">
@@ -305,7 +311,10 @@
                                 aria-label="@($"{member.Data.Name}, 레벨 {member.Level}, HP {member.CurrentHp}/{member.MaxHp}{(member.IsFainted ? ", 기절" : "")}{(!canSwitch ? ", 교체할 수 없음" : "")}")"
                                 @onclick="() => SwitchTo(idx)">
                             <div class="move-main">
-                                <span class="move-name">@member.Data.Name</span>
+                                <span class="move-name">
+                                    @member.Data.Name
+                                    <GenderMark Gender="member.Gender" />
+                                </span>
                                 <span class="move-meta">Lv.@member.Level · HP @member.CurrentHp/@member.MaxHp @(member.IsFainted ? "· 기절" : "")</span>
                             </div>
                             <span class="choice-state">@(member.IsFainted ? "기절" : idx == PlayerTeamIndex ? "출전 중" : canSwitch ? "교체" : "불가")</span>
@@ -332,7 +341,10 @@
                                 aria-label="@($"{member.Data.Name}, 레벨 {member.Level}, HP {member.CurrentHp}/{member.MaxHp}{(member.IsFainted ? ", 기절" : "")}")"
                                 @onclick="() => ForcedSwitchTo(idx)">
                             <div class="move-main">
-                                <span class="move-name">@member.Data.Name</span>
+                                <span class="move-name">
+                                    @member.Data.Name
+                                    <GenderMark Gender="member.Gender" />
+                                </span>
                                 <span class="move-meta">Lv.@member.Level · HP @member.CurrentHp/@member.MaxHp @(member.IsFainted ? "· 기절" : "")</span>
                             </div>
                             <span class="choice-state">@(member.IsFainted ? "기절" : "출전")</span>

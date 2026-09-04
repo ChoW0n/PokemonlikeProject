@@ -104,7 +104,14 @@
                                  @onclick="() => StartConfiguring(entry.Key, isUnlocked)">
                                 <span class="dex-number">No.@entry.Key.ToString("D3") @(existingInTeam != null ? $"Lv.{existingInTeam.Level}" : "")</span>
                                 <img src="@entry.Value.EffectiveImageUrl" alt="@entry.Value.Name" class="dex-sprite" />
-                                <span class="dex-name">@(isUnlocked ? entry.Value.Name : "???")</span>
+                                <span class="dex-name">
+                                    @(isUnlocked ? entry.Value.Name : "???")
+                                    @if (existingInTeam?.Gender is PokemonGender gender
+                                        && gender != PokemonGender.Unknown)
+                                    {
+                                        <GenderMark Gender="gender" />
+                                    }
+                                </span>
                                 <span class="card-state @(existingInTeam != null ? "is-selected" : "")">
                                     @(existingInTeam != null ? $"팀 포함 · #{TeamLoadouts.IndexOf(existingInTeam) + 1}" : isUnlocked ? "구성하기" : "잠김")
                                 </span>
@@ -146,7 +153,14 @@
                                 <div class="team-order-summary">
                                     <span class="dex-number">#@(idx + 1) · Lv.@TeamLoadouts[idx].Level</span>
                                     <img src="@data.EffectiveImageUrl" alt="@data.Name" class="team-order-sprite" />
-                                    <span class="dex-name">@data.Name</span>
+                                    <span class="dex-name">
+                                        @data.Name
+                                        @if (TeamLoadouts[idx].Gender is PokemonGender gender
+                                            && gender != PokemonGender.Unknown)
+                                        {
+                                            <GenderMark Gender="gender" />
+                                        }
+                                    </span>
                                 </div>
                                 <div class="order-buttons">
                                      <button type="button" class="order-button" aria-label="@($"{data.Name} 팀 순서 위로 이동")" disabled="@(idx == 0)" @onclick="() => MoveOrderUp(idx)" @onclick:stopPropagation>↑</button>
@@ -743,7 +757,7 @@
             ChosenAbility = DraftAbility,
             ChosenItem = TeamLoadoutRules.NormalizeItemName(DraftItem),
             Level = DraftLevel,
-            Gender = existing?.Gender
+            Gender = existing?.Gender ?? Pokemon.InferGender(configuredData)
         });
         TeamLoadouts = TeamLoadoutRules.NormalizeUniqueItems(TeamLoadouts);
 

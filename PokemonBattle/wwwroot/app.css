@@ -549,6 +549,18 @@ h1 {
 }
 .hud-name { font-weight: 800; font-size: 0.82rem; color: #fff; }
 .hud-level { font-size: 0.7rem; color: var(--accent); font-weight: 700; }
+.gender-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0.9em;
+    margin-inline-start: 0.25em;
+    font-size: 0.88em;
+    font-weight: 900;
+    line-height: 1;
+}
+.gender-male { color: #72b8ff; }
+.gender-female { color: #ff8db5; }
 .hud-types, .dex-type-icons { display: flex; gap: 4px; width: 100%; }
 .hud-hp-row { display: flex; align-items: center; gap: 6px; width: 100%; }
 .hud-hp-num { font-size: 0.7rem; color: #d7dcf5; font-weight: 700; }

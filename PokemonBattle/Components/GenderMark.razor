@@ -1,0 +1,14 @@
+@using PokemonBattle.Models
+
+@if (Gender is PokemonGender.Male or PokemonGender.Female)
+{
+    <span class="gender-mark @(Gender == PokemonGender.Male ? "gender-male" : "gender-female")"
+          aria-label="@(Gender == PokemonGender.Male ? "수컷" : "암컷")"
+          title="@(Gender == PokemonGender.Male ? "수컷" : "암컷")">
+        @(Gender == PokemonGender.Male ? "♂" : "♀")
+    </span>
+}
+
+@code {
+    [Parameter] public PokemonGender Gender { get; set; }
+}
