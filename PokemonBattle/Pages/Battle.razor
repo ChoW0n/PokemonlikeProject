@@ -214,7 +214,7 @@
                     @foreach (var moveKey in HeroMoveKeys)
                     {
                         var move = MoveDatabase.All[moveKey];
-                        int ppLoop = Hero.CurrentPP[moveKey];
+                        int ppLoop = CurrentPpFor(moveKey);
                         <button type="button"
                                 class="move-name-button @(PendingMoveKey == moveKey ? "is-pending" : "") @(!Hero.CanUseMove(moveKey) ? "is-unavailable" : "")"
                                 disabled="@(IsBusy || !Hero.CanUseMove(moveKey))"
@@ -253,7 +253,7 @@
                 {
                     var pmove = MoveDatabase.All[PendingMoveKey];
                         double pmult = pmove.IsStatus ? 1.0 : Rules.PreviewMultiplier(pmove, Enemy, Hero);
-                    int pp = Hero.CurrentPP[PendingMoveKey];
+                    int pp = CurrentPpFor(PendingMoveKey);
                     <div id="selected-move-details" class="move-detail-panel" role="region" aria-labelledby="selected-move-heading">
                         <div class="move-detail-heading">
                             <div>
@@ -656,9 +656,6 @@
             EnemyTeam = BuildRandomEnemies(enemyIds, enemyLevel);
         }
 
-        HeroMoveKeys = ResolveMoveKeys(Hero);
-        EnemyMoveKeys = ResolveMoveKeys(Enemy);
-
         var initialAbilityMessages = Rules.InitializeWeather(
             Hero,
             Enemy,
@@ -672,6 +669,8 @@
                 .TakeLast(MaxBattleLogLines)
                 .ToList();
         }
+        HeroMoveKeys = ResolveMoveKeys(Hero);
+        EnemyMoveKeys = ResolveMoveKeys(Enemy);
         PromptText = "행동을 선택하세요.";
     }
 
@@ -710,6 +709,10 @@
     }
 
     private static List<string> ResolveMoveKeys(Pokemon pokemon) => pokemon.CurrentPP.Keys.ToList();
+
+    // 변신 직후에도 없는 PP 키를 안전하게 0으로 표시한다.
+    private int CurrentPpFor(string moveKey) =>
+        Hero.CurrentPP.TryGetValue(moveKey, out var pp) ? pp : 0;
 
     private static Pokemon? GetIllusionTarget(Pokemon entrant, IReadOnlyList<Pokemon> team) =>
         team.FirstOrDefault(member => !ReferenceEquals(member, entrant) && !member.IsFainted);
@@ -895,10 +898,10 @@
         await PlayBattleEvent(BattleEvent.ActorStep(BattleEventPhase.Switch, Enemy, actorIsHero: false));
         Rules.PrepareSwitchOut(Enemy);
         EnemyTeamIndex++;
-        EnemyMoveKeys = ResolveMoveKeys(Enemy);
         await ShowMessage($"{Enemy.Data.Name}이(가) 기술의 효과로 교체되어 나왔다!");
-                 foreach (var message in Rules.ActivateSwitchIn(Enemy, Hero, GetIllusionTarget(Enemy, EnemyTeam), false))
+        foreach (var message in Rules.ActivateSwitchIn(Enemy, Hero, GetIllusionTarget(Enemy, EnemyTeam), false))
             await ShowMessage(message, 1000);
+        EnemyMoveKeys = ResolveMoveKeys(Enemy);
         return false;
     }
 
@@ -925,12 +928,12 @@
             if (EnemyTeamIndex < EnemyTeam.Count - 1)
             {
                 EnemyTeamIndex++;
-                EnemyMoveKeys = ResolveMoveKeys(Enemy);
                 await ShowMessage($"상대가 {Enemy.Data.Name}을(를) 내보냈다!");
-                 foreach (var message in Rules.ActivateSwitchIn(Enemy, Hero, GetIllusionTarget(Enemy, EnemyTeam), false))
+                foreach (var message in Rules.ActivateSwitchIn(Enemy, Hero, GetIllusionTarget(Enemy, EnemyTeam), false))
                 {
                     await ShowMessage(message, 1000);
                 }
+                EnemyMoveKeys = ResolveMoveKeys(Enemy);
                 PromptText = "행동을 선택하세요.";
                 IsBusy = false;
                 Menu = BattleMenu.Main;
@@ -1047,12 +1050,12 @@
                 await ShowMessage($"{outgoing.Data.Name}은(는) 자연회복으로 상태 이상을 회복했다!", 900);
             }
             PlayerTeamIndex = newIndex;
-            HeroMoveKeys = ResolveMoveKeys(Hero);
             await ShowMessage($"{Hero.Data.Name}을(를) 내보냈다!");
             foreach (var message in Rules.ActivateSwitchIn(Hero, Enemy, GetIllusionTarget(Hero, PlayerTeam)))
             {
                 await ShowMessage(message, 1000);
             }
+            HeroMoveKeys = ResolveMoveKeys(Hero);
 
             string? enemyMoveKey = Rules.PickEnemyMove(Enemy, EnemyMoveKeys, Hero);
             if (await RunTurn(Enemy, Hero, enemyMoveKey, false, attackerMovedFirst: true)) return;
@@ -1091,13 +1094,13 @@
                 await ShowMessage($"{outgoing.Data.Name}은(는) 자연회복으로 상태 이상을 회복했다!", 900);
 
             PlayerTeamIndex = idx;
-            HeroMoveKeys = ResolveMoveKeys(Hero);
             Menu = BattleMenu.Main;
             await ShowMessage($"{Hero.Data.Name}을(를) 내보냈다!");
             foreach (var message in Rules.ActivateSwitchIn(Hero, Enemy, GetIllusionTarget(Hero, PlayerTeam)))
             {
                 await ShowMessage(message, 1000);
             }
+            HeroMoveKeys = ResolveMoveKeys(Hero);
 
             // 기절 후 강제 교체는 끝난 턴의 연장이므로 턴 종료 효과를 반복하지 않는다.
             if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }

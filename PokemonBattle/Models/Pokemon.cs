@@ -771,13 +771,14 @@ public class Pokemon
         switch (Status)
         {
             case StatusCondition.Sleep:
-                SleepTurnsRemaining -= SelectedAbility == "일찍기상" ? 2 : 1;
-                if (SleepTurnsRemaining <= 0)
+                if (SleepTurnsRemaining > 0)
                 {
-                    Status = StatusCondition.None;
-                    return (true, $"{Data.Name}이(가) 잠에서 깼다!");
+                    int decrement = SelectedAbility == "일찍기상" ? 2 : 1;
+                    SleepTurnsRemaining = Math.Max(0, SleepTurnsRemaining - decrement);
+                    return (false, $"{Data.Name}은(는) 잠들어 있다...");
                 }
-                return (false, $"{Data.Name}은(는) 잠들어 있다...");
+                Status = StatusCondition.None;
+                return (true, $"{Data.Name}이(가) 잠에서 깼다!");
 
             case StatusCondition.Freeze:
                 if (random.Next(100) < 20)

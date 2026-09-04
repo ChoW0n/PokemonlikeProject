@@ -45,7 +45,7 @@ public sealed class StatusAndItemRegressionTests
     }
 
     [Fact]
-    public async Task Sleep_status_wakes_deterministically_and_allows_the_next_move()
+    public async Task Sleep_status_with_one_turn_remaining_skips_one_turn_before_waking()
     {
         const string moveKey = "regression-guaranteed-sleep";
         RegisterMove(moveKey, new Move(
@@ -68,6 +68,16 @@ public sealed class StatusAndItemRegressionTests
             // so the action-prevention and wake-up assertions remain deterministic.
             sleepingPokemon.SleepTurnsRemaining = 1;
             int ppBefore = sleepingPokemon.CurrentPP["tackle"];
+
+            events.Clear();
+            await CreateFullEngine().TakeTurnAsync(
+                sleepingPokemon, attacker, "tackle", attackerIsHero: false, Capture(events));
+
+            Assert.Equal(StatusCondition.Sleep, sleepingPokemon.Status);
+            Assert.Equal(0, sleepingPokemon.SleepTurnsRemaining);
+            Assert.Equal(ppBefore, sleepingPokemon.CurrentPP["tackle"]);
+            Assert.Contains(events, battleEvent =>
+                battleEvent.Message?.Contains("잠들어 있다", StringComparison.Ordinal) == true);
 
             events.Clear();
             await CreateFullEngine().TakeTurnAsync(

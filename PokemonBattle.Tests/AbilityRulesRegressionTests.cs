@@ -518,6 +518,20 @@ public sealed class AbilityRulesRegressionTests
         Assert.False(ditto.CanUseMove("judgment"));
     }
 
+    // 변신 후 현재 기술 키가 상대 기술 키와 일치하는지 확인한다.
+    [Fact]
+    public void Imposter_rebuilds_move_keys_after_entry_transformation()
+    {
+        var ditto = CreatePokemon(132, "tackle", ability: "괴짜");
+        var target = CreatePokemon(25, "thunderbolt", ability: "정전기");
+
+        CreateFullEngine().ActivateSwitchIn(ditto, target);
+
+        Assert.Equal(
+            target.CurrentPP.Keys.OrderBy(key => key),
+            ditto.CurrentPP.Keys.OrderBy(key => key));
+    }
+
     [Fact]
     public void Remaining_ability_catalog_is_registered()
     {
