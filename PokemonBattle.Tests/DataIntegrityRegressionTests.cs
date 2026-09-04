@@ -113,8 +113,7 @@ public sealed class DataIntegrityRegressionTests
             .SelectMany(pair => pair.Value.LearnableMoveNames
                 .Intersect(new[]
                 {
-                    "counter", "mirror-coat", "kings-shield", "spiky-shield", "sticky-web", "switcheroo",
-                    "haze", "roar", "whirlwind"
+                    "counter", "mirror-coat", "kings-shield", "spiky-shield", "sticky-web", "switcheroo"
                 }, StringComparer.Ordinal)
                 .Where(moveKey => !pair.Value.MoveNames.Contains(moveKey, StringComparer.Ordinal))
                 .Select(moveKey => $"#{pair.Key} {pair.Value.Name}: {moveKey}"))
@@ -127,9 +126,9 @@ public sealed class DataIntegrityRegressionTests
         Assert.Contains("mirror-coat", PokemonDatabase.All[202].MoveNames);
         Assert.Contains("counter", PokemonDatabase.All[360].MoveNames);
         Assert.Contains("mirror-coat", PokemonDatabase.All[360].MoveNames);
-        Assert.Contains("haze", PokemonDatabase.All.Values.SelectMany(data => data.MoveNames));
-        Assert.Contains("roar", PokemonDatabase.All.Values.SelectMany(data => data.MoveNames));
-        Assert.Contains("whirlwind", PokemonDatabase.All.Values.SelectMany(data => data.MoveNames));
+        Assert.Equal(26, PokemonDatabase.All.Values.Count(data => data.MoveNames.Contains("haze")));
+        Assert.Equal(36, PokemonDatabase.All.Values.Count(data => data.MoveNames.Contains("roar")));
+        Assert.Equal(26, PokemonDatabase.All.Values.Count(data => data.MoveNames.Contains("whirlwind")));
     }
 
     [Fact]

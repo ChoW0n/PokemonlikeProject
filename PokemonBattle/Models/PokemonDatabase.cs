@@ -733,14 +733,60 @@ public static class PokemonDatabase
         All[292].SpeciesNote = "설정상 '빈 껍질'이라 체력이 항상 1로 고정됩니다. 특성 '불가사의부적' 덕분에 효과가 굉장한 기술이 아니면 맞지 않아요.";
         All[360].SpeciesNote = "되받아치기 콘셉트라 카운터/미러코트 계열 기술 위주로 구성되어 있습니다.";
 
+        AddSelfLearnedImplementedMoves();
         BackfillImplementedLearnableMoves();
         PokemonHeightCatalog.Apply(All);
     }
 
+    private static readonly IReadOnlyDictionary<string, string[]> SelfLearnedImplementedMoves =
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["haze"] = new[]
+            {
+                "arbok", "articuno", "cofagrigus", "crobat", "cryogonal", "darkrai",
+                "ekans", "gengar", "golbat", "greninja", "honchkrow", "koffing",
+                "masquerain", "muk", "murkrow", "poliwrath", "quagsire", "seviper",
+                "surskit", "tentacruel", "vaporeon", "volcanion", "wooper", "yamask",
+                "zubat", "zygarde-50"
+            },
+            ["roar"] = new[]
+            {
+                "aerodactyl", "aggron", "arcanine", "aron", "deino", "emboar",
+                "entei", "exploud", "granbull", "growlithe", "herdier", "hippowdon",
+                "houndoom", "houndour", "hydreigon", "lairon", "lillipup", "loudred",
+                "luxio", "luxray", "manectric", "mightyena", "ninetales", "pignite",
+                "poochyena", "raikou", "shinx", "snubbull", "stoutland", "suicune",
+                "tepig", "tyrantrum", "tyrunt", "vulpix", "whismur", "zweilous"
+            },
+            ["whirlwind"] = new[]
+            {
+                "beautifly", "braviary", "butterfree", "dustox", "golbat", "hariyama",
+                "ho-oh", "lugia", "makuhita", "mandibuzz", "masquerain", "noibat",
+                "noivern", "pidgeot", "pidgeotto", "pidgey", "rufflet", "shiftry",
+                "sigilyph", "staraptor", "staravia", "starly", "tropius", "venomoth",
+                "volcarona", "vullaby"
+            }
+        };
+
+    private static void AddSelfLearnedImplementedMoves()
+    {
+        // 본가 레벨업 습득 기술은 선택 가능한 첫 번째 목록에 직접 추가한다.
+        foreach (var (moveKey, speciesNames) in SelfLearnedImplementedMoves)
+        {
+            var species = speciesNames.ToHashSet(StringComparer.Ordinal);
+            foreach (var data in All.Values.Where(data => species.Contains(data.EnglishName)))
+            {
+                data.MoveNames = data.MoveNames
+                    .Append(moveKey)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray();
+            }
+        }
+    }
+
     private static readonly string[] BackfillableImplementedMoveKeys =
     {
-        "counter", "mirror-coat", "kings-shield", "spiky-shield", "sticky-web", "switcheroo",
-        "haze", "roar", "whirlwind"
+        "counter", "mirror-coat", "kings-shield", "spiky-shield", "sticky-web", "switcheroo"
     };
 
     private static void BackfillImplementedLearnableMoves()
