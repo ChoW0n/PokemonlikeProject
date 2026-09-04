@@ -183,13 +183,13 @@ public static class EnemyTeamProvider
         double pressure = Math.Clamp(
             0.25 + roundPressure * 0.8 + ratingPressure * 0.45,
             0.2,
-            1.7);
+            1.2);
 
+        // 라운드와 스킬 보정치로 진화 단계 압력을 계산한다.
         double evolutionPressure = Math.Clamp(
-            0.05
-            + roundPressure * 0.55
+            Math.Clamp((safeRound - 1) / 14.0, 0, 1) * 0.75
             + Math.Clamp((skillAdjustment + 3) / 8.0, 0, 1) * 0.25,
-            0.05,
+            0,
             1.0);
         double evolutionWeight = GetEvolutionStageWeight(
             GetEvolutionStage(data),
@@ -200,9 +200,9 @@ public static class EnemyTeamProvider
 
     private static double GetEvolutionStageWeight(int stage, double pressure) => stage switch
     {
-        1 => 1.0 - pressure * 0.05,
-        2 => 0.95 + pressure * 0.1,
-        _ => 0.95 + pressure * 0.12
+        1 => 1.0,
+        2 => 0.45 + pressure * 1.55,
+        _ => 0.20 + pressure * 3.30
     };
 
     private static IReadOnlyDictionary<int, int> BuildEvolutionStages()

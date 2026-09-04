@@ -659,7 +659,7 @@ public class ProgressionRegressionTests
             .First();
 
         Assert.Equal(maximum, EnemyTeamProvider.GetBaseStatTotal(late));
-        Assert.Equal(maximum, EnemyTeamProvider.GetBaseStatTotal(early));
+        Assert.Equal(1, EnemyTeamProvider.GetEvolutionStage(early));
         Assert.True(
             EnemyTeamProvider.GetSpeciesSelectionWeight(late, minimum, maximum, 12, 5)
             > EnemyTeamProvider.GetSpeciesSelectionWeight(late, minimum, maximum, 1, -3));
@@ -707,6 +707,58 @@ public class ProgressionRegressionTests
         Assert.True(lateSecond > lateFirst);
         Assert.True(lateFinal > lateFinalAtNeutralSkill);
         Assert.True(lateFinal / lateFirst > earlyFinal / earlyFirst);
+    }
+
+    [Fact]
+    public void Enemy_evolution_stage_probabilities_follow_the_requested_curve()
+    {
+        var pool = PokemonDatabase.All
+            .Where(entry => entry.Key <= 300 && !EnemyTeamProvider.IsLegendary(entry.Key))
+            .ToList();
+        int minimum = pool.Min(entry => EnemyTeamProvider.GetBaseStatTotal(entry.Value));
+        int maximum = pool.Max(entry => EnemyTeamProvider.GetBaseStatTotal(entry.Value));
+        var expected = new Dictionary<int, (double First, double Second, double Final)>
+        {
+            [1] = (0.6157, 0.2934, 0.0909),
+            [5] = (0.4648, 0.3589, 0.1763),
+            [10] = (0.3478, 0.4061, 0.2460),
+            [15] = (0.2769, 0.4333, 0.2898),
+            [20] = (0.2769, 0.4333, 0.2898)
+        };
+
+        foreach (var (round, target) in expected)
+        {
+            var stageWeights = new double[4];
+            foreach (var entry in pool)
+            {
+                stageWeights[EnemyTeamProvider.GetEvolutionStage(entry.Key)] +=
+                    EnemyTeamProvider.GetSpeciesSelectionWeight(
+                        entry.Value,
+                        minimum,
+                        maximum,
+                        round,
+                        skillAdjustment: 0);
+            }
+
+            double total = stageWeights.Skip(1).Sum();
+            Assert.Equal(target.First, stageWeights[1] / total, 3);
+            Assert.Equal(target.Second, stageWeights[2] / total, 3);
+            Assert.Equal(target.Final, stageWeights[3] / total, 3);
+        }
+    }
+
+    [Fact]
+    public void First_stage_only_enemy_pool_excludes_evolved_species()
+    {
+        var team = EnemyTeamProvider.GetRandomTeam(
+            count: 6,
+            poolSize: 300,
+            firstStageOnly: true,
+            excludeIds: new HashSet<int>(),
+            legendaryUnlocked: false);
+
+        Assert.NotEmpty(team);
+        Assert.All(team, entry => Assert.Equal(1, EnemyTeamProvider.GetEvolutionStage(entry.Key)));
     }
 
     [Fact]
