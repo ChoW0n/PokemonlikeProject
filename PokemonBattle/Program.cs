@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.ResponseCompression;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +27,13 @@ builder.Services.AddSignalR(options =>
     options.KeepAliveInterval = TimeSpan.FromSeconds(15);
     options.ClientTimeoutInterval = TimeSpan.FromMinutes(2);
     options.HandshakeTimeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes;
 });
 
 builder.Services.AddScoped<CurrentUserService>();
@@ -74,8 +82,9 @@ builder.Services.AddScoped<GameState>();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options =>
     {
-        options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(30);
-        options.DisconnectedCircuitMaxRetained = 500;
+         // 끊긴 회로 보존량을 제한해 메모리 사용을 줄인다.
+         options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(10);
+         options.DisconnectedCircuitMaxRetained = 150;
         options.JSInteropDefaultCallTimeout = TimeSpan.FromMinutes(2);
         options.MaxBufferedUnacknowledgedRenderBatches = 20;
     });
@@ -228,7 +237,15 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
 }
 
-app.UseStaticFiles();
+app.UseResponseCompression();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        // 정적 파일은 캐시해 매 요청의 전송량을 줄인다.
+        context.Context.Response.Headers.CacheControl = "public,max-age=604800";
+    }
+});
 app.UseAntiforgery();
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
