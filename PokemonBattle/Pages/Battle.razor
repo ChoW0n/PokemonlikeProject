@@ -13,7 +13,12 @@
 
 <PageTitle>포켓몬 배틀</PageTitle>
 
-<main class="battle-page">
+@{
+    string currentWeather = Rules.CurrentWeather;
+    string currentField = Rules.CurrentField;
+}
+
+<main class="battle-page" @onclick="CloseEnvironmentTooltip">
     <header class="battle-header">
         <div>
             <p class="eyebrow">BATTLE LAB / SERVER SESSION</p>
@@ -24,7 +29,7 @@
                     <span class="rival-badge" aria-label="라이벌전">라이벌전</span>
                 }
             </div>
-            <p class="intro">현재 날씨: @Rules.CurrentWeather · 필드: @Rules.CurrentField</p>
+            <p class="intro">현재 날씨: @currentWeather · 필드: @currentField</p>
         </div>
         <button type="button" class="speed-toggle" aria-label="배틀 메시지 재생 속도 변경" @onclick="CycleSpeed">재생속도 @SpeedLabel</button>
     </header>
@@ -33,8 +38,34 @@
         <p id="battle-state-summary" class="visually-hidden">상대와 내 포켓몬의 이름, 레벨, 타입, 현재 HP와 상태 이상을 표시합니다.</p>
         <div class="arena-meta" role="group" aria-label="현재 전장 정보">
             <span class="arena-meta-label">LIVE ARENA</span>
-            <span>날씨 · @Rules.CurrentWeather</span>
-            <span>필드 · @Rules.CurrentField</span>
+            <div class="environment-badge @(IsEnvironmentTooltipOpen("weather") ? "is-open" : "")" @onclick:stopPropagation="true">
+                <button type="button"
+                        class="environment-badge-trigger"
+                        aria-label="@($"날씨 {currentWeather} 설명")"
+                        aria-describedby="weather-tooltip"
+                        aria-expanded="@(IsEnvironmentTooltipOpen("weather") ? "true" : "false")"
+                        @onclick="ToggleWeatherTooltip">
+                    날씨 · @currentWeather
+                </button>
+                <div id="weather-tooltip" class="environment-tooltip" role="tooltip">
+                    <strong>날씨 효과</strong>
+                    <p>@BattleEnvironmentDescriptions.Weather(currentWeather)</p>
+                </div>
+            </div>
+            <div class="environment-badge @(IsEnvironmentTooltipOpen("field") ? "is-open" : "")" @onclick:stopPropagation="true">
+                <button type="button"
+                        class="environment-badge-trigger"
+                        aria-label="@($"필드 {currentField} 설명")"
+                        aria-describedby="field-tooltip"
+                        aria-expanded="@(IsEnvironmentTooltipOpen("field") ? "true" : "false")"
+                        @onclick="ToggleFieldTooltip">
+                    필드 · @currentField
+                </button>
+                <div id="field-tooltip" class="environment-tooltip" role="tooltip">
+                    <strong>필드 효과</strong>
+                    <p>@BattleEnvironmentDescriptions.Field(currentField)</p>
+                </div>
+            </div>
         </div>
         <div id="battle-fx-layer" class="battle-fx-layer" aria-hidden="true"></div>
         <div class="stage-slot slot-top">
@@ -378,6 +409,7 @@
 
     private List<string> LogHistory = new();
     private string? PromptText = "행동을 선택하세요.";
+    private string? openEnvironmentTooltip;
 
     private double SpeedMultiplier = 1.0;
     private static readonly double[] SpeedOptions = { 1.0, 1.6, 2.4, 3.5, 5.0 };
@@ -392,6 +424,16 @@
         3.5 => "x3.5",
         _ => "x5"
     };
+
+    private bool IsEnvironmentTooltipOpen(string kind) => openEnvironmentTooltip == kind;
+
+    private void ToggleWeatherTooltip() =>
+        openEnvironmentTooltip = IsEnvironmentTooltipOpen("weather") ? null : "weather";
+
+    private void ToggleFieldTooltip() =>
+        openEnvironmentTooltip = IsEnvironmentTooltipOpen("field") ? null : "field";
+
+    private void CloseEnvironmentTooltip() => openEnvironmentTooltip = null;
 
     private async Task CycleSpeed()
     {

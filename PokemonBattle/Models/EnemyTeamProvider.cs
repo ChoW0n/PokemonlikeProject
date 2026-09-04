@@ -81,6 +81,19 @@ public static class EnemyTeamProvider
         712, 714, 716, 717, 718, 719, 720, 721
     };
 
+    private static readonly IReadOnlyDictionary<int, int> EvolutionStages = BuildEvolutionStages();
+
+    public static int GetEvolutionStage(int pokemonId) =>
+        EvolutionStages.TryGetValue(pokemonId, out int stage) ? stage : 1;
+
+    public static int GetEvolutionStage(PokemonData data)
+    {
+        var entry = PokemonDatabase.All.FirstOrDefault(candidate =>
+            ReferenceEquals(candidate.Value, data)
+            || candidate.Value.EnglishName == data.EnglishName);
+        return entry.Value == null ? 1 : GetEvolutionStage(entry.Key);
+    }
+
     public static List<KeyValuePair<int, PokemonData>> GetRandomTeam(
         int count,
         int poolSize,
@@ -114,8 +127,8 @@ public static class EnemyTeamProvider
 
         if (pool.Count == 0 || count <= 0) return new();
 
-        //라운드와 레이팅이 낮을 때는 거의 균등하게 뽑아 약한 종도 계속 등장하게 한다.
-        //진행할수록 종족값 상위 후보의 가중치가 커지지만, 최고 후보만 고정하지는 않는다.
+        //라운드가 오를수록 진화 단계 보정을 조금씩 높여 후반 선택지를 강화한다.
+        //BST 가중치와 겹치므로 단계 보정은 완만하게 유지해 난이도 급등을 막는다.
         int minBaseStatTotal = pool.Min(entry => GetBaseStatTotal(entry.Value));
         int maxBaseStatTotal = pool.Max(entry => GetBaseStatTotal(entry.Value));
         var remaining = pool.ToList();
@@ -172,7 +185,53 @@ public static class EnemyTeamProvider
             0.2,
             1.7);
 
-        return 1 + Math.Pow(normalized, 1.7) * pressure;
+        double evolutionPressure = Math.Clamp(
+            0.05
+            + roundPressure * 0.55
+            + Math.Clamp((skillAdjustment + 3) / 8.0, 0, 1) * 0.25,
+            0.05,
+            1.0);
+        double evolutionWeight = GetEvolutionStageWeight(
+            GetEvolutionStage(data),
+            evolutionPressure);
+
+        return (1 + Math.Pow(normalized, 1.7) * pressure) * evolutionWeight;
+    }
+
+    private static double GetEvolutionStageWeight(int stage, double pressure) => stage switch
+    {
+        1 => 1.0 - pressure * 0.05,
+        2 => 0.95 + pressure * 0.1,
+        _ => 0.95 + pressure * 0.12
+    };
+
+    private static IReadOnlyDictionary<int, int> BuildEvolutionStages()
+    {
+        var predecessors = PokemonDatabase.All
+            .Where(entry => entry.Value.EvolvesToId is int nextId && PokemonDatabase.All.ContainsKey(nextId))
+            .GroupBy(entry => entry.Value.EvolvesToId!.Value)
+            .ToDictionary(group => group.Key, group => group.Select(entry => entry.Key).ToList());
+        var stages = new Dictionary<int, int>();
+
+        int Resolve(int pokemonId, HashSet<int> path)
+        {
+            if (stages.TryGetValue(pokemonId, out int cached)) return cached;
+            if (!path.Add(pokemonId)) return 1;
+
+            int stage = predecessors.TryGetValue(pokemonId, out var previous)
+                ? 1 + previous.Max(id => Resolve(id, path))
+                : 1;
+            path.Remove(pokemonId);
+            stages[pokemonId] = stage;
+            return stage;
+        }
+
+        foreach (int pokemonId in PokemonDatabase.All.Keys)
+        {
+            Resolve(pokemonId, new HashSet<int>());
+        }
+
+        return stages;
     }
 
     //프로급 기술 선택: 자속(STAB) 우선 + 서로 다른 속성으로 커버리지 확보 + 변화기 최소 1개 포함

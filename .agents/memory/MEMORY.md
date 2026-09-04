@@ -14,6 +14,7 @@
 - [Skill rating persistence](skill-rating-persistence.md) — account rating is separate from the run; active-run difficulty is persisted and fixed until reset.
 - [Trace ability lifecycle](trace-ability-lifecycle.md) — copied abilities are temporary and restore on switch-out.
 - [Enemy team scaling](enemy-team-scaling.md) — opponent team size follows the current run round; unlock count only expands the selection pool.
+- [Enemy evolution scaling](enemy-evolution-scaling.md) — evolution-stage pressure stays mild when layered on top of BST weighting.
 - [Deployment UBB suspension](deployment-ubb-suspension.md) — successful builds can still be suspended by a usage-based billing hold.
 - [GitHub change control](github-change-control.md) — never commit or push unless the user explicitly asks for it.
 - [Gimmick scope](gimmick-scope.md) — gimmick work is paused and the active scope ends at Mega Evolution.

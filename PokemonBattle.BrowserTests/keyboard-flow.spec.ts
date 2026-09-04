@@ -207,6 +207,21 @@ test("completes the game flow with keyboard controls at mobile and desktop width
     await expect(page).toHaveURL(/\/battle$/);
   }
 
+  const weatherBadge = page.locator(".environment-badge").first();
+  const weatherTrigger = weatherBadge.getByRole("button");
+  const weatherTooltip = page.locator("#weather-tooltip");
+  await expect(weatherTrigger).toHaveAttribute("aria-expanded", "false");
+  await weatherTrigger.click();
+  await expect(weatherTrigger).toHaveAttribute("aria-expanded", "true");
+  await expect(weatherTooltip).toBeVisible();
+  await page.locator(".battle-title-row").click();
+  await expect(weatherTrigger).toHaveAttribute("aria-expanded", "false");
+  await expect(weatherTooltip).toBeHidden();
+  await weatherTrigger.hover();
+  await expect(weatherTooltip).toBeVisible();
+  await page.mouse.move(8, 300);
+  await expect(weatherTooltip).toBeHidden();
+
   const speedToggle = page.getByRole("button", { name: "배틀 메시지 재생 속도 변경" });
   await pressEnter(page, speedToggle);
   await page.keyboard.press("Enter");

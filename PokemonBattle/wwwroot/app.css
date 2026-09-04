@@ -4612,6 +4612,66 @@ p {
     font-weight: 800;
 }
 
+.environment-badge {
+    position: relative;
+}
+
+.environment-badge-trigger {
+    min-height: 28px;
+    padding: 3px 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: inherit;
+    letter-spacing: inherit;
+}
+
+.environment-badge-trigger:hover,
+.environment-badge-trigger:focus-visible {
+    border-color: rgba(199, 167, 98, .45);
+    color: var(--gold-300);
+}
+
+.environment-tooltip {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    z-index: 20;
+    display: none;
+    width: min(320px, calc(100vw - 28px));
+    padding: 11px 13px;
+    border: 1px solid rgba(199, 167, 98, .6);
+    background: rgba(10, 8, 9, .98);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .42);
+    color: var(--parchment);
+    font-family: var(--font-sans);
+    font-size: .72rem;
+    letter-spacing: 0;
+    line-height: 1.55;
+    text-align: left;
+    transform: translateX(-50%);
+}
+
+.environment-badge:hover .environment-tooltip,
+.environment-badge.is-open .environment-tooltip,
+.environment-badge-trigger:focus-visible + .environment-tooltip {
+    display: block;
+}
+
+.environment-tooltip strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--gold-300);
+    font-family: var(--font-mono);
+    font-size: .62rem;
+    letter-spacing: .08em;
+}
+
+.environment-tooltip p {
+    margin: 0;
+}
+
 .hud-plate {
     display: block;
     width: min(236px, 100%);

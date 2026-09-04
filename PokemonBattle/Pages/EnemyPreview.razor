@@ -113,7 +113,8 @@
         }
 
         State.MarkNormalBattle();
-        bool firstStageOnly = unlocked.Count < 12 && !State.LegendaryUnlocked;
+        // 도감 해금 수가 아니라 현재 런 난이도로 진화 단계를 가중한다.
+        bool firstStageOnly = false;
         int poolSize = State.LegendaryUnlocked
             ? 721
             : Math.Clamp(20 + unlocked.Count * 8, 30, 721);

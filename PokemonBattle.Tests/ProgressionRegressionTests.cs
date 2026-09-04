@@ -674,6 +674,42 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public void Enemy_evolution_stage_pressure_follows_round_and_skill()
+    {
+        var pool = PokemonDatabase.All
+            .Where(entry => entry.Key <= 300 && !EnemyTeamProvider.IsLegendary(entry.Key))
+            .Select(entry => entry.Value)
+            .ToList();
+        int minimum = pool.Min(EnemyTeamProvider.GetBaseStatTotal);
+        int maximum = pool.Max(EnemyTeamProvider.GetBaseStatTotal);
+        var firstStage = PokemonDatabase.All[1];
+        var secondStage = PokemonDatabase.All[2];
+        var finalStage = PokemonDatabase.All[3];
+
+        Assert.Equal(1, EnemyTeamProvider.GetEvolutionStage(firstStage));
+        Assert.Equal(2, EnemyTeamProvider.GetEvolutionStage(secondStage));
+        Assert.Equal(3, EnemyTeamProvider.GetEvolutionStage(finalStage));
+
+        double earlyFinal = EnemyTeamProvider.GetSpeciesSelectionWeight(
+            finalStage, minimum, maximum, round: 1, skillAdjustment: -3);
+        double lateFinal = EnemyTeamProvider.GetSpeciesSelectionWeight(
+            finalStage, minimum, maximum, round: 12, skillAdjustment: 5);
+        double earlyFirst = EnemyTeamProvider.GetSpeciesSelectionWeight(
+            firstStage, minimum, maximum, round: 1, skillAdjustment: -3);
+        double lateFirst = EnemyTeamProvider.GetSpeciesSelectionWeight(
+            firstStage, minimum, maximum, round: 12, skillAdjustment: 5);
+        double lateSecond = EnemyTeamProvider.GetSpeciesSelectionWeight(
+            secondStage, minimum, maximum, round: 12, skillAdjustment: 5);
+        double lateFinalAtNeutralSkill = EnemyTeamProvider.GetSpeciesSelectionWeight(
+            finalStage, minimum, maximum, round: 12, skillAdjustment: 0);
+
+        Assert.True(lateFinal > earlyFinal);
+        Assert.True(lateSecond > lateFirst);
+        Assert.True(lateFinal > lateFinalAtNeutralSkill);
+        Assert.True(lateFinal / lateFirst > earlyFinal / earlyFirst);
+    }
+
+    [Fact]
     public async Task RunStorePersistsLegendaryProgressAcrossFreshDbContext()
     {
         await WithTemporarySchema(async schema =>
