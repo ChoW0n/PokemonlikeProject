@@ -77,6 +77,25 @@ public class GameState
     private readonly Dictionary<int, int> _masteryWins = new();
     private readonly Random _metaRandom = new();
 
+    private static bool EnsureLoadoutGenders(IEnumerable<PokemonLoadout> loadouts)
+    {
+        bool changed = false;
+        foreach (var loadout in loadouts)
+        {
+            if (loadout.Gender.HasValue
+                || !PokemonDatabase.All.TryGetValue(loadout.PokemonId, out var data))
+            {
+                continue;
+            }
+
+            // 성별이 없는 기존 저장 데이터는 처음 읽을 때 한 번만 정한다.
+            loadout.Gender = Pokemon.InferGender(data);
+            changed = true;
+        }
+
+        return changed;
+    }
+
     public event Action? OnChange;
 
     public GameState(
@@ -164,6 +183,7 @@ public class GameState
         //전체 데이터를 신뢰할 수 없다고 보고 진행 상황을 완전히 초기화함
         bool hasCorruptedEntry = loadouts.Any(l => !PokemonDatabase.All.ContainsKey(l.PokemonId));
         bool hadDuplicateItems = false;
+        bool hadMissingGenders = false;
 
         if (hasCorruptedEntry)
         {
@@ -178,11 +198,8 @@ public class GameState
             CurrentScore = score;
             hadDuplicateItems = TeamLoadoutRules.HasDuplicateItems(loadouts);
             PlayerLoadouts = TeamLoadoutRules.NormalizeUniqueItems(loadouts);
+            hadMissingGenders = EnsureLoadoutGenders(PlayerLoadouts);
             PlayerTeamIds = PlayerLoadouts.Select(l => l.PokemonId).ToList();
-            if (hadDuplicateItems)
-            {
-                await PersistRun();
-            }
         }
 
         HighScore = highScore;
@@ -198,7 +215,7 @@ public class GameState
             CurrentRunDifficultyAdjustment = SkillRatingCalculator.CalculateDifficultyAdjustment(SkillRating);
             await PersistRun(); //깨끗해진 상태와 현재 런의 고정 보정을 DB에도 즉시 반영
         }
-        else if (hadDuplicateItems)
+        else if (hadDuplicateItems || hadMissingGenders)
         {
             await PersistRun();
         }
@@ -287,6 +304,7 @@ public class GameState
     public async Task SetEnemyLoadouts(List<PokemonLoadout> loadouts) //상대 미리보기에서 확정된 라인업 저장 및 전설 출현 소비
     {
         var normalizedLoadouts = TeamLoadoutRules.NormalizeUniqueItems(loadouts);
+        EnsureLoadoutGenders(normalizedLoadouts);
         if (!HaveSameLoadouts(EnemyLoadouts, normalizedLoadouts))
         {
             LegendaryEncounterConsumed = false;
@@ -323,6 +341,7 @@ public class GameState
     public async Task SetPlayerLoadouts(List<PokemonLoadout> loadouts)
     {
         PlayerLoadouts = TeamLoadoutRules.NormalizeUniqueItems(loadouts);
+        EnsureLoadoutGenders(PlayerLoadouts);
         PlayerTeamIds = PlayerLoadouts.Select(l => l.PokemonId).ToList();
         await PersistRun();
         if (_progression != null && _currentUser.IsLoggedIn)

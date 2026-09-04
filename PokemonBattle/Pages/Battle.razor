@@ -587,6 +587,7 @@
                     l.ChosenAbility,
                     l.ChosenItem,
                     l.Level,
+                    gender: l.Gender,
                     masteryBonusPercent: State.GetPokemonMasteryBonusPercent(l.PokemonId))
             ).ToList();
         }
@@ -617,7 +618,13 @@
         if (State.EnemyLoadouts.Count > 0)
         {
             EnemyTeam = State.EnemyLoadouts.Select(l =>
-                new Pokemon(PokemonDatabase.All[l.PokemonId], l.ChosenMoveNames, l.ChosenAbility, l.ChosenItem, l.Level)
+                new Pokemon(
+                    PokemonDatabase.All[l.PokemonId],
+                    l.ChosenMoveNames,
+                    l.ChosenAbility,
+                    l.ChosenItem,
+                    l.Level,
+                    l.Gender)
             ).ToList();
         }
         else

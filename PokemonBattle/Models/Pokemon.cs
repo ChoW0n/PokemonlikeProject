@@ -388,7 +388,7 @@ public class Pokemon
         }
     }
 
-    private static PokemonGender InferGender(PokemonData data)
+    internal static PokemonGender InferGender(PokemonData data)
     {
         string englishName = data.EnglishName.ToLowerInvariant();
         if (englishName.EndsWith("-male") || englishName.EndsWith("-m")

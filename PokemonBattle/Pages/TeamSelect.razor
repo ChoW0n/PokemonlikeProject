@@ -505,7 +505,8 @@
                         ChosenMoveNames = l.ChosenMoveNames.Where(m => validKeys.Contains(m)).ToList(),
                         ChosenAbility = l.ChosenAbility,
                         ChosenItem = l.ChosenItem,
-                        Level = l.Level
+                        Level = l.Level,
+                        Gender = l.Gender
                     };
                 }).ToList();
             }
@@ -741,7 +742,8 @@
             ChosenMoveNames = new List<string>(DraftMoves),
             ChosenAbility = DraftAbility,
             ChosenItem = TeamLoadoutRules.NormalizeItemName(DraftItem),
-            Level = DraftLevel
+            Level = DraftLevel,
+            Gender = existing?.Gender
         });
         TeamLoadouts = TeamLoadoutRules.NormalizeUniqueItems(TeamLoadouts);
 
@@ -840,7 +842,8 @@
                         ChosenItem = l.ChosenItem,
                         Level = currentLevels.TryGetValue(l.PokemonId, out var level)
                             ? level
-                            : State.CurrentRunLevel
+                            : State.CurrentRunLevel,
+                        Gender = l.Gender
                     };
                 }).ToList();
 

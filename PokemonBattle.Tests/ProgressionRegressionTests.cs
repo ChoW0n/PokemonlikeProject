@@ -36,6 +36,28 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public void LoadoutJsonRoundTripsGenderAndAcceptsLegacyLoadouts()
+    {
+        var original = new PokemonLoadout
+        {
+            PokemonId = 25,
+            ChosenMoveNames = new List<string> { "thunder-shock" },
+            ChosenAbility = "정전기",
+            ChosenItem = TeamLoadoutRules.NoItem,
+            Level = 8,
+            Gender = PokemonGender.Female
+        };
+
+        var restored = Assert.Single(LoadoutJson.Deserialize(
+            LoadoutJson.Serialize(new[] { original })));
+        Assert.Equal(PokemonGender.Female, restored.Gender);
+
+        var legacy = Assert.Single(LoadoutJson.Deserialize(
+            """[{"PokemonId":25,"ChosenMoveNames":["thunder-shock"],"ChosenAbility":"정전기","ChosenItem":"없음","Level":8}]"""));
+        Assert.Null(legacy.Gender);
+    }
+
+    [Fact]
     public void PresetKeepsCurrentRunLevelOnlyForExistingPokemon()
     {
         var preset = new[]

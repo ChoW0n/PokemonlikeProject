@@ -38,6 +38,12 @@ public static class PokemonGenderCatalog
       .Select(static value => int.Parse(value.Trim()))
       .ToArray();
 
+    private static readonly IReadOnlyDictionary<string, int> GenderRatesByEnglishName =
+        PokemonDatabase.All.ToDictionary(
+            candidate => candidate.Value.EnglishName,
+            candidate => GetGenderRate(candidate.Key),
+            StringComparer.OrdinalIgnoreCase);
+
     public static int GetGenderRate(int pokemonId) =>
         pokemonId is >= 1
             && pokemonId <= OfficialGenderRates.Length
@@ -46,9 +52,9 @@ public static class PokemonGenderCatalog
 
     public static int GetGenderRate(PokemonData data)
     {
-        var entry = PokemonDatabase.All.FirstOrDefault(candidate =>
-            ReferenceEquals(candidate.Value, data)
-            || candidate.Value.EnglishName == data.EnglishName);
-        return entry.Value == null ? -1 : GetGenderRate(entry.Key);
+        return GenderRatesByEnglishName.TryGetValue(data.EnglishName, out var rate)
+            ? rate
+            : -1;
     }
+
 }

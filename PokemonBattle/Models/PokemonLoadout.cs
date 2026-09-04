@@ -7,6 +7,7 @@ public class PokemonLoadout
     public string ChosenAbility = "";
     public string ChosenItem = "없음";
     public int Level = 1; //이 런(run) 안에서 누적된 레벨. 승리할 때마다 오르고, 패배하면 초기화됨
+    public PokemonGender? Gender;
 
     public PokemonLoadout Clone(int? level = null)
     {
@@ -16,7 +17,8 @@ public class PokemonLoadout
             ChosenMoveNames = new List<string>(ChosenMoveNames),
             ChosenAbility = ChosenAbility,
             ChosenItem = ChosenItem,
-            Level = level ?? Level
+            Level = level ?? Level,
+            Gender = Gender
         };
     }
 }
