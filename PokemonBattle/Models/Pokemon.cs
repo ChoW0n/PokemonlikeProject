@@ -441,6 +441,7 @@ public class Pokemon
     public bool CanUseMove(string moveName)
     {
         if (RampageMoveKey != null) return RampageMoveKey == moveName;
+        if (PendingMoveKey != null) return PendingMoveKey == moveName;
         if (!CurrentPP.TryGetValue(moveName, out var pp) || pp <= 0) return false;
         if (DisabledMoveKey == moveName) return false;
         if (ImprisonedMoveKeys.Contains(moveName)) return false;

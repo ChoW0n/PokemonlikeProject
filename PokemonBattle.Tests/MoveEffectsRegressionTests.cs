@@ -254,6 +254,18 @@ public sealed class MoveEffectsRegressionTests
             MoveRuleMetadata.GetRule("dig", MoveDatabase.All["dig"]).Kind);
     }
 
+    // 충전 중에는 PP가 없어도 예약 기술만 선택 가능해야 한다.
+    [Fact]
+    public void Charging_move_locks_other_move_selection_before_pp_check()
+    {
+        var attacker = CreatePokemon(50, "dig", "tackle");
+        attacker.SetPendingMove("dig", semiInvulnerable: true);
+        attacker.CurrentPP["dig"] = 0;
+
+        Assert.True(attacker.CanUseMove("dig"));
+        Assert.False(attacker.CanUseMove("tackle"));
+    }
+
     [Fact]
     public async Task Persistent_move_effects_apply_damage_and_recovery_at_turn_end()
     {

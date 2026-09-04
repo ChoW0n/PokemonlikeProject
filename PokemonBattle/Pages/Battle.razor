@@ -1081,7 +1081,9 @@
         await InvokeAsync(StateHasChanged);
         try
         {
-            BeginActionLog();
+            // 강제 교체는 같은 턴의 연장이므로 새 턴 헤더를 만들지 않는다.
+            pendingLogScroll = true;
+            PromptText = null;
             await BeginEffects();
             var outgoing = Hero;
             await PlayBattleEvent(BattleEvent.ActorStep(BattleEventPhase.Switch, outgoing, actorIsHero: true));

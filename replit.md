@@ -52,6 +52,21 @@
 - 데이터베이스에 이름과 설명이 존재해도 전투 효과가 구현된 것은 아닙니다. 새 특성·기술·도구는 표시 데이터와 런타임 판정을 함께 연결해야 합니다.
 - 구애 도구의 기술 잠금과 PP 사용 가능 여부는 `Pokemon`의 공통 검증을 통해 처리해야 하며, 전투 화면에서 다른 기술로 조용히 대체하면 안 됩니다.
 
+## Git 커밋 및 원격 반영
+
+작업 완료의 기준은 로컬 커밋 생성이 아니라 GitHub 원격 저장소의 `main` 브랜치까지 반영된 상태입니다. 이번 작업에서 확인한 순서는 다음과 같습니다.
+
+```bash
+git add <변경 파일>
+git commit -m "<작업 내용>"
+gh auth setup-git
+git push origin main
+```
+
+`gh auth setup-git`은 이미 연결된 GitHub CLI 인증을 Git의 HTTPS 인증으로 연결합니다. 먼저 `git commit`만 하고 `git push`를 빠뜨리거나, `gh auth setup-git` 없이 `git push origin main`을 실행하면 저장된 HTTPS 자격 증명이 거부되어 원격 반영이 완료되지 않을 수 있습니다.
+
+SSH remote를 임의로 지정하는 방식은 이 저장소의 HTTPS `origin`과 별개로 동작하지 않을 수 있고, SSH 키와 호스트 확인 설정이 없는 환경에서는 인증 단계에서 멈춥니다. 따라서 이 저장소에서는 위 순서대로 GitHub CLI 인증을 Git에 연결한 뒤 `git push origin main`의 결과를 확인합니다.
+
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
