@@ -25,6 +25,8 @@ public class AppDbContext : DbContext
 
     public DbSet<PokemonMastery> PokemonMasteries => Set<PokemonMastery>();
 
+    public DbSet<BattleResult> BattleResults => Set<BattleResult>();
+
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -52,5 +54,9 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<PokemonMastery>()
             .HasIndex(mastery => new { mastery.Username, mastery.PokemonId })
             .IsUnique();
+
+        modelBuilder.Entity<BattleResult>()
+            .HasIndex(result => new { result.Username, result.CreatedAtUtc })
+            .HasDatabaseName("IX_BattleResults_Username_CreatedAtUtc");
     }
 }

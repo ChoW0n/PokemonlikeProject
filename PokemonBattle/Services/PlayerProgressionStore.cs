@@ -110,9 +110,23 @@ public sealed class PlayerProgressionStore
         string username,
         IEnumerable<PokemonLoadout> latestLoadouts,
         bool isRivalBattle,
-        bool won)
+        bool won,
+        int round = 1,
+        int turns = 0,
+        double playerHpRatio = 0,
+        int difficultyAdjustment = 0,
+        double? skillRating = null)
     {
         var loadouts = latestLoadouts.ToList();
+        await TryRecordBattleResultAsync(
+            username,
+            isRivalBattle,
+            won,
+            round,
+            turns,
+            playerHpRatio,
+            difficultyAdjustment,
+            skillRating);
         await _database.ExecuteAsync("progression.complete-battle", async db =>
         {
             var profile = await GetOrCreateAsync(db, username);
@@ -176,6 +190,55 @@ public sealed class PlayerProgressionStore
             profile.UpdatedAtUtc = DateTime.UtcNow;
             await db.SaveChangesAsync();
         });
+    }
+
+    private async Task TryRecordBattleResultAsync(
+        string username,
+        bool isRivalBattle,
+        bool won,
+        int round,
+        int turns,
+        double playerHpRatio,
+        int difficultyAdjustment,
+        double? skillRating)
+    {
+        try
+        {
+            await _database.ExecuteAsync("progression.record-battle-result", async db =>
+            {
+                int rivalNumber = isRivalBattle
+                    ? await db.PlayerProgressions
+                        .Where(profile => profile.Username == username)
+                        .Select(profile => profile.RivalNumber)
+                        .FirstOrDefaultAsync()
+                    : 0;
+                double recordedRating = skillRating
+                    ?? await db.PlayerSkillRatings
+                        .Where(rating => rating.Username == username)
+                        .Select(rating => rating.Rating)
+                        .FirstOrDefaultAsync();
+
+                db.BattleResults.Add(new BattleResult
+                {
+                    Username = username,
+                    IsRivalBattle = isRivalBattle,
+                    RivalNumber = Math.Max(0, rivalNumber),
+                    Won = won,
+                    Round = Math.Max(1, round),
+                    Turns = Math.Max(0, turns),
+                    PlayerHpRatio = Math.Clamp(playerHpRatio, 0, 1),
+                    DifficultyAdjustment = difficultyAdjustment,
+                    SkillRating = recordedRating <= 0
+                        ? SkillRatingCalculator.DefaultRating
+                        : recordedRating
+                });
+                await db.SaveChangesAsync();
+            });
+        }
+        catch
+        {
+            // 통계 기록 실패가 전투 종료를 막지 않게 한다.
+        }
     }
 
     public async Task<bool> MarkMessageReadAsync(string username, int messageId)

@@ -631,7 +631,10 @@ public class GameState
     {
         if (_battleOutcomeProcessed) return;
         _battleOutcomeProcessed = true;
-        RecordRoundPerformance(turns, playerTeam, cleared: true);
+        int battleRound = CurrentRunLevel;
+        int battleDifficultyAdjustment = CurrentRunDifficultyAdjustment;
+        double battleSkillRating = SkillRating;
+        double playerHpRatio = RecordRoundPerformance(turns, playerTeam, cleared: true);
         ResultSkillRating = SkillRatingCalculator.PreviewRating(
             SkillRating,
             _roundPerformances,
@@ -687,7 +690,15 @@ public class GameState
         if (_progression != null && _currentUser.IsLoggedIn)
         {
             await _progression.CompleteBattleAsync(
-                _currentUser.Username!, PlayerLoadouts, IsRivalBattle, won: true);
+                _currentUser.Username!,
+                PlayerLoadouts,
+                IsRivalBattle,
+                won: true,
+                round: battleRound,
+                turns: turns,
+                playerHpRatio: playerHpRatio,
+                difficultyAdjustment: battleDifficultyAdjustment,
+                skillRating: battleSkillRating);
             await RefreshAccountProgress();
         }
         if (_mastery != null && _currentUser.IsLoggedIn)
@@ -721,8 +732,11 @@ public class GameState
     {
         if (_battleOutcomeProcessed) return;
         _battleOutcomeProcessed = true;
+        int battleRound = CurrentRunLevel;
+        int battleDifficultyAdjustment = CurrentRunDifficultyAdjustment;
+        double battleSkillRating = SkillRating;
         var latestLoadouts = PlayerLoadouts.Select(loadout => loadout.Clone()).ToList();
-        RecordRoundPerformance(turns, playerTeam, cleared: false);
+        double playerHpRatio = RecordRoundPerformance(turns, playerTeam, cleared: false);
         await UpdateSkillRatingForCurrentRun();
         _scoreStore.SaveIfHigher(CurrentScore);
         HighScore = Math.Max(HighScore, _scoreStore.GetHighScore());
@@ -736,7 +750,15 @@ public class GameState
         if (_progression != null && _currentUser.IsLoggedIn)
         {
             await _progression.CompleteBattleAsync(
-                _currentUser.Username!, latestLoadouts, IsRivalBattle, won: false);
+                _currentUser.Username!,
+                latestLoadouts,
+                IsRivalBattle,
+                won: false,
+                round: battleRound,
+                turns: turns,
+                playerHpRatio: playerHpRatio,
+                difficultyAdjustment: battleDifficultyAdjustment,
+                skillRating: battleSkillRating);
             await RefreshAccountProgress();
         }
         _roundPerformances.Clear();
@@ -810,7 +832,7 @@ public class GameState
         OnChange?.Invoke();
     }
 
-    private void RecordRoundPerformance(
+    private double RecordRoundPerformance(
         int turns,
         IEnumerable<Pokemon>? playerTeam,
         bool cleared)
@@ -828,6 +850,7 @@ public class GameState
             PlayerHpRatio = hpRatio,
             Turns = Math.Max(0, turns)
         });
+        return hpRatio;
     }
 
     private async Task UpdateSkillRatingForCurrentRun(bool won = false)

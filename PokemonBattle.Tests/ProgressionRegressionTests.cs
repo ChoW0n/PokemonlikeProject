@@ -486,6 +486,95 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public async Task BattleResultIsRecordedForVictory()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreatePlayerRunsTable(schema);
+            await CreateProgressionTables(schema);
+            const string username = "battle-result-win";
+            var currentUser = new CurrentUserService();
+            currentUser.SignIn(username, isAdmin: false);
+
+            await using (var db = CreateDbContext(schema))
+            {
+                var state = new GameState(
+                    new InMemoryScoreStore(),
+                    new InMemoryPresetStore(),
+                    new UnlockService(db, currentUser),
+                    new RunStore(db),
+                    currentUser,
+                    new SkillRatingService(db),
+                    new PlayerProgressionStore(db));
+                await state.LoadRunForCurrentUser();
+
+                var player = new Pokemon(
+                    PokemonDatabase.All[1],
+                    new List<string> { "tackle" },
+                    level: 10);
+                await state.WinRound(turns: 6, playerTeam: new[] { player });
+            }
+
+            await using var verifyDb = CreateDbContext(schema);
+            var result = Assert.Single(await verifyDb.BattleResults
+                .Where(item => item.Username == username)
+                .ToListAsync());
+            Assert.True(result.Won);
+            Assert.False(result.IsRivalBattle);
+            Assert.Equal(1, result.Round);
+            Assert.Equal(6, result.Turns);
+            Assert.Equal(1, result.PlayerHpRatio);
+            Assert.Equal(0, result.DifficultyAdjustment);
+            Assert.Equal(SkillRatingCalculator.DefaultRating, result.SkillRating);
+        });
+    }
+
+    [Fact]
+    public async Task BattleResultIsRecordedForLoss()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreatePlayerRunsTable(schema);
+            await CreateProgressionTables(schema);
+            const string username = "battle-result-loss";
+            var currentUser = new CurrentUserService();
+            currentUser.SignIn(username, isAdmin: false);
+
+            await using (var db = CreateDbContext(schema))
+            {
+                var state = new GameState(
+                    new InMemoryScoreStore(),
+                    new InMemoryPresetStore(),
+                    new UnlockService(db, currentUser),
+                    new RunStore(db),
+                    currentUser,
+                    new SkillRatingService(db),
+                    new PlayerProgressionStore(db));
+                await state.LoadRunForCurrentUser();
+
+                var player = new Pokemon(
+                    PokemonDatabase.All[1],
+                    new List<string> { "tackle" },
+                    level: 10);
+                player.CurrentHp = player.MaxHp / 2;
+                await state.LoseBattle(turns: 4, playerTeam: new[] { player });
+            }
+
+            await using var verifyDb = CreateDbContext(schema);
+            var result = Assert.Single(await verifyDb.BattleResults
+                .Where(item => item.Username == username)
+                .ToListAsync());
+            Assert.False(result.Won);
+            Assert.False(result.IsRivalBattle);
+            Assert.Equal(1, result.Round);
+            Assert.Equal(4, result.Turns);
+            Assert.Equal(0.5, result.PlayerHpRatio, 6);
+            Assert.Equal(0, result.DifficultyAdjustment);
+            Assert.Equal(SkillRatingCalculator.DefaultRating, result.SkillRating);
+        });
+    }
+
+    [Fact]
     public async Task InMemoryPresetsUpdateDeleteAndIsolateUsers()
     {
         var currentUser = new CurrentUserService();
@@ -1426,6 +1515,21 @@ public class ProgressionRegressionTests
             );
             CREATE UNIQUE INDEX "IX_TechnicalMachines_Username_MoveKey"
                 ON "TechnicalMachines" ("Username", "MoveKey");
+            CREATE TABLE "BattleResults" (
+                "Id" SERIAL PRIMARY KEY,
+                "Username" TEXT NOT NULL,
+                "CreatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                "IsRivalBattle" BOOLEAN NOT NULL DEFAULT FALSE,
+                "RivalNumber" INTEGER NOT NULL DEFAULT 0,
+                "Won" BOOLEAN NOT NULL,
+                "Round" INTEGER NOT NULL DEFAULT 1,
+                "Turns" INTEGER NOT NULL DEFAULT 0,
+                "PlayerHpRatio" DOUBLE PRECISION NOT NULL DEFAULT 0,
+                "DifficultyAdjustment" INTEGER NOT NULL DEFAULT 0,
+                "SkillRating" DOUBLE PRECISION NOT NULL DEFAULT 1000
+            );
+            CREATE INDEX "IX_BattleResults_Username_CreatedAtUtc"
+                ON "BattleResults" ("Username", "CreatedAtUtc" DESC);
             """);
     }
 
