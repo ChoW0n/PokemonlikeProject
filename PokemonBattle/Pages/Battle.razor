@@ -661,13 +661,20 @@
     {
         var usedItems = new HashSet<string>(StringComparer.Ordinal);
         var enemies = new List<Pokemon>();
+        bool unawareAlreadyChosen = false;
 
         foreach (int id in ids)
         {
             var data = PokemonDatabase.All[id];
             var moves = EnemyTeamProvider.PickProMoveset(data);
             int skillAdjustment = State.CurrentRunDifficultyAdjustment;
-            string ability = EnemyTeamProvider.PickProAbility(data, moves, skillAdjustment);
+            string ability = EnemyTeamProvider.PickProAbility(
+                data,
+                moves,
+                skillAdjustment,
+                round: State.CurrentRunLevel,
+                unawareAlreadyChosen: unawareAlreadyChosen);
+            unawareAlreadyChosen |= ability == "천진";
             var items = ItemDatabase.GetAvailableItems(data.Name)
                 .Where(item => item.Name == TeamLoadoutRules.NoItem || !usedItems.Contains(item.Name))
                 .ToList();

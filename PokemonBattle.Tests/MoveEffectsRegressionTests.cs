@@ -48,6 +48,84 @@ public sealed class MoveEffectsRegressionTests
     }
 
     [Fact]
+    public async Task Critical_hits_ignore_only_favorable_rank_stages()
+    {
+        async Task<int> DealDamage(
+            string moveKey,
+            int attackerId,
+            int defenderId,
+            bool critical,
+            int attackerAttackStage = 0,
+            int attackerSpecialAttackStage = 0,
+            int attackerDefenseStage = 0,
+            int defenderDefenseStage = 0,
+            int defenderSpecialDefenseStage = 0)
+        {
+            var attacker = CreatePokemon(attackerId, moveKey);
+            var defender = CreatePokemon(defenderId, "tackle");
+            attacker.ChangeStage("attack", attackerAttackStage);
+            attacker.ChangeStage("special-attack", attackerSpecialAttackStage);
+            attacker.ChangeStage("defense", attackerDefenseStage);
+            defender.ChangeStage("defense", defenderDefenseStage);
+            defender.ChangeStage("special-defense", defenderSpecialDefenseStage);
+            int hpBefore = defender.CurrentHp;
+
+            await CreateEngine(new FixedRandom(critical ? 0 : 99)).TakeTurnAsync(
+                attacker, defender, moveKey, true, _ => Task.CompletedTask);
+
+            return hpBefore - defender.CurrentHp;
+        }
+
+        int physicalCritical = await DealDamage("tackle", 25, 1, critical: true);
+        Assert.Equal(
+            physicalCritical,
+            await DealDamage("tackle", 25, 1, critical: true, defenderDefenseStage: 2));
+        Assert.Equal(
+            physicalCritical,
+            await DealDamage("tackle", 25, 1, critical: true, attackerAttackStage: -2));
+        Assert.True(
+            await DealDamage("tackle", 25, 1, critical: true, defenderDefenseStage: -2)
+            > physicalCritical);
+        Assert.True(
+            await DealDamage("tackle", 25, 1, critical: true, attackerAttackStage: 2)
+            > physicalCritical);
+        int physicalNormal = await DealDamage("tackle", 25, 1, critical: false);
+        Assert.True(
+            await DealDamage("tackle", 25, 1, critical: false, attackerAttackStage: 2)
+            > physicalNormal);
+
+        int specialCritical = await DealDamage("water-gun", 7, 1, critical: true);
+        Assert.Equal(
+            specialCritical,
+            await DealDamage(
+                "water-gun", 7, 1, critical: true, defenderSpecialDefenseStage: 2));
+        Assert.Equal(
+            specialCritical,
+            await DealDamage(
+                "water-gun", 7, 1, critical: true, attackerSpecialAttackStage: -2));
+        Assert.True(
+            await DealDamage(
+                "water-gun", 7, 1, critical: true, defenderSpecialDefenseStage: -2)
+            > specialCritical);
+        Assert.True(
+            await DealDamage(
+                "water-gun", 7, 1, critical: true, attackerSpecialAttackStage: 2)
+            > specialCritical);
+
+        // 바디프레스는 자신의 방어를 공격 스탯으로 사용한다.
+        int bodyPressCritical = await DealDamage(
+            "body-press", 95, 1, critical: true);
+        Assert.Equal(
+            bodyPressCritical,
+            await DealDamage(
+                "body-press", 95, 1, critical: true, attackerDefenseStage: -2));
+        Assert.True(
+            await DealDamage(
+                "body-press", 95, 1, critical: true, attackerDefenseStage: 2)
+            > bodyPressCritical);
+    }
+
+    [Fact]
     public void Hex_doubles_only_against_a_real_status_condition_not_confusion()
     {
         var attacker = CreatePokemon(94, "hex");

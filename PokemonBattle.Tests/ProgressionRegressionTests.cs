@@ -770,6 +770,54 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public void High_round_enemy_ability_selection_can_spawn_unaware_but_caps_it_per_team()
+    {
+        var unawareData = PokemonDatabase.All.Values
+            .Where(data => data.AbilityNames.Contains("천진"))
+            .OrderByDescending(EnemyTeamProvider.GetBaseStatTotal)
+            .First();
+        var moves = EnemyTeamProvider.PickProMoveset(unawareData);
+        int unawareSelections = Enumerable.Range(0, 500)
+            .Count(_ => EnemyTeamProvider.PickProAbility(
+                unawareData,
+                moves,
+                skillAdjustment: 5,
+                round: 20) == "천진");
+
+        Assert.True(unawareSelections > 0);
+        Assert.NotEqual(
+            "천진",
+            EnemyTeamProvider.PickProAbility(
+                unawareData,
+                moves,
+                skillAdjustment: 5,
+                round: 20,
+                unawareAlreadyChosen: true));
+
+        var team = new[] { 399, 400, 528, 399, 400, 528 }
+            .Select(id => PokemonDatabase.All[id])
+            .ToList();
+        bool unawareAlreadyChosen = false;
+        int teamUnawareCount = 0;
+        foreach (var data in team)
+        {
+            string ability = EnemyTeamProvider.PickProAbility(
+                data,
+                EnemyTeamProvider.PickProMoveset(data),
+                skillAdjustment: 5,
+                round: 20,
+                unawareAlreadyChosen);
+            if (ability == "천진")
+            {
+                teamUnawareCount++;
+                unawareAlreadyChosen = true;
+            }
+        }
+
+        Assert.InRange(teamUnawareCount, 0, 1);
+    }
+
+    [Fact]
     public void First_stage_only_enemy_pool_excludes_evolved_species()
     {
         var team = EnemyTeamProvider.GetRandomTeam(

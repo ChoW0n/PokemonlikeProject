@@ -296,12 +296,25 @@ public static class EnemyTeamProvider
     public static string PickProAbility(
         PokemonData data,
         IEnumerable<string> moveKeys,
-        int skillAdjustment = 0)
+        int skillAdjustment = 0,
+        int round = 1,
+        bool unawareAlreadyChosen = false)
     {
         var abilities = data.AbilityNames
             .Where(AbilityDatabase.IsImplemented)
             .Distinct()
             .ToList();
+
+        if (unawareAlreadyChosen && data.AbilityNames.Any(ability => ability != "천진"))
+        {
+            abilities = abilities
+                .Where(ability => ability != "천진")
+                .ToList();
+            if (abilities.Count == 0)
+            {
+                return data.AbilityNames.First(ability => ability != "천진");
+            }
+        }
 
         if (abilities.Count == 0)
         {
@@ -311,7 +324,7 @@ public static class EnemyTeamProvider
         var profile = AnalyzeMoveset(moveKeys);
         return WeightedPick(
             abilities,
-            ability => AbilityWeight(ability, profile, skillAdjustment));
+            ability => AbilityWeight(ability, data, profile, skillAdjustment, round));
     }
 
     public static string PickProItem(
@@ -346,8 +359,10 @@ public static class EnemyTeamProvider
 
     private static double AbilityWeight(
         string ability,
+        PokemonData data,
         MoveProfile profile,
-        int skillAdjustment)
+        int skillAdjustment,
+        int round)
     {
         double weight = 1.0;
         bool physicalFocused = profile.PhysicalCount > profile.SpecialCount;
@@ -378,7 +393,29 @@ public static class EnemyTeamProvider
             weight += 3.0;
         }
 
+        if (ability == "천진")
+        {
+            double roundPressure = Math.Clamp((Math.Max(1, round) - 1) / 12.0, 0, 1);
+            double ratingPressure = Math.Clamp((skillAdjustment + 3) / 8.0, 0, 1);
+            double progressionPressure = Math.Clamp(
+                roundPressure * 0.75 + ratingPressure * 0.25,
+                0,
+                1);
+
+            // 후반일수록, 그리고 물리막이 성향일수록 천진을 우대한다.
+            weight += 1.5 + progressionPressure * 4.5;
+            weight += GetPhysicalWallScore(data) * (2.5 + progressionPressure * 2.0);
+        }
+
         return ApplySkillAdjustment(weight, skillAdjustment);
+    }
+
+    private static double GetPhysicalWallScore(PokemonData data)
+    {
+        double hpScore = Math.Clamp((data.BaseHp - 60) / 100.0, 0, 1);
+        double defenseScore = Math.Clamp((data.BaseDef - 60) / 100.0, 0, 1);
+        double speedScore = Math.Clamp((100 - data.BaseSpd) / 100.0, 0, 1);
+        return hpScore * 0.35 + defenseScore * 0.45 + speedScore * 0.20;
     }
 
     private static double ItemWeight(

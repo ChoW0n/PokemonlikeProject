@@ -248,19 +248,23 @@ public class Pokemon
     public int SpDef => (int)(StatOther(BaseStat("special-defense")) * ItemStatMult("special-defense"));
     public int Spd => StatOther(BaseStat("speed"));
 
-    private double StageMult(string key)
+    private double StageMult(string key, bool ignoreNegativeStage = false, bool ignorePositiveStage = false)
     {
         int stage = StatStages[key];
+        if ((ignoreNegativeStage && stage < 0) || (ignorePositiveStage && stage > 0))
+            stage = 0;
         return stage >= 0 ? (2.0 + stage) / 2.0 : 2.0 / (2.0 - stage);
     }
 
     public int EffectiveAtk => EffectiveAtkAgainst();
 
-    public int EffectiveAtkAgainst(Pokemon? opponent = null)
+    public int EffectiveAtkAgainst(Pokemon? opponent = null, bool ignoreNegativeStage = false)
     {
         bool opponentIgnoresStages = opponent?.SelectedAbility == "천진"
             && !opponent.IsAbilitySuppressedBy(this);
-        double value = Atk * (opponentIgnoresStages ? 1.0 : StageMult("attack"));
+        double value = Atk * (opponentIgnoresStages
+            ? 1.0
+            : StageMult("attack", ignoreNegativeStage: ignoreNegativeStage));
         if (Status == StatusCondition.Burn && SelectedAbility != "근성")
             value *= ResistsStatusStatPenalties ? 0.75 : 0.5;
         if (HasActiveAbility("근성", opponent) && Status != StatusCondition.None) value *= 1.5;
@@ -279,10 +283,18 @@ public class Pokemon
 
     public int EffectiveDef => EffectiveDefAgainst();
 
-    public int EffectiveDefAgainst(Pokemon? opponent = null)
+    public int EffectiveDefAgainst(
+        Pokemon? opponent = null,
+        bool ignorePositiveStage = false,
+        bool ignoreNegativeStage = false)
     {
         bool opponentIgnoresStages = opponent?.SelectedAbility == "천진";
-        double value = Def * (opponentIgnoresStages ? 1.0 : StageMult("defense"));
+        double value = Def * (opponentIgnoresStages
+            ? 1.0
+            : StageMult(
+                "defense",
+                ignoreNegativeStage: ignoreNegativeStage,
+                ignorePositiveStage: ignorePositiveStage));
         if (!IsAbilitySuppressedBy(opponent)
             && HasActiveAbility("풀모피", opponent) && BattleField.Current == BattleField.Grassy) value *= 2.0;
         if (!IsAbilitySuppressedBy(opponent)
@@ -292,10 +304,15 @@ public class Pokemon
 
     public int EffectiveSpAtk => EffectiveSpAtkAgainst();
 
-    public int EffectiveSpAtkAgainst(Pokemon? opponent = null, Pokemon? ally = null)
+    public int EffectiveSpAtkAgainst(
+        Pokemon? opponent = null,
+        Pokemon? ally = null,
+        bool ignoreNegativeStage = false)
     {
         bool opponentIgnoresStages = opponent?.SelectedAbility == "천진";
-        double value = SpAtk * (opponentIgnoresStages ? 1.0 : StageMult("special-attack"));
+        double value = SpAtk * (opponentIgnoresStages
+            ? 1.0
+            : StageMult("special-attack", ignoreNegativeStage: ignoreNegativeStage));
         if (HasPlusMinusPartner(ally) && HasActiveAbility(SelectedAbility, opponent)) value *= 1.5;
         if (!BattleWeather.AreEffectsSuppressed(this, opponent)
             && HasActiveAbility("선파워", opponent) && BattleWeather.Current == "쾌청") value *= 1.5;
@@ -305,10 +322,12 @@ public class Pokemon
 
     public int EffectiveSpDef => EffectiveSpDefAgainst();
 
-    public int EffectiveSpDefAgainst(Pokemon? opponent = null)
+    public int EffectiveSpDefAgainst(Pokemon? opponent = null, bool ignorePositiveStage = false)
     {
         bool opponentIgnoresStages = opponent?.SelectedAbility == "천진";
-        double value = SpDef * (opponentIgnoresStages ? 1.0 : StageMult("special-defense"));
+        double value = SpDef * (opponentIgnoresStages
+            ? 1.0
+            : StageMult("special-defense", ignorePositiveStage: ignorePositiveStage));
         if (!IsAbilitySuppressedBy(opponent)
             && !BattleWeather.AreEffectsSuppressed(this, opponent)
             && HasActiveAbility("플라워기프트", opponent) && BattleWeather.Current == "쾌청")

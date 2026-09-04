@@ -926,8 +926,6 @@ public sealed class BattleEngine
 
         if (!move.IsStatus && move.Power > 0)
         {
-            int attackStat = GetAttackStat(attacker, defender, moveKey, move);
-            int defenseStat = GetDefenseStat(attacker, defender, moveKey, move);
             bool movedFirst = attackerMovedFirst
                 ?? EffectiveSpeed(attacker, defender) >= EffectiveSpeed(defender, attacker);
             double power = MoveRuleMetadata.EffectivePower(
@@ -964,6 +962,11 @@ public sealed class BattleEngine
                 {
                     await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 공격이 급소에 맞았다!"));
                 }
+                // 급소마다 랭크업/랭크다운 무시 규칙을 적용해 스탯을 다시 계산한다.
+                int attackStat = GetAttackStat(
+                    attacker, defender, moveKey, move, ignoreNegativeStage: isCritical);
+                int defenseStat = GetDefenseStat(
+                    attacker, defender, moveKey, move, ignorePositiveStage: isCritical);
                 int hpBefore = defender.CurrentHp;
                 int scaledPower = (int)(((2.0 * attacker.Level / 5 + 2)
                     * power
@@ -1124,22 +1127,40 @@ public sealed class BattleEngine
         return messages;
     }
 
-    private static int GetAttackStat(Pokemon attacker, Pokemon defender, string moveKey, Move move)
+    private static int GetAttackStat(
+        Pokemon attacker,
+        Pokemon defender,
+        string moveKey,
+        Move move,
+        bool ignoreNegativeStage = false)
     {
-        if (moveKey == "body-press") return attacker.EffectiveDef;
-        if (moveKey == "foul-play") return defender.EffectiveAtkAgainst(attacker);
+        if (moveKey == "body-press")
+        {
+            return attacker.EffectiveDefAgainst(
+                defender, ignoreNegativeStage: ignoreNegativeStage);
+        }
+
+        if (moveKey == "foul-play")
+            return defender.EffectiveAtkAgainst(attacker, ignoreNegativeStage);
+
         return move.IsSpecial
-            ? attacker.EffectiveSpAtkAgainst(defender)
-            : attacker.EffectiveAtkAgainst(defender);
+            ? attacker.EffectiveSpAtkAgainst(
+                defender, ignoreNegativeStage: ignoreNegativeStage)
+            : attacker.EffectiveAtkAgainst(defender, ignoreNegativeStage);
     }
 
-    private static int GetDefenseStat(Pokemon attacker, Pokemon defender, string moveKey, Move move)
+    private static int GetDefenseStat(
+        Pokemon attacker,
+        Pokemon defender,
+        string moveKey,
+        Move move,
+        bool ignorePositiveStage = false)
     {
         if (moveKey is "secret-sword" or "psystrike" or "psyshock")
-            return defender.EffectiveDefAgainst(attacker);
+            return defender.EffectiveDefAgainst(attacker, ignorePositiveStage);
         return move.IsSpecial
-            ? defender.EffectiveSpDefAgainst(attacker)
-            : defender.EffectiveDefAgainst(attacker);
+            ? defender.EffectiveSpDefAgainst(attacker, ignorePositiveStage)
+            : defender.EffectiveDefAgainst(attacker, ignorePositiveStage);
     }
 
     private int RollHitCount(Pokemon attacker, Move move)
