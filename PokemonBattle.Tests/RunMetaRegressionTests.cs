@@ -259,12 +259,145 @@ public class RunMetaRegressionTests
 
         Assert.Equal(BattleWeather.Rain, BattleWeather.Current);
         Assert.Equal(BattleField.Electric, BattleField.Current);
+        Assert.Equal(5, BattleField.TurnsRemaining);
         BattleWeather.Reset();
         BattleField.Reset();
     }
 
-    private static Pokemon NewPokemon(int pokemonId) =>
-        new(PokemonDatabase.All[pokemonId], new List<string> { "tackle" }, level: 10);
+    [Fact]
+    public async Task CalmFieldTemporarilyIgnoresBothSidesStatStages()
+    {
+        BattleField.Reset();
+        try
+        {
+            var baselineAttacker = NewPokemon(1);
+            var baselineDefender = NewPokemon(4);
+            int baselineDamage = await DealTackleDamageAsync(
+                baselineAttacker, baselineDefender);
+            double baselineAccuracy = MoveRuleMetadata.EffectiveAccuracy(
+                "thunder",
+                MoveDatabase.All["thunder"],
+                baselineAttacker,
+                baselineDefender);
+
+            var hero = NewPokemon(1);
+            var enemy = NewPokemon(4);
+            hero.ChangeStage("attack", 2);
+            hero.ChangeStage("accuracy", 2);
+            hero.ChangeStage("special-attack", 2);
+            enemy.ChangeStage("evasion", 2);
+            enemy.ChangeStage("special-defense", 2);
+
+            BattleField.Set(BattleField.Calm, turns: 5);
+            int sealedDamage = await DealTackleDamageAsync(hero, enemy);
+
+            Assert.Equal(2, hero.StatStages["attack"]);
+            Assert.Equal(2, hero.StatStages["accuracy"]);
+            Assert.Equal(2, hero.StatStages["special-attack"]);
+            Assert.Equal(2, enemy.StatStages["evasion"]);
+            Assert.Equal(2, enemy.StatStages["special-defense"]);
+            Assert.Equal(hero.Atk, hero.EffectiveAtkAgainst(enemy));
+            Assert.Equal(hero.SpAtk, hero.EffectiveSpAtkAgainst(enemy));
+            Assert.Equal(enemy.Def, enemy.EffectiveDefAgainst(hero));
+            Assert.Equal(enemy.SpDef, enemy.EffectiveSpDefAgainst(hero));
+            Assert.Equal(
+                baselineAccuracy,
+                MoveRuleMetadata.EffectiveAccuracy(
+                    "thunder",
+                    MoveDatabase.All["thunder"],
+                    hero,
+                    enemy),
+                8);
+            Assert.Equal(baselineDamage, sealedDamage);
+            Assert.Equal(5, BattleField.TurnsRemaining);
+
+            for (int turn = 0; turn < 4; turn++)
+            {
+                Assert.False(BattleField.AdvanceTurn());
+                Assert.Equal(BattleField.Calm, BattleField.Current);
+            }
+
+            Assert.True(BattleField.AdvanceTurn());
+            Assert.Equal(BattleField.None, BattleField.Current);
+            Assert.Equal(0, BattleField.TurnsRemaining);
+            Assert.Equal(2, hero.StatStages["attack"]);
+            Assert.Equal(2, enemy.StatStages["evasion"]);
+
+            int damageAfterField = await DealTackleDamageAsync(hero, enemy);
+            Assert.True(damageAfterField > sealedDamage);
+            Assert.True(hero.EffectiveAtkAgainst(enemy) > hero.Atk);
+
+            var enemyBaselineAttacker = NewPokemon(445, level: 50);
+            var heroBaselineDefender = NewPokemon(1, level: 50);
+            int enemyBaselineDamage = await DealTackleDamageAsync(
+                enemyBaselineAttacker, heroBaselineDefender);
+            var enemyAttacker = NewPokemon(445, level: 50);
+            var heroDefender = NewPokemon(1, level: 50);
+            enemyAttacker.ChangeStage("attack", 2);
+            enemyAttacker.ChangeStage("accuracy", 2);
+            heroDefender.ChangeStage("evasion", 2);
+
+            BattleField.Set(BattleField.Calm, turns: 5);
+            int enemySideSealedDamage = await DealTackleDamageAsync(
+                enemyAttacker, heroDefender);
+
+            Assert.Equal(enemyBaselineDamage, enemySideSealedDamage);
+            Assert.Equal(2, enemyAttacker.StatStages["attack"]);
+            Assert.Equal(2, enemyAttacker.StatStages["accuracy"]);
+            Assert.Equal(2, heroDefender.StatStages["evasion"]);
+            Assert.Equal(
+                enemyAttacker.Atk,
+                enemyAttacker.EffectiveAtkAgainst(heroDefender));
+
+            for (int turn = 0; turn < 5; turn++)
+            {
+                BattleField.AdvanceTurn();
+            }
+
+            int enemyDamageAfterField = await DealTackleDamageAsync(
+                enemyAttacker, heroDefender);
+            Assert.True(enemyDamageAfterField > enemySideSealedDamage);
+        }
+        finally
+        {
+            BattleField.Reset();
+        }
+    }
+
+    [Fact]
+    public void BattlefieldCatalogIncludesTheStatSealingImprint()
+    {
+        Assert.Equal(5, RunMetaCatalog.BattlefieldImprints.Count);
+        var imprint = RunMetaCatalog.Battlefield("stillness-sanctum");
+
+        Assert.NotNull(imprint);
+        Assert.Equal(BattleWeather.Clear, imprint!.Weather);
+        Assert.Equal(BattleField.Calm, imprint.Field);
+        Assert.Contains("랭크", imprint.Description, StringComparison.Ordinal);
+        Assert.Contains("랭크", BattleEnvironmentDescriptions.Field(BattleField.Calm));
+    }
+
+    private static Pokemon NewPokemon(int pokemonId, int level = 10) =>
+        new(PokemonDatabase.All[pokemonId], new List<string> { "tackle" }, level: level);
+
+    private static async Task<int> DealTackleDamageAsync(
+        Pokemon attacker,
+        Pokemon defender)
+    {
+        int before = defender.CurrentHp;
+        var engine = new BattleEngine(
+            new FixedRandom(99),
+            new IBattleEffectHandler[]
+            {
+                new MoveEffectHandler(),
+                new ContactReactionEffectHandler(),
+                new AbilityLifecycleEffectHandler(),
+                new DamageModifierEffectHandler()
+            });
+        await engine.TakeTurnAsync(
+            attacker, defender, "tackle", true, _ => Task.CompletedTask);
+        return before - defender.CurrentHp;
+    }
 
     private static BattlePowerContext NewPowerContext(
         Pokemon attacker,
@@ -283,4 +416,16 @@ public class RunMetaRegressionTests
             attackerMovedFirst: movedFirst,
             runMeta: meta,
             attackerIsHero: attackerIsHero);
+
+    private sealed class FixedRandom : Random
+    {
+        private readonly int value;
+
+        public FixedRandom(int value)
+        {
+            this.value = value;
+        }
+
+        public override int Next(int maxValue) => Math.Min(value, maxValue - 1);
+    }
 }

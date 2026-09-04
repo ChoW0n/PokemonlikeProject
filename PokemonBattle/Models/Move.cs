@@ -457,8 +457,9 @@ public static class MoveRuleMetadata
             if (attacker.HasActiveAbility("복안", defender)) accuracy *= 1.3;
             if (attacker.HasActiveAbility("승리의별", defender)) accuracy *= 1.1;
             if (attacker.HasActiveHeldItem(defender) && attacker.HeldItem == "광각렌즈") accuracy *= 1.1;
-            bool attackerUnaware = attacker.HasActiveAbility("천진", defender);
-            if (!attackerUnaware)
+            bool attackerIgnoresStages = BattleField.IgnoresStatStages
+                || attacker.HasActiveAbility("천진", defender);
+            if (!attackerIgnoresStages)
                 accuracy *= AccuracyStageMultiplier(attacker.StatStages["accuracy"]);
         }
 
@@ -474,8 +475,9 @@ public static class MoveRuleMetadata
                 && BattleWeather.Current == BattleWeather.Hail) accuracy *= 0.8;
             if (!defender.IsAbilitySuppressedBy(attacker)
                 && defender.HasActiveAbility("갈지자걸음", attacker) && defender.IsConfused) accuracy *= 0.5;
-            bool defenderUnaware = defender.HasActiveAbility("천진", attacker);
-            if (!defenderUnaware)
+            bool defenderIgnoresStages = BattleField.IgnoresStatStages
+                || defender.HasActiveAbility("천진", attacker);
+            if (!defenderIgnoresStages)
                 accuracy /= AccuracyStageMultiplier(defender.StatStages["evasion"]);
             if (!defender.IsAbilitySuppressedBy(attacker)
                 && defender.HasActiveAbility("미라클스킨", attacker)

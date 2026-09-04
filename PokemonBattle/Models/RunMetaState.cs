@@ -147,7 +147,10 @@ public static class RunMetaCatalog
             BattleWeather.Clear, BattleField.Misty),
         new("iron-dust", "철가루 평원",
             "모래바람이 불어 바위·땅·강철의 힘이 솟습니다.",
-            BattleWeather.Sand, BattleField.None)
+            BattleWeather.Sand, BattleField.None),
+        new("stillness-sanctum", "평정의 성소",
+            "고요한 기운이 양쪽 포켓몬의 능력 랭크 변화를 잠시 봉인합니다.",
+            BattleWeather.Clear, BattleField.Calm)
     ];
 
     public static readonly IReadOnlyList<RiskCovenantDefinition> RiskCovenants =

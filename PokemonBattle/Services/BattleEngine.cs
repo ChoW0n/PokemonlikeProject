@@ -138,7 +138,7 @@ public sealed class BattleEngine
         }
         if (initialField != null && initialField != BattleField.None)
         {
-            BattleField.Set(initialField);
+            BattleField.Set(initialField, turns: 5);
             messages.Add($"전장 각인으로 {initialField}이(가) 펼쳐졌다!");
         }
         var entrants = new[] { (Pokemon: hero, Opponent: enemy), (Pokemon: enemy, Opponent: hero) }
@@ -159,7 +159,7 @@ public sealed class BattleEngine
         }
         if (initialField != null && BattleField.Current != initialField)
         {
-            BattleField.Set(initialField);
+            BattleField.Set(initialField, turns: 5);
             messages.Add($"전장 각인이 {initialField}을(를) 유지했다!");
         }
         return messages;

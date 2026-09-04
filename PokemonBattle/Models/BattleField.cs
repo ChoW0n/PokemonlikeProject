@@ -11,6 +11,7 @@ public static class BattleField
     public const string Electric = "일렉트릭필드";
     public const string Psychic = "사이코필드";
     public const string Misty = "미스트필드";
+    public const string Calm = "평정필드";
 
     private static BattleEnvironment CurrentEnvironment => BattleEnvironmentContext.Active;
 
@@ -25,6 +26,8 @@ public static class BattleField
     }
 
     public static int TurnsRemaining => CurrentEnvironment.FieldTurnsRemaining;
+    // 랭크 수치는 유지하고 계산에서만 봉인한다.
+    public static bool IgnoresStatStages => Current == Calm;
     public static bool TrickRoomActive => CurrentEnvironment.TrickRoomActive;
     public static int TrickRoomTurnsRemaining => CurrentEnvironment.TrickRoomTurnsRemaining;
     public static bool GravityActive => CurrentEnvironment.GravityActive;
