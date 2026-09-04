@@ -365,6 +365,22 @@ public sealed class BattleRulesRegressionTests
         Assert.Equal("tackle", selectedMove);
     }
 
+    [Fact]
+    public void PickEnemyMove_prioritizes_high_accuracy_finishing_move()
+    {
+        var enemy = CreatePokemon(25, "thunder", "thunderbolt");
+        var hero = CreatePokemon(1, "tackle");
+        hero.CurrentHp = 1;
+
+        string? selectedMove = CreateEngine().PickEnemyMove(
+            enemy,
+            new[] { "thunder", "thunderbolt" },
+            hero);
+
+        // 둘 다 마무리할 수 있으면 명중률 높은 기술을 고른다.
+        Assert.Equal("thunderbolt", selectedMove);
+    }
+
     private static Pokemon CreatePokemon(
         int pokemonId,
         params string[] moves)

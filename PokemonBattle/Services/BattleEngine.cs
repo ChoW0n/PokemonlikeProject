@@ -348,12 +348,16 @@ public sealed class BattleEngine
                 PokemonType attackType = MoveRuleMetadata.ResolveMoveType(key, move, enemy, hero);
                 double averageHits = (move.MinHits + move.MaxHits) / 2.0;
                 bool stab = enemy.HasType(attackType);
-                score = MoveRuleMetadata.EffectivePower(key, move, enemy, hero) * averageHits
+                double estimatedDamage = MoveRuleMetadata.EffectivePower(key, move, enemy, hero) * averageHits
                     * (stab ? 1.5 : 1.0)
-                    * PreviewMultiplier(move, hero, enemy)
-                    * ((move.AlwaysHits
-                        ? 100
-                        : MoveRuleMetadata.EffectiveAccuracy(key, move, enemy, hero)) / 100.0);
+                    * PreviewMultiplier(move, hero, enemy);
+                double accuracy = move.AlwaysHits
+                    ? 100
+                    : MoveRuleMetadata.EffectiveAccuracy(key, move, enemy, hero);
+                score = estimatedDamage * (accuracy / 100.0);
+                // 한 번에 쓰러뜨릴 수 있으면 높은 명중률을 함께 우선한다.
+                if (estimatedDamage >= hero.CurrentHp)
+                    score += 1_000_000 + accuracy * 1_000;
             }
 
             if (score > bestScore)
