@@ -201,16 +201,31 @@ using (var scope = app.Services.CreateScope())
             ""Username"" TEXT NOT NULL,
             ""CreatedAtUtc"" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             ""IsRivalBattle"" BOOLEAN NOT NULL DEFAULT FALSE,
+            ""IsLegendaryBattle"" BOOLEAN NOT NULL DEFAULT FALSE,
             ""RivalNumber"" INTEGER NOT NULL DEFAULT 0,
             ""Won"" BOOLEAN NOT NULL,
+            ""EndReason"" TEXT NOT NULL DEFAULT '',
             ""Round"" INTEGER NOT NULL DEFAULT 1,
             ""Turns"" INTEGER NOT NULL DEFAULT 0,
             ""PlayerHpRatio"" DOUBLE PRECISION NOT NULL DEFAULT 0,
+            ""EnemyHpRatio"" DOUBLE PRECISION NOT NULL DEFAULT 0,
             ""DifficultyAdjustment"" INTEGER NOT NULL DEFAULT 0,
-            ""SkillRating"" DOUBLE PRECISION NOT NULL DEFAULT 1000
+            ""SkillRating"" DOUBLE PRECISION NOT NULL DEFAULT 1000,
+            ""UnlockedCount"" INTEGER NOT NULL DEFAULT 0,
+            ""RunSeq"" INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS ""IX_BattleResults_Username_CreatedAtUtc""
             ON ""BattleResults"" (""Username"", ""CreatedAtUtc"" DESC);
+        ALTER TABLE ""BattleResults""
+            ADD COLUMN IF NOT EXISTS ""IsLegendaryBattle"" BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE ""BattleResults""
+            ADD COLUMN IF NOT EXISTS ""EndReason"" TEXT NOT NULL DEFAULT '';
+        ALTER TABLE ""BattleResults""
+            ADD COLUMN IF NOT EXISTS ""EnemyHpRatio"" DOUBLE PRECISION NOT NULL DEFAULT 0;
+        ALTER TABLE ""BattleResults""
+            ADD COLUMN IF NOT EXISTS ""UnlockedCount"" INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE ""BattleResults""
+            ADD COLUMN IF NOT EXISTS ""RunSeq"" INTEGER NOT NULL DEFAULT 0;
         CREATE TABLE IF NOT EXISTS ""AppMaintenanceMarkers"" (
             ""Key"" TEXT PRIMARY KEY,
             ""AppliedAtUtc"" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
