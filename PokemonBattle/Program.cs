@@ -196,6 +196,21 @@ using (var scope = app.Services.CreateScope())
         );
         CREATE UNIQUE INDEX IF NOT EXISTS ""IX_TechnicalMachines_Username_MoveKey""
             ON ""TechnicalMachines"" (""Username"", ""MoveKey"");
+        CREATE TABLE IF NOT EXISTS ""BattleResults"" (
+            ""Id"" SERIAL PRIMARY KEY,
+            ""Username"" TEXT NOT NULL,
+            ""CreatedAtUtc"" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            ""IsRivalBattle"" BOOLEAN NOT NULL DEFAULT FALSE,
+            ""RivalNumber"" INTEGER NOT NULL DEFAULT 0,
+            ""Won"" BOOLEAN NOT NULL,
+            ""Round"" INTEGER NOT NULL DEFAULT 1,
+            ""Turns"" INTEGER NOT NULL DEFAULT 0,
+            ""PlayerHpRatio"" DOUBLE PRECISION NOT NULL DEFAULT 0,
+            ""DifficultyAdjustment"" INTEGER NOT NULL DEFAULT 0,
+            ""SkillRating"" DOUBLE PRECISION NOT NULL DEFAULT 1000
+        );
+        CREATE INDEX IF NOT EXISTS ""IX_BattleResults_Username_CreatedAtUtc""
+            ON ""BattleResults"" (""Username"", ""CreatedAtUtc"" DESC);
         CREATE TABLE IF NOT EXISTS ""AppMaintenanceMarkers"" (
             ""Key"" TEXT PRIMARY KEY,
             ""AppliedAtUtc"" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
