@@ -381,6 +381,21 @@ public sealed class BattleRulesRegressionTests
         Assert.Equal("thunderbolt", selectedMove);
     }
 
+    [Fact]
+    public void PickEnemyMove_does_not_apply_finish_bonus_at_full_health()
+    {
+        var enemy = CreatePokemon(4, "fire-blast", "flamethrower");
+        var hero = CreatePokemon(1, "tackle");
+
+        string? selectedMove = CreateEngine().PickEnemyMove(
+            enemy,
+            new[] { "fire-blast", "flamethrower" },
+            hero);
+
+        // 체력이 가득 차면 확정 마무리 보너스 없이 고위력 기술을 고른다.
+        Assert.Equal("fire-blast", selectedMove);
+    }
+
     private static Pokemon CreatePokemon(
         int pokemonId,
         params string[] moves)
