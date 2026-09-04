@@ -215,6 +215,7 @@ test("completes the game flow with keyboard controls at mobile and desktop width
   const battleLog = page.getByRole("log", { name: "전투 로그" });
   await expect(battleLog).toHaveAttribute("aria-live", "polite");
   const initialLog = await battleLog.innerText();
+  const initialLogLineCount = await battleLog.locator(".log-line").count();
   await issueKeyboardBattleCommand(page);
   await expect
     .poll(async () => {
@@ -223,6 +224,11 @@ test("completes the game flow with keyboard controls at mobile and desktop width
       return currentLog === initialLog ? null : currentLog;
     })
     .not.toBeNull();
+  await expect(battleLog.locator(".log-turn-divider")).toBeVisible();
+  await expect.poll(async () => battleLog.locator(".log-line").count()).toBeGreaterThan(initialLogLineCount);
+  await expect
+    .poll(async () => battleLog.evaluate((panel) => panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 2))
+    .toBe(true);
   await assertNoHorizontalOverflow(page);
 
   let outcome = await waitForBattleReadyOrResult(page);

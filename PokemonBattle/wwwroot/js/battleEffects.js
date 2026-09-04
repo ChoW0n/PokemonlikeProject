@@ -74,6 +74,11 @@ window.battleEffects = {
         });
     },
 
+    scrollLogToBottom() {
+        const panel = document.getElementById('battle-log-panel');
+        if (panel) panel.scrollTop = panel.scrollHeight;
+    },
+
     actor(side) {
         return document.getElementById('sprite-' + side);
     },

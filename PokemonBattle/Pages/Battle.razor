@@ -320,7 +320,7 @@
             <span>전투 로그를 재생하고 있습니다. 잠시 기다려 주세요.</span>
         </div>
 
-        <div class="battle-log-panel @(IsBusy ? "is-playback" : "")" role="log" aria-live="polite" aria-atomic="false" aria-relevant="additions text" aria-label="전투 로그">
+        <div id="battle-log-panel" class="battle-log-panel @(IsBusy ? "is-playback" : "")" role="log" aria-live="polite" aria-atomic="false" aria-relevant="additions text" aria-label="전투 로그">
             @if (!string.IsNullOrWhiteSpace(ActionError))
             {
                 <div class="form-message battle-recovery-message" role="alert">
@@ -331,7 +331,8 @@
             @for (int logIndex = 0; logIndex < LogHistory.Count; logIndex++)
             {
                 var entry = LogHistory[logIndex];
-                <p class="log-line @(logIndex == LogHistory.Count - 1 ? "is-latest" : "is-fading")">
+                var isTurnMarker = entry.StartsWith("──", StringComparison.Ordinal);
+                <p class="log-line @(isTurnMarker ? "log-turn-divider" : logIndex == LogHistory.Count - 1 ? "is-latest" : "is-fading")">
                     <span class="log-marker"></span><span class="log-text" data-full="@entry">@entry</span>
                 </p>
             }
@@ -373,13 +374,14 @@
     private string? ActionError;
     private int narrationCursor;
     private TaskCompletionSource<bool>? pendingLogRender;
+    private bool pendingLogScroll;
 
     private List<string> LogHistory = new();
     private string? PromptText = "행동을 선택하세요.";
 
     private double SpeedMultiplier = 1.0;
     private static readonly double[] SpeedOptions = { 1.0, 1.6, 2.4, 3.5, 5.0 };
-    private const int MaxBattleLogLines = 3;
+    private const int MaxBattleLogLines = 60;
     private string SpeedStorageKey => $"pokemon-battle-speed:{CurrentUser.Username ?? "guest"}";
 
     private string SpeedLabel => SpeedMultiplier switch
@@ -414,6 +416,12 @@
         {
             pendingLogRender = null;
             renderedLog.TrySetResult(true);
+        }
+
+        if (pendingLogScroll)
+        {
+            pendingLogScroll = false;
+            await JS.InvokeVoidAsync("battleEffects.scrollLogToBottom");
         }
 
         if (!firstRender) return;
@@ -656,6 +664,7 @@
         PromptText = null;
         LogHistory.Add(message);
         if (LogHistory.Count > MaxBattleLogLines) LogHistory.RemoveAt(0);
+        pendingLogScroll = true;
 
         pendingLogRender = new TaskCompletionSource<bool>(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -775,9 +784,20 @@
             await ShowMessage(FaintLine(result.FaintedPokemon));
         }
 
-        return await HandleFaint(
+        bool stoppedAfterFaint = await HandleFaint(
             result.FaintedPokemon,
             faintedIsAttacker ? attackerIsHero : !attackerIsHero);
+
+        if (!faintedIsAttacker
+            && attackerIsHero
+            && ReferenceEquals(result.ForcedSwitchPokemon, attacker))
+        {
+            // 상대 기절 처리를 먼저 끝낸 뒤 유턴 사용자의 교체 선택을 이어간다.
+            if (EnemyTeam.All(p => p.IsFainted)) return true;
+            return await HandleForcedSwitch(true);
+        }
+
+        return stoppedAfterFaint;
     }
 
     private async Task<bool> HandleForcedSwitch(bool isHero)
@@ -1005,7 +1025,7 @@
                 await ShowMessage(message, 1000);
             }
 
-            await Rules.ApplyEndOfTurnEffectsAsync(new[] { Hero, Enemy }, PlayBattleEvent);
+            // 기절 후 강제 교체는 끝난 턴의 연장이므로 턴 종료 효과를 반복하지 않는다.
             if (Hero.IsFainted) { if (await HandleFaint(Hero, true)) return; }
             if (Enemy.IsFainted) { if (await HandleFaint(Enemy, false)) return; }
 
@@ -1036,6 +1056,7 @@
         ActionError = "배틀 처리 중 문제가 발생했습니다. 현재 상태를 유지했으니 다시 시도해주세요.";
         LogHistory.Add("오류가 발생했습니다. 다시 시도해주세요.");
         if (LogHistory.Count > MaxBattleLogLines) LogHistory.RemoveAt(0);
+        pendingLogScroll = true;
 
         try
         {
@@ -1049,7 +1070,10 @@
 
     private void BeginActionLog()
     {
-        LogHistory.Clear();
+        // 행동 로그는 누적하고 새 턴 시작 지점만 표시한다.
+        LogHistory.Add($"── {Turn + 1}턴 시작 ──");
+        if (LogHistory.Count > MaxBattleLogLines) LogHistory.RemoveAt(0);
+        pendingLogScroll = true;
         PromptText = null;
     }
 

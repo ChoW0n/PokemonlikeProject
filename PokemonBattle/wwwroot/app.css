@@ -4869,6 +4869,28 @@ p {
     overflow-wrap: anywhere;
 }
 
+.battle-log-panel .log-line.is-fading {
+    opacity: .84;
+    font-weight: 500;
+}
+
+.battle-log-panel .log-line.is-latest {
+    opacity: 1;
+    font-weight: 700;
+}
+
+.battle-log-panel .log-turn-divider {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(199, 167, 98, .32);
+    color: var(--gold-300);
+    font-family: var(--font-mono);
+    font-size: .62rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    opacity: 1;
+}
+
 .preview-lead {
     max-width: 680px;
 }
