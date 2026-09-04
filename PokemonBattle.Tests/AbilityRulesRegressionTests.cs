@@ -687,6 +687,20 @@ public sealed class AbilityRulesRegressionTests
     }
 
     [Fact]
+    public void Gender_catalog_covers_all_species_and_preserves_genderless_species()
+    {
+        var rates = Enumerable.Range(1, 721)
+            .Select(PokemonGenderCatalog.GetGenderRate)
+            .ToList();
+        Assert.Equal(721, rates.Count);
+        Assert.All(rates, rate => Assert.InRange(rate, -1, 8));
+        Assert.Equal(77, rates.Count(rate => rate == -1));
+        Assert.Equal(0, PokemonGenderCatalog.GetGenderRate(32));
+        Assert.Equal(8, PokemonGenderCatalog.GetGenderRate(29));
+        Assert.Equal(-1, PokemonGenderCatalog.GetGenderRate(132));
+    }
+
+    [Fact]
     public async Task Cute_charm_requires_contact_and_opposite_known_gender()
     {
         var cuteCharm = CreatePokemon(

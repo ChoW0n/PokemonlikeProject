@@ -403,7 +403,12 @@ public class Pokemon
             return PokemonGender.Female;
         }
 
-        return PokemonGender.Unknown;
+        int genderRate = PokemonGenderCatalog.GetGenderRate(data);
+        if (genderRate < 0) return PokemonGender.Unknown;
+
+        return rng.Next(8) < genderRate
+            ? PokemonGender.Female
+            : PokemonGender.Male;
     }
 
     private static Dictionary<string, int> CreateMovePp(IEnumerable<string> moveKeys) =>
