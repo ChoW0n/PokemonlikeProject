@@ -236,14 +236,18 @@ public sealed class PlayerProgressionStore
 
                 if (won)
                 {
-                    string rewardMoveKey = PickRewardMove(profile);
-                    await AddTechnicalMachineAsync(db, username, rewardMoveKey);
-                    await AddMessageIfMissingAsync(
-                        db,
-                        username,
-                        $"{keyPrefix}-reward",
-                        "기술머신 보상",
-                        $"{MoveDatabase.All[rewardMoveKey].Name} 기술머신을 1개 획득했습니다.");
+                    var ownedMoveKeys = await GetOwnedTechnicalMachineKeysAsync(db, username);
+                    string? rewardMoveKey = PickRewardMove(profile, ownedMoveKeys);
+                    if (rewardMoveKey != null)
+                    {
+                        await AddTechnicalMachineAsync(db, username, rewardMoveKey);
+                        await AddMessageIfMissingAsync(
+                            db,
+                            username,
+                            $"{keyPrefix}-reward",
+                            "기술머신 보상",
+                            $"{MoveDatabase.All[rewardMoveKey].Name} 기술머신을 1개 획득했습니다.");
+                    }
                 }
             }
             else
@@ -251,14 +255,18 @@ public sealed class PlayerProgressionStore
                 profile.CompletedBattles++;
                 if (won && _random.Next(100) < 12)
                 {
-                    string rewardMoveKey = PickRewardMove(profile);
-                    await AddTechnicalMachineAsync(db, username, rewardMoveKey);
-                    await AddMessageIfMissingAsync(
-                        db,
-                        username,
-                        $"battle-{profile.CompletedBattles}-technical-machine",
-                        "기술머신 획득",
-                        $"{MoveDatabase.All[rewardMoveKey].Name} 기술머신을 1개 획득했습니다.");
+                    var ownedMoveKeys = await GetOwnedTechnicalMachineKeysAsync(db, username);
+                    string? rewardMoveKey = PickRewardMove(profile, ownedMoveKeys);
+                    if (rewardMoveKey != null)
+                    {
+                        await AddTechnicalMachineAsync(db, username, rewardMoveKey);
+                        await AddMessageIfMissingAsync(
+                            db,
+                            username,
+                            $"battle-{profile.CompletedBattles}-technical-machine",
+                            "기술머신 획득",
+                            $"{MoveDatabase.All[rewardMoveKey].Name} 기술머신을 1개 획득했습니다.");
+                    }
                 }
 
                 if (profile.CompletedBattles % 50 == 0 && loadouts.Count > 0)
@@ -401,7 +409,15 @@ public sealed class PlayerProgressionStore
         {
             var profile = await GetOrCreateAsync(db, username);
             profile.LatestLoadoutsJson = SerializeLoadouts(latestLoadouts);
-            string rewardMoveKey = PickRewardMove(profile);
+            var ownedMoveKeys = await GetOwnedTechnicalMachineKeysAsync(db, username);
+            string? rewardMoveKey = PickRewardMove(profile, ownedMoveKeys);
+            if (rewardMoveKey == null)
+            {
+                profile.UpdatedAtUtc = DateTime.UtcNow;
+                await db.SaveChangesAsync();
+                return null;
+            }
+
             await AddTechnicalMachineAsync(db, username, rewardMoveKey);
             profile.UpdatedAtUtc = DateTime.UtcNow;
             await db.SaveChangesAsync();
@@ -479,27 +495,92 @@ public sealed class PlayerProgressionStore
         }
     }
 
-    private static string PickRewardMove(PlayerProgression profile)
+    private static async Task<HashSet<string>> GetOwnedTechnicalMachineKeysAsync(
+        AppDbContext db,
+        string username)
+    {
+        var ownedKeys = await db.TechnicalMachines
+            .AsNoTracking()
+            .Where(machine => machine.Username == username && machine.Quantity > 0)
+            .Select(machine => machine.MoveKey)
+            .ToListAsync();
+        return ownedKeys.ToHashSet(StringComparer.Ordinal);
+    }
+
+    private string? PickRewardMove(
+        PlayerProgression profile,
+        IReadOnlySet<string> ownedMoveKeys)
     {
         var latest = DeserializeLoadouts(profile.LatestLoadoutsJson);
         var preferences = DeserializePreferences(profile.MovePreferencesJson);
-        var alreadySelected = latest
-            .SelectMany(loadout => loadout.ChosenMoveNames)
-            .ToHashSet(StringComparer.Ordinal);
-        var candidates = latest
+        var teamData = latest
             .Where(loadout => PokemonDatabase.All.ContainsKey(loadout.PokemonId))
-            .SelectMany(loadout => PokemonDatabase.All[loadout.PokemonId].MoveNames)
-            .Distinct()
-            .Where(moveKey => !alreadySelected.Contains(moveKey))
-            .OrderByDescending(moveKey => MovePreferenceRules.CountFor(preferences, moveKey))
-            .ThenBy(moveKey => moveKey, StringComparer.Ordinal)
+            .Select(loadout => PokemonDatabase.All[loadout.PokemonId])
             .ToList();
-        return candidates.FirstOrDefault()
-            ?? latest
-                .Where(loadout => PokemonDatabase.All.ContainsKey(loadout.PokemonId))
-                .SelectMany(loadout => PokemonDatabase.All[loadout.PokemonId].MoveNames)
-                .FirstOrDefault()
-            ?? "tackle";
+
+        // TM 전용 기술의 팀 합집합을 먼저 사용해 새 선택지를 보상한다.
+        var candidates = teamData
+            .SelectMany(data => data.MachineOnlyMoveNames)
+            .Where(MoveDatabase.All.ContainsKey)
+            .Distinct()
+            .Where(moveKey => !ownedMoveKeys.Contains(moveKey))
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            // TM 전용 후보가 없을 때만 일반 기술 목록으로 폴백한다.
+            candidates = teamData
+                .SelectMany(data => data.MoveNames)
+                .Where(MoveDatabase.All.ContainsKey)
+                .Distinct()
+                .Where(moveKey => !ownedMoveKeys.Contains(moveKey))
+                .ToList();
+        }
+
+        if (candidates.Count == 0) return null;
+
+        // 선호도는 약하게 반영하고, 최종 선택은 매번 무작위로 한다.
+        var weightedCandidates = candidates
+            .Select(moveKey => (moveKey, weight: RewardWeight(preferences, moveKey)))
+            .ToList();
+        int totalWeight = weightedCandidates.Sum(candidate => candidate.weight);
+        int roll = _random.Next(totalWeight);
+        foreach (var candidate in weightedCandidates)
+        {
+            if (roll < candidate.weight) return candidate.moveKey;
+            roll -= candidate.weight;
+        }
+
+        return weightedCandidates[^1].moveKey;
+    }
+
+    private static int RewardWeight(MovePreferenceProfile preferences, string moveKey)
+    {
+        if (!MoveDatabase.All.TryGetValue(moveKey, out var move)) return 100;
+
+        string category = move.IsStatus ? "status" : move.IsSpecial ? "special" : "physical";
+        int exactCount = MovePreferenceRules.CountFor(preferences, moveKey);
+        int typeCount = preferences.TypeCounts.TryGetValue(move.Type.ToString(), out var type) ? type : 0;
+        int categoryCount = preferences.CategoryCounts.TryGetValue(category, out var categoryValue)
+            ? categoryValue
+            : 0;
+        int tacticalCount = 0;
+        if (move.Priority > 0)
+            tacticalCount += preferences.TacticalCounts.TryGetValue("priority", out var priority) ? priority : 0;
+        if (move.StatChanges.Count > 0)
+            tacticalCount += preferences.TacticalCounts.TryGetValue("rank-up", out var rankUp) ? rankUp : 0;
+        if (!string.Equals(move.AilmentName, "none", StringComparison.Ordinal))
+            tacticalCount += preferences.TacticalCounts.TryGetValue("status-effect", out var statusEffect) ? statusEffect : 0;
+        if (MoveRuleMetadata.IsProtectionMove(moveKey))
+            tacticalCount += preferences.TacticalCounts.TryGetValue("protection", out var protection) ? protection : 0;
+        if (!move.IsStatus)
+            tacticalCount += preferences.TacticalCounts.TryGetValue("damage", out var damage) ? damage : 0;
+
+        return 100
+            + Math.Min(exactCount, 5) * 4
+            + Math.Min(typeCount, 5) * 2
+            + Math.Min(categoryCount, 5)
+            + Math.Min(tacticalCount, 5);
     }
 
     private static List<PokemonLoadout> BuildRivalLoadouts(

@@ -7,4 +7,4 @@ DataGen must measure the first frame of each sprite independently for front and 
 
 **Why:** Fixed per-species pixel offsets do not survive responsive sprite sizes and cannot account for different front/back canvases or community GIF overrides.
 
-**How to apply:** Resolve the exact effective URL, including community overrides, before measuring. Keep scale and grounding as separate CSS properties, and pass the same side-specific ratio to the fighter sprite and its platform shadow.
+**How to apply:** Resolve the exact effective URL, including community overrides, before measuring. Keep scale and grounding as separate CSS properties; apply the side-specific ratio only to the fighter sprite, while the platform shadow stays fixed.

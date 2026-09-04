@@ -3539,6 +3539,7 @@ p { line-height: 1.72; }
     position: relative;
     translate: 0 var(--species-ground-offset, 0%);
     object-fit: contain;
+    object-position: center bottom;
     scale: var(--species-scale, 1);
     transform-origin: bottom center;
     image-rendering: pixelated;
@@ -3562,7 +3563,6 @@ p { line-height: 1.72; }
     border-radius: 50%;
     background: radial-gradient(ellipse, rgba(0,0,0,.92), rgba(91,34,39,.24) 45%, transparent 74%);
     filter: blur(2px);
-    translate: 0 var(--species-ground-offset, 0%);
 }
 .slot-top .platform-shadow {
     transform-origin: bottom right;

@@ -171,7 +171,9 @@ internal static class SpriteGroundCatalogGenerator
             throw new InvalidDataException("image has no visible pixels");
         }
 
-        return Math.Clamp((frame.Height - 1 - lowestVisibleRow) / (double)frame.Height, 0, 1);
+        // contain이 긴 축에 맞추는 실제 축소 배율을 분모로 사용한다.
+        int containDimension = Math.Max(frame.Width, frame.Height);
+        return Math.Clamp((frame.Height - 1 - lowestVisibleRow) / (double)containDimension, 0, 1);
     }
 
     private static void AppendDictionary(StringBuilder output, string name, IReadOnlyDictionary<string, double> values)

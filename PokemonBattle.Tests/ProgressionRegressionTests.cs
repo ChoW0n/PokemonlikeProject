@@ -1204,6 +1204,79 @@ public class ProgressionRegressionTests
     }
 
     [Fact]
+    public async Task Technical_machine_rewards_use_unowned_machine_only_moves_and_vary_between_grants()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreatePlayerRunsTable(schema);
+            await CreateProgressionTables(schema);
+            const string username = "technical-machine-reward-pool";
+            var loadouts = new List<PokemonLoadout>
+            {
+                new()
+                {
+                    PokemonId = 1,
+                    ChosenMoveNames = new List<string> { "tackle" },
+                    ChosenAbility = "심록",
+                    ChosenItem = TeamLoadoutRules.NoItem,
+                    Level = 4
+                }
+            };
+
+            await using var db = CreateDbContext(schema);
+            var store = new PlayerProgressionStore(db, new FixedRandom(0));
+            string? firstReward = await store.GrantTechnicalMachineRewardAsync(username, loadouts);
+            string? secondReward = await store.GrantTechnicalMachineRewardAsync(username, loadouts);
+            var machines = await db.TechnicalMachines
+                .Where(machine => machine.Username == username && machine.Quantity > 0)
+                .ToListAsync();
+
+            Assert.NotNull(firstReward);
+            Assert.NotNull(secondReward);
+            Assert.Equal(2, machines.Count);
+            Assert.All(
+                machines,
+                machine => Assert.Contains(machine.MoveKey, PokemonDatabase.All[1].MachineOnlyMoveNames));
+            Assert.All(machines, machine => Assert.Equal(1, machine.Quantity));
+        });
+    }
+
+    [Fact]
+    public async Task Technical_machine_fallback_excludes_owned_moves()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreatePlayerRunsTable(schema);
+            await CreateProgressionTables(schema);
+            const string username = "technical-machine-fallback";
+            var loadouts = new List<PokemonLoadout>
+            {
+                new()
+                {
+                    PokemonId = 201,
+                    ChosenMoveNames = new List<string> { "hidden-power" },
+                    ChosenAbility = "부유",
+                    ChosenItem = TeamLoadoutRules.NoItem,
+                    Level = 4
+                }
+            };
+
+            await using var db = CreateDbContext(schema);
+            var store = new PlayerProgressionStore(db, new FixedRandom(0));
+            string? firstReward = await store.GrantTechnicalMachineRewardAsync(username, loadouts);
+            string? secondReward = await store.GrantTechnicalMachineRewardAsync(username, loadouts);
+
+            Assert.Equal(MoveDatabase.All["hidden-power"].Name, firstReward);
+            Assert.Null(secondReward);
+            var machine = Assert.Single(await db.TechnicalMachines
+                .Where(item => item.Username == username)
+                .ToListAsync());
+            Assert.Equal("hidden-power", machine.MoveKey);
+            Assert.Equal(1, machine.Quantity);
+        });
+    }
+
+    [Fact]
     public async Task TechnicalMachineSelectionConsumesExactlyOneAndSavedMoveSurvivesReload()
     {
         await WithTemporarySchema(async schema =>

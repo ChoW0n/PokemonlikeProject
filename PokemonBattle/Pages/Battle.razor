@@ -515,7 +515,9 @@
     private static string SpriteStyle(PokemonData data, bool shadow, bool back)
     {
         double scale = PokemonSpriteScale.ForHeight(data.HeightDecimeters);
-        double groundOffsetRatio = PokemonSpriteGroundCatalog.GroundOffsetRatioFor(data.EnglishName, back);
+        double groundOffsetRatio = shadow
+            ? 0
+            : PokemonSpriteGroundCatalog.GroundOffsetRatioFor(data.EnglishName, back);
         return string.Join(
             " ",
             $"--species-scale:{scale.ToString("0.###", CultureInfo.InvariantCulture)};",

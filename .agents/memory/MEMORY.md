@@ -26,3 +26,4 @@
 - [PokeAPI move metadata generation](pokemon-data-generation.md) — machine-only requires nonempty all-version machine methods; unknown or failed lookups stay unlocked.
 - [Localized item identity](localized-item-identity.md) — item display names are runtime identifiers, so renames must update behavior checks and regression tests.
 - [Sprite ground measurement](sprite-ground-measurement.md) — measure first-frame front/back alpha bounds and apply generated ratios as element-relative movement.
+- [Technical machine rewards](technical-machine-rewards.md) — reward from unowned team TM-only moves with weak weighted randomness; fall back only when that pool is empty.
