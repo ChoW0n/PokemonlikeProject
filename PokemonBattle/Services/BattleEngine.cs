@@ -334,7 +334,14 @@ public sealed class BattleEngine
             double score;
             if (move.IsStatus)
             {
-                score = 30 + move.StatChanges.Count * 15 + (move.AilmentName != "none" ? 20 : 0);
+                bool ailmentBlocked = move.AilmentName != "none"
+                    && (hero.Status != StatusCondition.None
+                        || hero.IsImmuneToAilment(move.AilmentName, enemy));
+                // 이미 걸렸거나 면역인 상태 이상은 선택하지 않는다.
+                score = ailmentBlocked
+                    ? 0
+                    : 30 + move.StatChanges.Count * 15
+                        + (move.AilmentName != "none" ? 20 : 0);
             }
             else
             {

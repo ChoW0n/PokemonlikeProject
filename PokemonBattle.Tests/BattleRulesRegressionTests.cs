@@ -349,6 +349,22 @@ public sealed class BattleRulesRegressionTests
         Assert.Equal(new[] { "early", "late" }, calls);
     }
 
+    [Fact]
+    public void PickEnemyMove_does_not_choose_sleep_powder_for_sleeping_target()
+    {
+        var enemy = CreatePokemon(1, "sleep-powder", "tackle");
+        var hero = CreatePokemon(4, "tackle");
+        hero.ApplyAilment("sleep");
+
+        string? selectedMove = CreateEngine().PickEnemyMove(
+            enemy,
+            new[] { "sleep-powder", "tackle" },
+            hero);
+
+        // 이미 잠든 상대에게 수면가루 대신 사용할 기술을 고른다.
+        Assert.Equal("tackle", selectedMove);
+    }
+
     private static Pokemon CreatePokemon(
         int pokemonId,
         params string[] moves)
