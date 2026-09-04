@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using PokemonBattle.Data;
 using PokemonBattle.Models;
+using System.Text.Json;
 
 namespace PokemonBattle.Services;
 
@@ -93,16 +94,98 @@ public sealed class PlayerProgressionStore
         });
     }
 
-    public async Task<List<PokemonLoadout>?> GetPendingRivalAsync(string username)
+    public async Task<PendingRival?> GetPendingRivalAsync(string username)
     {
         return await _database.ExecuteAsync("progression.pending-rival", async db =>
         {
             var profile = await GetOrCreateAsync(db, username);
             if (!profile.RivalPending) return null;
 
-            var latest = DeserializeLoadouts(profile.LatestLoadoutsJson);
-            var preferences = DeserializePreferences(profile.MovePreferencesJson);
-            return BuildRivalLoadouts(latest, preferences);
+            double currentRating = await db.PlayerSkillRatings
+                .AsNoTracking()
+                .Where(rating => rating.Username == username)
+                .Select(rating => (double?)rating.Rating)
+                .FirstOrDefaultAsync()
+                ?? SkillRatingCalculator.DefaultRating;
+
+            // 자기 자신·관리자·빈 팀은 라이벌 후보에서 제외한다.
+            var candidateProfiles = await (
+                from candidate in db.PlayerProgressions.AsNoTracking()
+                join account in db.Users.AsNoTracking()
+                    on candidate.Username equals account.Username
+                where candidate.Username != username && !account.IsAdmin
+                select new
+                {
+                    candidate.Username,
+                    candidate.LatestLoadoutsJson,
+                    candidate.MovePreferencesJson
+                })
+                .ToListAsync();
+
+            var candidateUsernames = candidateProfiles
+                .Select(candidate => candidate.Username)
+                .ToList();
+            var candidateRatings = await db.PlayerSkillRatings
+                .AsNoTracking()
+                .Where(rating => candidateUsernames.Contains(rating.Username))
+                .ToDictionaryAsync(rating => rating.Username, rating => rating.Rating);
+
+            var candidates = new List<RivalCandidate>();
+            foreach (var candidate in candidateProfiles)
+            {
+                try
+                {
+                    var latest = DeserializeLoadouts(candidate.LatestLoadoutsJson);
+                    if (latest.Count == 0) continue;
+
+                    var preferences = DeserializePreferences(candidate.MovePreferencesJson);
+                    var loadouts = BuildRivalLoadouts(latest, preferences);
+                    if (loadouts.Count == 0) continue;
+
+                    double rating = candidateRatings.GetValueOrDefault(
+                        candidate.Username,
+                        SkillRatingCalculator.DefaultRating);
+                    candidates.Add(new RivalCandidate(
+                        candidate.Username,
+                        double.IsFinite(rating)
+                            ? Math.Clamp(rating, 400, 2000)
+                            : SkillRatingCalculator.DefaultRating,
+                        loadouts));
+                }
+                catch (JsonException)
+                {
+                    // 깨진 상대 프로필은 후보에서 건너뛴다.
+                }
+            }
+
+            if (candidates.Count == 0)
+            {
+                // 상대가 없으면 예약을 소비하고 일반 전투로 진행한다.
+                profile.RivalPending = false;
+                profile.UpdatedAtUtc = DateTime.UtcNow;
+                await db.SaveChangesAsync();
+                return null;
+            }
+
+            double safeCurrentRating = double.IsFinite(currentRating)
+                ? Math.Clamp(currentRating, 400, 2000)
+                : SkillRatingCalculator.DefaultRating;
+            double closestDistance = candidates
+                .Min(candidate => Math.Abs(candidate.Rating - safeCurrentRating));
+            var closestCandidates = candidates
+                .Where(candidate =>
+                    Math.Abs(candidate.Rating - safeCurrentRating) <= closestDistance + 0.0001)
+                .ToList();
+            const double similarRatingRange = 100;
+            var similarCandidates = candidates
+                .Where(candidate =>
+                    Math.Abs(candidate.Rating - safeCurrentRating) <= similarRatingRange)
+                .ToList();
+            var selectionPool = similarCandidates.Count > 0
+                ? similarCandidates
+                : closestCandidates;
+            var selected = selectionPool[_random.Next(selectionPool.Count)];
+            return new PendingRival(selected.Username, selected.Loadouts);
         });
     }
 
@@ -462,4 +545,13 @@ public sealed class PlayerProgressionStore
     private static MovePreferenceProfile DeserializePreferences(string json) =>
         System.Text.Json.JsonSerializer.Deserialize<MovePreferenceProfile>(json)
         ?? new MovePreferenceProfile();
+
+    private sealed record RivalCandidate(
+        string Username,
+        double Rating,
+        List<PokemonLoadout> Loadouts);
 }
+
+public sealed record PendingRival(
+    string Username,
+    List<PokemonLoadout> Loadouts);

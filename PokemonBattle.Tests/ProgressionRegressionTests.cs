@@ -1036,21 +1036,62 @@ public class ProgressionRegressionTests
                     Level = 4
                 }
             };
+            var rivalLoadouts = new List<PokemonLoadout>
+            {
+                new()
+                {
+                    PokemonId = 4,
+                    ChosenMoveNames = new List<string> { "ember", "growl" },
+                    ChosenAbility = "맹화",
+                    ChosenItem = "없음",
+                    Level = 9
+                }
+            };
+            var farRivalLoadouts = new List<PokemonLoadout>
+            {
+                new()
+                {
+                    PokemonId = 25,
+                    ChosenMoveNames = new List<string> { "thunder-shock" },
+                    ChosenAbility = "정전기",
+                    ChosenItem = "없음",
+                    Level = 12
+                }
+            };
 
             await using (var db = CreateDbContext(schema))
             {
+                db.Users.AddRange(
+                    new UserAccount { Username = username, PasswordHash = "test" },
+                    new UserAccount { Username = "rival-source", PasswordHash = "test" },
+                    new UserAccount { Username = "rival-far", PasswordHash = "test" },
+                    new UserAccount { Username = "admin", PasswordHash = "test", IsAdmin = true });
+                db.PlayerSkillRatings.AddRange(
+                    new PlayerSkillRating { Username = username, Rating = 1000 },
+                    new PlayerSkillRating { Username = "rival-source", Rating = 1010 },
+                    new PlayerSkillRating { Username = "rival-far", Rating = 1600 },
+                    new PlayerSkillRating { Username = "admin", Rating = 1001 });
+                await db.SaveChangesAsync();
+
                 var store = new PlayerProgressionStore(db, new FixedRandom(99));
                 await store.SaveLatestLoadoutsAsync(username, loadouts);
                 await store.RecordTeamSelectionsAsync(username, loadouts);
+                await store.SaveLatestLoadoutsAsync("rival-source", rivalLoadouts);
+                await store.RecordTeamSelectionsAsync("rival-source", rivalLoadouts);
+                await store.SaveLatestLoadoutsAsync("rival-far", farRivalLoadouts);
+                await store.SaveLatestLoadoutsAsync("admin", farRivalLoadouts);
                 for (var battle = 0; battle < 50; battle++)
                 {
                     await store.CompleteBattleAsync(username, loadouts, isRivalBattle: false, won: true);
                 }
 
                 var pending = await store.GetPendingRivalAsync(username);
-                var rival = Assert.Single(pending!);
-                Assert.Equal(1, rival.PokemonId);
-                Assert.All(rival.ChosenMoveNames, move => Assert.Contains(move, PokemonDatabase.All[1].MoveNames));
+                Assert.NotNull(pending);
+                Assert.Equal("rival-source", pending.Username);
+                var rival = Assert.Single(pending.Loadouts);
+                Assert.Equal(4, rival.PokemonId);
+                Assert.Equal(9, rival.Level);
+                Assert.All(rival.ChosenMoveNames, move => Assert.Contains(move, PokemonDatabase.All[4].MoveNames));
 
                 await store.CompleteBattleAsync(username, loadouts, isRivalBattle: true, won: true);
                 await store.CompleteBattleAsync(username, loadouts, isRivalBattle: true, won: true);
@@ -1074,6 +1115,52 @@ public class ProgressionRegressionTests
                 Assert.Empty(other.messages);
                 Assert.Empty(other.machines);
             }
+        });
+    }
+
+    [Fact]
+    public async Task Pending_rival_without_eligible_other_user_is_skipped()
+    {
+        await WithTemporarySchema(async schema =>
+        {
+            await CreatePlayerRunsTable(schema);
+            await CreateProgressionTables(schema);
+            const string username = "rival-only-user";
+            var loadouts = new List<PokemonLoadout>
+            {
+                new()
+                {
+                    PokemonId = 1,
+                    ChosenMoveNames = new List<string> { "tackle" },
+                    ChosenAbility = "심록",
+                    ChosenItem = "없음",
+                    Level = 4
+                }
+            };
+
+            await using (var db = CreateDbContext(schema))
+            {
+                db.Users.AddRange(
+                    new UserAccount { Username = username, PasswordHash = "test" },
+                    new UserAccount { Username = "admin", PasswordHash = "test", IsAdmin = true });
+                await db.SaveChangesAsync();
+
+                var store = new PlayerProgressionStore(db, new FixedRandom(0));
+                await store.SaveLatestLoadoutsAsync(username, loadouts);
+                await store.RecordTeamSelectionsAsync(username, loadouts);
+                await store.SaveLatestLoadoutsAsync("admin", loadouts);
+                for (var battle = 0; battle < 50; battle++)
+                {
+                    await store.CompleteBattleAsync(username, loadouts, isRivalBattle: false, won: true);
+                }
+
+                Assert.Null(await store.GetPendingRivalAsync(username));
+            }
+
+            await using var verifyDb = CreateDbContext(schema);
+            var restored = await new PlayerProgressionStore(verifyDb)
+                .LoadAsync(username);
+            Assert.False(restored.rivalPending);
         });
     }
 
@@ -1530,6 +1617,14 @@ public class ProgressionRegressionTests
     {
         await using var db = CreateDbContext(schema);
         await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE "Users" (
+                "Id" SERIAL PRIMARY KEY,
+                "Username" TEXT NOT NULL,
+                "PasswordHash" TEXT NOT NULL,
+                "IsAdmin" BOOLEAN NOT NULL DEFAULT FALSE
+            );
+            CREATE UNIQUE INDEX "IX_Users_Username"
+                ON "Users" ("Username");
             CREATE TABLE "PlayerProgressions" (
                 "Id" SERIAL PRIMARY KEY,
                 "Username" TEXT NOT NULL,

@@ -34,6 +34,7 @@ public class GameState
     public int CompletedBattles { get; private set; }
     public bool RivalPending { get; private set; }
     public bool IsRivalBattle { get; private set; }
+    public string? RivalUsername { get; private set; }
     public List<MailboxMessage> MailboxMessages { get; private set; } = new();
     public List<TechnicalMachineInventory> TechnicalMachines { get; private set; } = new();
     public IReadOnlyDictionary<int, int> PokemonMasteryWins => _masteryWins;
@@ -359,10 +360,16 @@ public class GameState
         if (rival == null) return null;
         IsRivalBattle = true;
         RivalPending = true;
-        return rival;
+        RivalUsername = rival.Username;
+        return rival.Loadouts;
     }
 
-    public void MarkNormalBattle() => IsRivalBattle = false;
+    public void MarkNormalBattle()
+    {
+        IsRivalBattle = false;
+        RivalPending = false;
+        RivalUsername = null;
+    }
 
     public void BeginBattle(bool? rival = null)
     {
@@ -804,6 +811,7 @@ public class GameState
         EnemyLoadouts = new List<PokemonLoadout>();
         EnemyTeamIds = new List<int>();
         IsRivalBattle = false;
+        RivalUsername = null;
         RunMeta = new RunMetaState();
         _battleUsedEnemyMoves.Clear();
         _battleOutcomeProcessed = false;

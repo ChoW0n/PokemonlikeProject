@@ -15,6 +15,12 @@
         @if (State.IsRivalBattle)
         {
             <span class="rival-badge" aria-label="라이벌전">라이벌전</span>
+            @if (!string.IsNullOrWhiteSpace(State.RivalUsername))
+            {
+                <span class="rival-opponent" aria-label="@($"라이벌 상대 {State.RivalUsername}")">
+                    상대 · @State.RivalUsername
+                </span>
+            }
         }
     </div>
     <p class="preview-lead">클릭하면 스탯과 기술을 확인할 수 있습니다. 배틀에 들어가기 전 상대의 전력을 확인하세요.</p>
@@ -23,7 +29,9 @@
         <strong>ROUND @(State.CurrentScore + 1)</strong>
         @if (State.IsRivalBattle)
         {
-            <span class="preview-round-note">라이벌전 · 상대 정보를 꼼꼼히 확인하세요.</span>
+            <span class="preview-round-note">
+                라이벌전 · @(State.RivalUsername ?? "상대")의 팀을 꼼꼼히 확인하세요.
+            </span>
         }
     </div>
     <p class="config-label">

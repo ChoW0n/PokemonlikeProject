@@ -79,6 +79,12 @@ button { font: inherit; }
     letter-spacing: 0.02em;
 }
 
+.rival-opponent {
+    color: #f3c86b;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
 .secondary-action {
     border-color: rgba(255, 255, 255, 0.18);
     background: rgba(255, 255, 255, 0.06);
