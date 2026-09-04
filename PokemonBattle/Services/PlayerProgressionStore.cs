@@ -89,6 +89,30 @@ public sealed class PlayerProgressionStore
                     : machine.Quantity - 1);
         });
 
+    public async Task<List<string>> GrantTechnicalMachineRewardsAsync(
+        string username,
+        int count) =>
+        await _database.ExecuteAsync("progression.grant-machine-rewards", async db =>
+        {
+            var profile = await GetOrCreateAsync(db, username);
+            var ownedMoveKeys = await GetOwnedTechnicalMachineKeysAsync(db, username);
+            var rewardNames = new List<string>();
+
+            for (int index = 0; index < count; index++)
+            {
+                string? rewardMoveKey = PickRewardMove(profile, ownedMoveKeys);
+                if (rewardMoveKey == null) break;
+
+                await AddTechnicalMachineAsync(db, username, rewardMoveKey);
+                ownedMoveKeys.Add(rewardMoveKey);
+                rewardNames.Add(MoveDatabase.All[rewardMoveKey].Name);
+            }
+
+            // 반복 지급 결과를 한 번에 저장한다.
+            await db.SaveChangesAsync();
+            return rewardNames;
+        });
+
     public async Task RecordMoveSelectionAsync(string username, string moveKey)
     {
         await _database.ExecuteAsync("progression.record-move", async db =>
