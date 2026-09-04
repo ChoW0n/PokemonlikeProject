@@ -115,6 +115,8 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         var suppressionReasons = new List<string>();
         if (!move.IsStatus && attacker.HasActiveAbility("우격다짐", defender))
             suppressionReasons.Add($"{attacker.Data.Name}의 우격다짐이 공격의 부가효과를 없앴다!");
+        if (!move.IsStatus && defender.HasActiveAbility("인분", attacker))
+            suppressionReasons.Add($"{defender.Data.Name}의 인분 특성이 부가효과를 막았다!");
         if (defender.LastHitBlockedBySubstitute)
             suppressionReasons.Add($"{defender.Data.Name}의 대타출동이 기술의 효과를 막았다!");
         if (!move.IsStatus
@@ -127,6 +129,11 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
             && defender.HasActiveAbility("인분", attacker))
         {
             suppressionReasons.Add($"{defender.Data.Name}의 인분 특성이 가루 효과를 막았다!");
+        }
+        if (MoveRuleMetadata.IsPowderMove(context.MoveKey)
+            && defender.HasActiveAbility("방진", attacker))
+        {
+            suppressionReasons.Add($"{defender.Data.Name}의 방진 특성이 가루 효과를 막았다!");
         }
         bool suppressSecondaryEffects = suppressionReasons.Count > 0;
         int chanceMultiplier = attacker.HasActiveAbility("하늘의은총", defender) ? 2 : 1;

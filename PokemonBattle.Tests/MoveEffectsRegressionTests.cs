@@ -205,6 +205,93 @@ public sealed class MoveEffectsRegressionTests
     }
 
     [Fact]
+    public async Task Delayed_attack_resolves_even_when_its_caster_cannot_act()
+    {
+        var attacker = CreatePokemon(468, "future-sight");
+        var defender = CreatePokemon(1, "tackle");
+        var engine = CreateEngine(new FixedRandom(0));
+        var events = new List<BattleEvent>();
+
+        await engine.TakeTurnAsync(attacker, defender, "future-sight", true, Capture(events));
+        attacker.ApplyAilment("sleep", new FixedRandom(0));
+        int hpBeforeImpact = defender.CurrentHp;
+
+        await engine.ApplyEndOfTurnEffectsAsync(new[] { attacker, defender }, Capture(events));
+        await engine.TakeTurnAsync(attacker, defender, null, true, Capture(events));
+        await engine.ApplyEndOfTurnEffectsAsync(new[] { attacker, defender }, Capture(events));
+
+        Assert.True(defender.CurrentHp < hpBeforeImpact);
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("시한 공격이 떨어졌다", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task Delayed_attack_follows_the_caster_after_a_switch()
+    {
+        var attacker = CreatePokemon(468, "future-sight");
+        var defender = CreatePokemon(1, "tackle");
+        var replacement = CreatePokemon(25, "tackle");
+        var engine = CreateEngine(new FixedRandom(0));
+        var events = new List<BattleEvent>();
+
+        await engine.TakeTurnAsync(attacker, defender, "future-sight", true, Capture(events));
+        engine.PrepareSwitchOut(attacker);
+        engine.ActivateSwitchIn(replacement, defender, isHeroSide: true);
+        int hpBeforeImpact = defender.CurrentHp;
+
+        await engine.ApplyEndOfTurnEffectsAsync(
+            new[] { replacement, defender }, Capture(events));
+        await engine.ApplyEndOfTurnEffectsAsync(
+            new[] { replacement, defender }, Capture(events));
+
+        Assert.True(
+            defender.CurrentHp < hpBeforeImpact,
+            string.Join(" / ", events.Select(battleEvent => battleEvent.Message)
+                .Where(message => !string.IsNullOrWhiteSpace(message))));
+    }
+
+    [Fact]
+    public async Task Delayed_attack_retargets_a_living_opponent_when_recorded_target_faints()
+    {
+        var attacker = CreatePokemon(468, "future-sight");
+        var defeatedTarget = CreatePokemon(1, "tackle");
+        var replacement = CreatePokemon(25, "tackle");
+        var engine = CreateEngine(new FixedRandom(0));
+
+        await engine.TakeTurnAsync(
+            attacker, defeatedTarget, "future-sight", true, _ => Task.CompletedTask);
+        defeatedTarget.MarkFainted();
+        int hpBeforeImpact = replacement.CurrentHp;
+
+        await engine.ApplyEndOfTurnEffectsAsync(
+            new[] { attacker, replacement }, _ => Task.CompletedTask);
+        await engine.ApplyEndOfTurnEffectsAsync(
+            new[] { attacker, replacement }, _ => Task.CompletedTask);
+
+        Assert.True(replacement.CurrentHp < hpBeforeImpact);
+    }
+
+    [Fact]
+    public async Task Delayed_attack_logs_and_expires_when_no_target_remains()
+    {
+        var attacker = CreatePokemon(468, "future-sight");
+        var defeatedTarget = CreatePokemon(1, "tackle");
+        var engine = CreateEngine(new FixedRandom(0));
+        var events = new List<BattleEvent>();
+
+        await engine.TakeTurnAsync(
+            attacker, defeatedTarget, "future-sight", true, Capture(events));
+        defeatedTarget.MarkFainted();
+
+        await engine.ApplyEndOfTurnEffectsAsync(new[] { attacker }, Capture(events));
+        await engine.ApplyEndOfTurnEffectsAsync(new[] { attacker }, Capture(events));
+
+        Assert.Contains(events, battleEvent =>
+            battleEvent.Message?.Contains("대상이 없어 사라졌다", StringComparison.Ordinal) == true);
+        Assert.Null(attacker.PendingDelayedAttackKey);
+    }
+
+    [Fact]
     public async Task Dream_eater_is_selectable_awake_but_only_damages_and_heals_against_sleep()
     {
         var attacker = CreatePokemon(96, "dream-eater");

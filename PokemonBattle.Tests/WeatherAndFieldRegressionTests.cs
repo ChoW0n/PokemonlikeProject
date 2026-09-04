@@ -338,16 +338,23 @@ public sealed class WeatherAndFieldRegressionTests
     [Fact]
     public void Electric_and_misty_fields_block_status_conditions()
     {
-        var pokemon = CreatePokemon(25, "tackle");
+        var grounded = CreatePokemon(25, "tackle");
+        var flying = CreatePokemon(6, "tackle");
 
         try
         {
             BattleField.Current = BattleField.Electric;
-            Assert.True(pokemon.IsImmuneToAilment("sleep"));
+            Assert.True(grounded.IsImmuneToAilment("sleep"));
+            Assert.Null(grounded.GetAilmentImmunityMessage("paralysis"));
+            Assert.Contains("일렉트릭필드", grounded.GetAilmentImmunityMessage("sleep"));
+            Assert.Null(flying.GetAilmentImmunityMessage("sleep"));
 
             BattleField.Current = BattleField.Misty;
-            Assert.True(pokemon.IsImmuneToAilment("burn"));
-            Assert.True(pokemon.IsImmuneToConfusion());
+            Assert.True(grounded.IsImmuneToAilment("burn"));
+            Assert.True(grounded.IsImmuneToConfusion());
+            Assert.Contains("미스트필드", grounded.GetAilmentImmunityMessage("burn"));
+            Assert.Null(flying.GetAilmentImmunityMessage("burn"));
+            Assert.False(flying.IsImmuneToConfusion());
         }
         finally
         {
@@ -412,8 +419,8 @@ public sealed class WeatherAndFieldRegressionTests
             level: 50);
     }
 
-    private static BattleEngine CreateEngine() => new(
-        new Random(1234),
+    private static BattleEngine CreateEngine(Random? random = null) => new(
+        random ?? new Random(1234),
         new IBattleEffectHandler[]
         {
             new MoveEffectHandler(),

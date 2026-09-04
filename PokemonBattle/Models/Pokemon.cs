@@ -644,6 +644,13 @@ public class Pokemon
         LastHitBlockedBySubstitute = false;
     }
 
+    // 교체되어 활성 목록에서 빠진 포켓몬의 시한 공격도 턴을 소비한다.
+    public void AdvancePendingDelayedAttackTurn()
+    {
+        if (PendingDelayedAttackKey != null && PendingDelayedAttackTurns > 0)
+            PendingDelayedAttackTurns--;
+    }
+
     public void ResetFieldCounter() => TurnsOnField = 0;
 
     public bool ShouldSkipTurn => SelectedAbility == "게으름" && TurnsOnField % 2 == 1;

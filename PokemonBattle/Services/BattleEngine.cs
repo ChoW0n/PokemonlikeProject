@@ -387,6 +387,12 @@ public sealed class BattleEngine
             pokemon.AdvanceTurn();
         }
 
+        foreach (var pokemon in knownPokemon)
+        {
+            if (!active.Contains(pokemon))
+                pokemon.AdvancePendingDelayedAttackTurn();
+        }
+
         if (BattleWeather.AdvanceTurn())
         {
             await emit(BattleEvent.TurnEnd("날씨의 효과가 사라졌다!", 900));
