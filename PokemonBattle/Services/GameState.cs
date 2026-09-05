@@ -165,6 +165,16 @@ public class GameState
 
         if (_progression != null)
         {
+            try
+            {
+                // 로그인 전에 기술머신 재지급을 시도한다.
+                await _progression.RunTechnicalMachineRegrantOnceAsync(_currentUser.Username!);
+            }
+            catch
+            {
+                // 재지급 실패가 로그인을 막지 않게 한다.
+            }
+
             var accountProgress = await _progression.LoadAsync(_currentUser.Username!);
             CompletedBattles = accountProgress.completedBattles;
             RivalPending = accountProgress.rivalPending;
