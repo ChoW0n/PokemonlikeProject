@@ -412,6 +412,23 @@ public sealed class BattleRulesRegressionTests
         Assert.Equal("fire-blast", selectedMove);
     }
 
+    [Fact]
+    public void PickEnemyMove_does_not_repeat_active_weather()
+    {
+        var enemy = CreatePokemon(25, "rain-dance", "tackle");
+        var hero = CreatePokemon(1, "tackle");
+        var engine = CreateEngine();
+        engine.InitializeWeather(hero, enemy, initialWeather: BattleWeather.Rain);
+
+        string? selectedMove = engine.PickEnemyMove(
+            enemy,
+            new[] { "rain-dance", "tackle" },
+            hero);
+
+        // 이미 비가 오면 비바라기를 다시 쓰지 않는다.
+        Assert.Equal("tackle", selectedMove);
+    }
+
     private static Pokemon CreatePokemon(
         int pokemonId,
         params string[] moves)

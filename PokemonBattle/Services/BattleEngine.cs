@@ -343,8 +343,13 @@ public sealed class BattleEngine
                     .Count(change => change.TargetsSelf && change.Change > 0) * 15;
                 bool selfBoostIsDiscouraged = enemy.CurrentHp < enemy.MaxHp / 2.0
                     || IsTypeDisadvantaged(enemy, hero);
+                string? weather = MoveRuleMetadata.WeatherForMove(key);
+                string? field = MoveRuleMetadata.FieldForMove(key);
+                bool environmentAlreadyActive =
+                    (weather != null && weather == BattleWeather.Current)
+                    || (field != null && field == BattleField.Current);
                 // 이미 걸렸거나 면역인 상태 이상은 선택하지 않는다.
-                score = ailmentBlocked
+                score = ailmentBlocked || environmentAlreadyActive
                     ? 0
                     : 30 + opponentStatChangeBonus
                         + (selfBoostIsDiscouraged ? 0 : selfBoostBonus)
