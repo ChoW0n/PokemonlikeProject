@@ -348,7 +348,7 @@ public sealed class BattleEngine
                     .Count(change => change.TargetsSelf && change.Change > 0) * 15;
                 bool selfBoostIsDiscouraged = aiGrade >= 2
                     && (enemy.CurrentHp < enemy.MaxHp / 2.0
-                    || IsTypeDisadvantaged(enemy, hero);
+                    || IsTypeDisadvantaged(enemy, hero));
                 string? weather = MoveRuleMetadata.WeatherForMove(key);
                 string? field = MoveRuleMetadata.FieldForMove(key);
                 bool environmentAlreadyActive = aiGrade >= 2
