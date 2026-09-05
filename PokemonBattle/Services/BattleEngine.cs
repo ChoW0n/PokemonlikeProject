@@ -338,7 +338,8 @@ public sealed class BattleEngine
             double score;
             if (move.IsStatus)
             {
-                bool ailmentBlocked = move.AilmentName != "none"
+                bool ailmentBlocked = aiGrade >= 1
+                    && move.AilmentName != "none"
                     && (hero.Status != StatusCondition.None
                         || hero.IsImmuneToAilment(move.AilmentName, enemy));
                 int opponentStatChangeBonus = move.StatChanges
