@@ -337,10 +337,17 @@ public sealed class BattleEngine
                 bool ailmentBlocked = move.AilmentName != "none"
                     && (hero.Status != StatusCondition.None
                         || hero.IsImmuneToAilment(move.AilmentName, enemy));
+                int opponentStatChangeBonus = move.StatChanges
+                    .Count(change => !change.TargetsSelf) * 15;
+                int selfBoostBonus = move.StatChanges
+                    .Count(change => change.TargetsSelf && change.Change > 0) * 15;
+                bool selfBoostIsDiscouraged = enemy.CurrentHp < enemy.MaxHp / 2.0
+                    || IsTypeDisadvantaged(enemy, hero);
                 // 이미 걸렸거나 면역인 상태 이상은 선택하지 않는다.
                 score = ailmentBlocked
                     ? 0
-                    : 30 + move.StatChanges.Count * 15
+                    : 30 + opponentStatChangeBonus
+                        + (selfBoostIsDiscouraged ? 0 : selfBoostBonus)
                         + (move.AilmentName != "none" ? 20 : 0);
             }
             else
@@ -1355,6 +1362,21 @@ public sealed class BattleEngine
         if (!move.IsStatus) return true;
         if (move.AilmentName != "none") return true;
         return move.StatChanges.Any(change => !change.TargetsSelf);
+    }
+
+    private static bool IsTypeDisadvantaged(Pokemon defender, Pokemon opponent)
+    {
+        var opponentTypes = new[] { opponent.CurrentType1, opponent.CurrentType2 }
+            .Where(type => type.HasValue)
+            .Select(type => type!.Value);
+
+        return opponentTypes.Any(attackType =>
+        {
+            double multiplier = TypeChart.GetMultiplier(attackType, defender.CurrentType1);
+            if (defender.CurrentType2 != null)
+                multiplier *= TypeChart.GetMultiplier(attackType, defender.CurrentType2.Value);
+            return multiplier > 1.0;
+        });
     }
 
     private static bool IsSemiInvulnerableBypass(string moveKey) =>

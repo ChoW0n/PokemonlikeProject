@@ -396,6 +396,22 @@ public sealed class BattleRulesRegressionTests
         Assert.Equal("fire-blast", selectedMove);
     }
 
+    [Fact]
+    public void PickEnemyMove_prefers_attack_over_self_boost_when_low_health_and_type_disadvantaged()
+    {
+        var enemy = CreatePokemon(6, "swords-dance", "fire-blast");
+        var hero = CreatePokemon(7, "tackle");
+        enemy.CurrentHp = enemy.MaxHp / 4;
+
+        string? selectedMove = CreateEngine().PickEnemyMove(
+            enemy,
+            new[] { "swords-dance", "fire-blast" },
+            hero);
+
+        // 체력이 1/4이고 물 타입 상대에게 불리한 불꽃 타입이면 칼춤보다 공격을 고른다.
+        Assert.Equal("fire-blast", selectedMove);
+    }
+
     private static Pokemon CreatePokemon(
         int pokemonId,
         params string[] moves)
