@@ -9,6 +9,9 @@ namespace PokemonBattle.Services;
 
 public sealed class PlayerProgressionStore
 {
+    private const string TechnicalMachineRegrantDeduplicationKey =
+        "technical-machine-regrant-v1";
+
     private readonly DatabaseContextExecutor _database;
     private readonly Random _random;
 
@@ -112,6 +115,37 @@ public sealed class PlayerProgressionStore
             await db.SaveChangesAsync();
             return rewardNames;
         });
+
+    public async Task<List<string>> RunTechnicalMachineRegrantOnceAsync(string username)
+    {
+        bool alreadyCompleted = await _database.ExecuteAsync(
+            "progression.check-machine-regrant",
+            db => db.MailboxMessages.AnyAsync(message =>
+                message.Username == username
+                && message.DeduplicationKey == TechnicalMachineRegrantDeduplicationKey));
+        if (alreadyCompleted) return new List<string>();
+
+        int rewardCount = await CountTechnicalMachineRewardsAsync(username);
+        if (rewardCount == 0) return new List<string>();
+
+        var rewardNames = await GrantTechnicalMachineRewardsAsync(username, rewardCount);
+        if (rewardNames.Count == 0) return rewardNames;
+
+        await _database.ExecuteAsync("progression.complete-machine-regrant", async db =>
+        {
+            // 지급 완료를 우편함 메시지로 기록한다.
+            await AddMessageIfMissingAsync(
+                db,
+                username,
+                TechnicalMachineRegrantDeduplicationKey,
+                "기술머신 재지급",
+                $"기술머신 지급 방식이 수정되어 이전 보상을 다시 지급했습니다. " +
+                $"지급된 기술머신: {string.Join(", ", rewardNames)}");
+            await db.SaveChangesAsync();
+        });
+
+        return rewardNames;
+    }
 
     public async Task RecordMoveSelectionAsync(string username, string moveKey)
     {
