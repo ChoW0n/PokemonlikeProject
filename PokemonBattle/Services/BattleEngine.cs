@@ -338,22 +338,20 @@ public sealed class BattleEngine
             double score;
             if (move.IsStatus)
             {
-                bool ailmentBlocked = aiGrade >= 1
-                    && move.AilmentName != "none"
+                bool ailmentBlocked = move.AilmentName != "none"
                     && (hero.Status != StatusCondition.None
                         || hero.IsImmuneToAilment(move.AilmentName, enemy));
                 int opponentStatChangeBonus = move.StatChanges
                     .Count(change => !change.TargetsSelf) * 15;
                 int selfBoostBonus = move.StatChanges
                     .Count(change => change.TargetsSelf && change.Change > 0) * 15;
-                bool selfBoostIsDiscouraged = aiGrade >= 2
-                    && (enemy.CurrentHp < enemy.MaxHp / 2.0
-                    || IsTypeDisadvantaged(enemy, hero));
+                bool selfBoostIsDiscouraged = enemy.CurrentHp < enemy.MaxHp / 2.0
+                    || IsTypeDisadvantaged(enemy, hero);
                 string? weather = MoveRuleMetadata.WeatherForMove(key);
                 string? field = MoveRuleMetadata.FieldForMove(key);
-                bool environmentAlreadyActive = aiGrade >= 2
-                    && ((weather != null && weather == BattleWeather.Current)
-                    || (field != null && field == BattleField.Current));
+                bool environmentAlreadyActive =
+                    (weather != null && weather == BattleWeather.Current)
+                    || (field != null && field == BattleField.Current);
                 // 이미 걸렸거나 면역인 상태 이상은 선택하지 않는다.
                 score = ailmentBlocked || environmentAlreadyActive
                     ? 0
@@ -383,7 +381,7 @@ public sealed class BattleEngine
                     ? 100
                     : MoveRuleMetadata.EffectiveAccuracy(key, move, enemy, hero);
                 score = estimatedDamage * (accuracy / 100.0);
-                // 한 번에 쓰러뜨릴 수 있으면 높은 명중률을 함께 우선한다.
+                // 3등급 이상일 때만 마무리 가산점을 붙인다.
                 if (aiGrade >= 3 && estimatedDamage >= hero.CurrentHp * 1.15)
                     score += 1_000_000 + accuracy * 1_000;
             }

@@ -366,23 +366,6 @@ public sealed class BattleRulesRegressionTests
     }
 
     [Fact]
-    public void PickEnemyMove_grade_zero_keeps_legacy_status_move_choice()
-    {
-        var enemy = CreatePokemon(1, "sleep-powder", "tackle");
-        var hero = CreatePokemon(4, "tackle");
-        hero.ApplyAilment("sleep");
-
-        string? selectedMove = CreateEngine().PickEnemyMove(
-            enemy,
-            new[] { "sleep-powder", "tackle" },
-            hero,
-            aiGrade: 0);
-
-        // 0등급에서는 잠든 상대에게도 예전처럼 수면가루를 고른다.
-        Assert.Equal("sleep-powder", selectedMove);
-    }
-
-    [Fact]
     public void PickEnemyMove_prioritizes_high_accuracy_finishing_move()
     {
         var enemy = CreatePokemon(25, "thunder", "thunderbolt");
