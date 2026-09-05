@@ -320,7 +320,11 @@ public sealed class BattleEngine
         return new BattleTurnPlan(enemyMoveKey, heroFirst);
     }
 
-    public string? PickEnemyMove(Pokemon enemy, IReadOnlyCollection<string> moveKeys, Pokemon hero)
+    public string? PickEnemyMove(
+        Pokemon enemy,
+        IReadOnlyCollection<string> moveKeys,
+        Pokemon hero,
+        int aiGrade = 3)
     {
         ActivateEnvironment();
         var usable = moveKeys.Where(enemy.CanUseMove).ToArray();
@@ -334,20 +338,22 @@ public sealed class BattleEngine
             double score;
             if (move.IsStatus)
             {
-                bool ailmentBlocked = move.AilmentName != "none"
+                bool ailmentBlocked = aiGrade >= 1
+                    && move.AilmentName != "none"
                     && (hero.Status != StatusCondition.None
                         || hero.IsImmuneToAilment(move.AilmentName, enemy));
                 int opponentStatChangeBonus = move.StatChanges
                     .Count(change => !change.TargetsSelf) * 15;
                 int selfBoostBonus = move.StatChanges
                     .Count(change => change.TargetsSelf && change.Change > 0) * 15;
-                bool selfBoostIsDiscouraged = enemy.CurrentHp < enemy.MaxHp / 2.0
+                bool selfBoostIsDiscouraged = aiGrade >= 2
+                    && (enemy.CurrentHp < enemy.MaxHp / 2.0
                     || IsTypeDisadvantaged(enemy, hero);
                 string? weather = MoveRuleMetadata.WeatherForMove(key);
                 string? field = MoveRuleMetadata.FieldForMove(key);
-                bool environmentAlreadyActive =
-                    (weather != null && weather == BattleWeather.Current)
-                    || (field != null && field == BattleField.Current);
+                bool environmentAlreadyActive = aiGrade >= 2
+                    && ((weather != null && weather == BattleWeather.Current)
+                    || (field != null && field == BattleField.Current));
                 // 이미 걸렸거나 면역인 상태 이상은 선택하지 않는다.
                 score = ailmentBlocked || environmentAlreadyActive
                     ? 0
@@ -378,7 +384,7 @@ public sealed class BattleEngine
                     : MoveRuleMetadata.EffectiveAccuracy(key, move, enemy, hero);
                 score = estimatedDamage * (accuracy / 100.0);
                 // 한 번에 쓰러뜨릴 수 있으면 높은 명중률을 함께 우선한다.
-                if (estimatedDamage >= hero.CurrentHp * 1.15)
+                if (aiGrade >= 3 && estimatedDamage >= hero.CurrentHp * 1.15)
                     score += 1_000_000 + accuracy * 1_000;
             }
 
