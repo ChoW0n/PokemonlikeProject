@@ -4704,6 +4704,57 @@ p {
     margin: 0;
 }
 
+/* 전투 중 획득 현황을 작게 보여 주고 좁은 화면에서는 자연스럽게 줄바꿈한다. */
+.run-inventory-strip {
+    position: absolute;
+    top: 47px;
+    left: 50%;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    width: calc(100% - 40px);
+    max-width: 760px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: .58rem;
+    line-height: 1.4;
+    text-align: center;
+    transform: translateX(-50%);
+}
+
+.run-inventory-group {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+}
+
+.run-inventory-label {
+    color: var(--gold-300);
+    font-weight: 800;
+}
+
+.run-inventory-legacy,
+.run-inventory-item {
+    padding: 2px 6px;
+    border: 1px solid var(--line-soft);
+    background: rgba(8, 8, 9, .58);
+}
+
+.run-inventory-legacy {
+    cursor: help;
+}
+
+.run-inventory-unread {
+    border-color: rgba(199, 167, 98, .6);
+    color: var(--gold-300);
+    font-weight: 800;
+}
+
 .hud-plate {
     display: block;
     width: min(236px, 100%);

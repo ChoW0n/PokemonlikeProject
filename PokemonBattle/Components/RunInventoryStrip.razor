@@ -1,0 +1,41 @@
+@using PokemonBattle.Services
+@inject GameState State
+
+@{
+    int technicalMachineCount = State.TechnicalMachines
+        .Where(machine => machine.Quantity > 0)
+        .Sum(machine => machine.Quantity);
+    bool hasInventory = State.ActiveLegacies.Count > 0
+        || technicalMachineCount > 0
+        || State.UnreadMailboxCount > 0;
+}
+
+@if (hasInventory)
+{
+    @* 현재 런에서 확인할 수 있는 보유 현황만 작게 표시한다. *@
+    <div class="run-inventory-strip" aria-label="현재 런 보유 현황">
+        @if (State.ActiveLegacies.Count > 0)
+        {
+            <div class="run-inventory-group">
+                <span class="run-inventory-label">관록</span>
+                @foreach (var legacy in State.ActiveLegacies)
+                {
+                    <span class="run-inventory-legacy" title="@legacy.Description">@legacy.Name</span>
+                }
+            </div>
+        }
+
+        @if (technicalMachineCount > 0)
+        {
+            <span class="run-inventory-item">기술머신 @technicalMachineCount개</span>
+        }
+
+        @if (State.UnreadMailboxCount > 0)
+        {
+            <span class="run-inventory-item run-inventory-unread"
+                  aria-label="@($"{State.UnreadMailboxCount}개 읽지 않은 우편")">
+                새 우편 @State.UnreadMailboxCount
+            </span>
+        }
+    </div>
+}
