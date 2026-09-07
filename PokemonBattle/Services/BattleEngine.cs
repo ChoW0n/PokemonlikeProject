@@ -670,10 +670,12 @@ public sealed class BattleEngine
                     presentationKey: MovePresentationCatalog.Resolve(executingMoveKey, move)));
                 return result;
             }
-            await ExecuteMoveAsync(
+            bool moveConnected = await ExecuteMoveAsync(
                 attacker, defender, move, executingMoveKey, attackerIsHero, emit, result,
                 isContinuation, attackerMovedFirst);
-            await AdvanceRampageAfterAttemptAsync(attacker, executingMoveKey, emit);
+            // 난동 후처리에 이번 기술이 실제로 통했는지를 전달한다.
+            await AdvanceRampageAfterAttemptAsync(
+                attacker, executingMoveKey, moveConnected, emit);
         }
 
         if (attacker.IsFainted && defender.IsFainted)
@@ -743,6 +745,8 @@ public sealed class BattleEngine
     private async Task AdvanceRampageAfterAttemptAsync(
         Pokemon attacker,
         string moveKey,
+        // 이번 기술이 실제로 상대에게 통했는지를 나타낸다.
+        bool moveConnected,
         Func<BattleEvent, Task> emit)
     {
         if (!MoveRuleMetadata.IsRampageMove(moveKey) || attacker.IsFainted)
@@ -750,13 +754,13 @@ public sealed class BattleEngine
             return;
         }
 
-        bool ended;
-        if (attacker.RampageMoveKey == null)
+        // 기술이 통하지 않으면 첫 턴이라도 난동을 즉시 종료한다.
+        bool ended = !moveConnected;
+        if (!ended && attacker.RampageMoveKey == null)
         {
             attacker.StartRampage(moveKey, rng.Next(2, 4));
-            ended = false;
         }
-        else
+        else if (!ended)
         {
             ended = attacker.AdvanceRampageTurn();
         }
@@ -775,7 +779,7 @@ public sealed class BattleEngine
         }
     }
 
-    private async Task ExecuteMoveAsync(
+    private async Task<bool> ExecuteMoveAsync(
         Pokemon attacker,
         Pokemon defender,
         Move move,
@@ -818,7 +822,7 @@ public sealed class BattleEngine
         {
             await emit(BattleEvent.MessageLine(
                 $"{defender.Data.Name} 주변의 사이코필드가 우선도 기술을 막았다!"));
-            return;
+            return false;
         }
         if (moveKey is "self-destruct" or "explosion" or "misty-explosion"
             && (attacker.HasActiveAbility("습기", defender)
@@ -826,7 +830,7 @@ public sealed class BattleEngine
         {
             await emit(BattleEvent.MessageLine(
                 $"{attacker.Data.Name}은(는) 습기 때문에 폭발할 수 없다!"));
-            return;
+            return false;
         }
         bool hit = move.AlwaysHits || attacker.HasActiveAbility("노가드", defender)
             || defender.HasActiveAbility("노가드", attacker)
@@ -840,7 +844,7 @@ public sealed class BattleEngine
             await emit(BattleEvent.MoveStep(
                 BattleEventPhase.Recovery, attacker, defender, attackerIsHero, move, moveKey,
                 attackType, effectKind, target: "opponent", presentationKey: presentationKey));
-            return;
+            return false;
         }
 
         var context = new BattleEffectContext(
@@ -865,7 +869,7 @@ public sealed class BattleEngine
                 hpBefore: defender.CurrentHp,
                 hpAfter: defender.CurrentHp,
                 statusResult: defender.Status.ToString()));
-            return;
+            return false;
         }
 
         if (!isReflected && move.IsStatus && TargetsOpponent(move)
@@ -876,7 +880,8 @@ public sealed class BattleEngine
             await ExecuteMoveAsync(
                 defender, attacker, move, moveKey, !attackerIsHero, emit, result,
                 isContinuation, attackerMovedFirst, isReflected: true);
-            return;
+            // 매직미러 반사는 원래 공격자 기준으로 기술이 통하지 않은 처리다.
+            return false;
         }
 
         if (move.IsStatus && TargetsOpponent(move)
@@ -889,7 +894,7 @@ public sealed class BattleEngine
                 BattleEventPhase.Impact, attacker, defender, attackerIsHero, move, moveKey,
                 attackType, "shield", target: "opponent", presentationKey: presentationKey,
                 statusResult: "blocked"));
-            return;
+            return false;
         }
 
         if (defender.IsSemiInvulnerable && !IsSemiInvulnerableBypass(moveKey))
@@ -898,7 +903,7 @@ public sealed class BattleEngine
             await emit(BattleEvent.MoveStep(
                 BattleEventPhase.Impact, attacker, defender, attackerIsHero, move, moveKey,
                 attackType, "miss", target: "opponent", presentationKey: presentationKey));
-            return;
+            return false;
         }
 
         if (MoveRuleMetadata.IsProtectionMove(moveKey) && moveKey != "kings-shield")
@@ -914,17 +919,17 @@ public sealed class BattleEngine
             {
                 await emit(BattleEvent.MessageLine($"{attacker.Data.Name}의 {move.Name}은(는) 실패했다!"));
             }
-            return;
+            return false;
         }
 
         if (MoveRuleMetadata.ChangesToShieldForm(moveKey))
         {
-            if (!attacker.TryActivateProtection(moveKey, rng)) return;
+            if (!attacker.TryActivateProtection(moveKey, rng)) return false;
             await emit(BattleEvent.MessageLine($"{attacker.Data.Name}은(는) {move.Name}으로 몸을 지켰다!"));
             await emit(BattleEvent.MoveStep(
                 BattleEventPhase.Impact, attacker, defender, attackerIsHero, move, moveKey,
                 attackType, "shield", target: "self", presentationKey: presentationKey));
-            return;
+            return false;
         }
 
         if (defender.IsProtected
@@ -999,7 +1004,7 @@ public sealed class BattleEngine
             await emit(BattleEvent.MoveStep(
                 BattleEventPhase.Impact, attacker, defender, attackerIsHero, move, moveKey,
                 attackType, "shield", target: "opponent", presentationKey: presentationKey));
-            return;
+            return false;
         }
 
         if (IsBlockedByAbility(defender, move, attacker))
@@ -1009,7 +1014,7 @@ public sealed class BattleEngine
                 BattleEventPhase.Impact, attacker, defender, attackerIsHero, move, moveKey,
                 attackType, "immune", target: "opponent", presentationKey: presentationKey,
                 statusResult: "immune"));
-            return;
+            return false;
         }
 
         bool revealedImmunity = defender.TypeImmunityRevealed
@@ -1025,7 +1030,7 @@ public sealed class BattleEngine
                 BattleEventPhase.Impact, attacker, defender, attackerIsHero, move, moveKey,
                 attackType, "immune", target: "opponent", presentationKey: presentationKey,
                 statusResult: "immune"));
-            return;
+            return false;
         }
         if (TargetsOpponent(move) && defender.IsImmuneToMoveType(attackType, attacker)
             && !revealedImmunity && !bypassesGroundImmunity)
@@ -1044,7 +1049,7 @@ public sealed class BattleEngine
                 BattleEventPhase.Impact, attacker, defender, attackerIsHero, move, moveKey,
                 attackType, "immune", target: "opponent", presentationKey: presentationKey,
                 statusResult: "immune"));
-            return;
+            return false;
         }
 
         if (moveKey is "counter" or "mirror-coat")
@@ -1072,7 +1077,7 @@ public sealed class BattleEngine
                 presentationKey: presentationKey, damage: context.LastHitDamage,
                 hpBefore: hpBefore, hpAfter: defender.CurrentHp,
                 statusResult: defender.Status.ToString()));
-            return;
+            return damage > 0;
         }
 
         if (!move.IsStatus && move.Power > 0)
@@ -1173,6 +1178,8 @@ public sealed class BattleEngine
             if (effectivenessLine != null) await emit(BattleEvent.MessageLine(effectivenessLine));
             if (defender.SurvivedByEndure) await emit(BattleEvent.MessageLine($"{defender.Data.Name}은(는) 버텨냈다!"));
             foreach (var handler in effectHandlers) await handler.AfterDamageResultAsync(context);
+            // 타입 상성으로 피해를 주지 못하면 난동을 즉시 끝낸다.
+            if (defender.LastMultiplier == 0) return false;
         }
         else if (move.IsStatus)
         {
@@ -1211,6 +1218,7 @@ public sealed class BattleEngine
             result.ForcedSwitchPokemon = context.SwitchPokemon;
             result.ForcedSwitchReason = context.SwitchReason;
         }
+        return true;
     }
 
     private static IReadOnlyList<string> ApplyEntryHazards(

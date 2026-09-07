@@ -402,7 +402,7 @@ public sealed class MoveEffectsRegressionTests
     }
 
     [Fact]
-    public async Task Rampage_turns_advance_when_the_attempt_is_blocked_by_protection()
+    public async Task Rampage_ends_and_confuses_when_the_attempt_is_blocked_by_protection()
     {
         var attacker = CreatePokemon(1, "outrage");
         var defender = CreatePokemon(25, "protect");
@@ -411,13 +411,23 @@ public sealed class MoveEffectsRegressionTests
         await engine.TakeTurnAsync(defender, attacker, "protect", false, _ => Task.CompletedTask);
         await engine.TakeTurnAsync(attacker, defender, "outrage", true, _ => Task.CompletedTask);
 
-        Assert.Equal("outrage", attacker.RampageMoveKey);
-        int remainingAfterBlockedAttempt = attacker.RampageTurnsRemaining;
+        // 방어에 막힌 역린은 난동을 시작하지 않고 즉시 혼란을 건다.
+        Assert.Null(attacker.RampageMoveKey);
+        Assert.True(attacker.IsConfused);
+    }
 
-        await engine.TakeTurnAsync(attacker, defender, "tackle", true, _ => Task.CompletedTask);
+    [Fact]
+    public async Task Rampage_ends_and_confuses_when_the_attempt_is_type_immune()
+    {
+        var attacker = CreatePokemon(1, "outrage");
+        var fairyDefender = CreatePokemon(36, "tackle");
+        var engine = CreateEngine();
 
-        Assert.True(remainingAfterBlockedAttempt > attacker.RampageTurnsRemaining
-            || attacker.RampageMoveKey == null);
+        await engine.TakeTurnAsync(attacker, fairyDefender, "outrage", true, _ => Task.CompletedTask);
+
+        // 페어리 타입에 무효화된 역린은 난동을 시작하지 않고 즉시 혼란을 건다.
+        Assert.Null(attacker.RampageMoveKey);
+        Assert.True(attacker.IsConfused);
     }
 
     private sealed class FixedRandom : Random
