@@ -366,6 +366,30 @@ public sealed class BattleRulesRegressionTests
     }
 
     [Fact]
+    public void PickEnemyMove_does_not_repeat_protection_when_streak_is_nonzero()
+    {
+        var enemy = CreatePokemon(1, "protect", "tackle");
+        var hero = CreatePokemon(4, "tackle");
+
+        string? firstSelection = CreateEngine().PickEnemyMove(
+            enemy,
+            new[] { "protect", "tackle" },
+            hero);
+
+        // 첫 턴은 방어와 공격 중 어느 쪽을 골라도 유효하다.
+        Assert.True(firstSelection is "protect" or "tackle");
+
+        enemy.TryActivateProtection("protect", new Random(1234));
+        string? repeatedSelection = CreateEngine().PickEnemyMove(
+            enemy,
+            new[] { "protect", "tackle" },
+            hero);
+
+        // 방어 연속 사용 상태에서는 방어기를 다시 고르지 않는다.
+        Assert.NotEqual("protect", repeatedSelection);
+    }
+
+    [Fact]
     public void PickEnemyMove_prioritizes_high_accuracy_finishing_move()
     {
         var enemy = CreatePokemon(25, "thunder", "thunderbolt");

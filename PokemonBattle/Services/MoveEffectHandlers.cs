@@ -712,7 +712,7 @@ public sealed class MoveEffectHandler : IBattleEffectHandler
         }
     }
 
-    private static bool IsSupportedAilment(string ailment) =>
+    public static bool IsSupportedAilment(string ailment) =>
         ailment is "paralysis" or "poison" or "toxic" or "burn" or "sleep" or "freeze" or "confusion";
 
     private static bool IsSelfStatChange(string moveKey, string stat) =>

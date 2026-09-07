@@ -330,6 +330,34 @@ public sealed class BattleEngine
         var usable = moveKeys.Where(enemy.CanUseMove).ToArray();
         if (usable.Length == 0) return null;
 
+        // 공격기와 변화기를 같은 피해량 단위로 비교하기 위한 예상 피해량을 계산한다.
+        double EstimateDamage(string key, Move move)
+        {
+            PokemonType attackType = MoveRuleMetadata.ResolveMoveType(key, move, enemy, hero);
+            double averageHits = (move.MinHits + move.MaxHits) / 2.0;
+            bool stab = enemy.HasType(attackType);
+            double effectivePower = MoveRuleMetadata.EffectivePower(key, move, enemy, hero)
+                * averageHits
+                * (stab ? 1.5 : 1.0);
+            int attackStat = move.IsSpecial
+                ? enemy.EffectiveSpAtkAgainst(hero)
+                : enemy.EffectiveAtkAgainst(hero);
+            int defenseStat = move.IsSpecial
+                ? hero.EffectiveSpDefAgainst(enemy)
+                : hero.EffectiveDefAgainst(enemy);
+            double estimatedDamage = (((2.0 * enemy.Level / 5 + 2)
+                * effectivePower
+                * ((double)attackStat / Math.Max(defenseStat, 1))) / 50) + 2;
+            return estimatedDamage * PreviewMultiplier(move, hero, enemy);
+        }
+
+        // 사용 가능한 공격기가 없을 때도 변화기 점수의 기준값을 유지한다.
+        double maxAttackDamage = usable
+            .Where(key => !MoveDatabase.All[key].IsStatus)
+            .Select(key => EstimateDamage(key, MoveDatabase.All[key]))
+            .DefaultIfEmpty(enemy.Level * 0.4 + 2)
+            .Max();
+
         double bestScore = -1;
         var bestKeys = new List<string>();
         foreach (var key in usable)
@@ -338,47 +366,44 @@ public sealed class BattleEngine
             double score;
             if (move.IsStatus)
             {
+                // 지원되는 실제 상태이상만 상태이상 기술로 분류한다.
+                bool isSupportedAilment = MoveEffectHandler.IsSupportedAilment(move.AilmentName);
+                // 이미 걸렸거나 면역인 실제 상태이상은 선택하지 않는다.
                 bool ailmentBlocked = aiGrade >= 1
-                    && move.AilmentName != "none"
+                    && isSupportedAilment
                     && (hero.Status != StatusCondition.None
                         || hero.IsImmuneToAilment(move.AilmentName, enemy));
-                int opponentStatChangeBonus = move.StatChanges
-                    .Count(change => !change.TargetsSelf) * 15;
-                int selfBoostBonus = move.StatChanges
-                    .Count(change => change.TargetsSelf && change.Change > 0) * 15;
+                int opponentStatChangeCount = move.StatChanges
+                    .Count(change => !change.TargetsSelf);
+                int selfBoostCount = move.StatChanges
+                    .Count(change => change.TargetsSelf && change.Change > 0);
+                // 체력 부족이나 상성 불리 상황에서는 자기 강화를 억제한다.
                 bool selfBoostIsDiscouraged = aiGrade >= 2
                     && (enemy.CurrentHp < enemy.MaxHp / 2.0
                     || IsTypeDisadvantaged(enemy, hero));
                 string? weather = MoveRuleMetadata.WeatherForMove(key);
                 string? field = MoveRuleMetadata.FieldForMove(key);
+                // 이미 활성화된 날씨나 필드는 고등급 AI가 반복하지 않는다.
                 bool environmentAlreadyActive = aiGrade >= 2
                     && ((weather != null && weather == BattleWeather.Current)
                     || (field != null && field == BattleField.Current));
-                // 이미 걸렸거나 면역인 상태 이상은 선택하지 않는다.
+                // 방어기는 연속 선택을 막고 그 외 변화기는 효과별 가중치를 적용한다.
+                double weight = MoveRuleMetadata.IsProtectionMove(key)
+                    ? enemy.ProtectionStreak == 0 ? 0.45 : 0
+                    : (isSupportedAilment ? 1.10 : 0.30)
+                        + opponentStatChangeCount * 0.25
+                        + (selfBoostIsDiscouraged ? 0 : selfBoostCount * 0.25);
+                double accuracy = move.AlwaysHits
+                    ? 100
+                    : MoveRuleMetadata.EffectiveAccuracy(key, move, enemy, hero);
+                // 차단된 변화기는 기존처럼 점수를 0으로 유지한다.
                 score = ailmentBlocked || environmentAlreadyActive
                     ? 0
-                    : 30 + opponentStatChangeBonus
-                        + (selfBoostIsDiscouraged ? 0 : selfBoostBonus)
-                        + (move.AilmentName != "none" ? 20 : 0);
+                    : maxAttackDamage * weight * (accuracy / 100.0);
             }
             else
             {
-                PokemonType attackType = MoveRuleMetadata.ResolveMoveType(key, move, enemy, hero);
-                double averageHits = (move.MinHits + move.MaxHits) / 2.0;
-                bool stab = enemy.HasType(attackType);
-                double effectivePower = MoveRuleMetadata.EffectivePower(key, move, enemy, hero)
-                    * averageHits
-                    * (stab ? 1.5 : 1.0);
-                int attackStat = move.IsSpecial
-                    ? enemy.EffectiveSpAtkAgainst(hero)
-                    : enemy.EffectiveAtkAgainst(hero);
-                int defenseStat = move.IsSpecial
-                    ? hero.EffectiveSpDefAgainst(enemy)
-                    : hero.EffectiveDefAgainst(enemy);
-                double estimatedDamage = (((2.0 * enemy.Level / 5 + 2)
-                    * effectivePower
-                    * ((double)attackStat / Math.Max(defenseStat, 1))) / 50) + 2;
-                estimatedDamage *= PreviewMultiplier(move, hero, enemy);
+                double estimatedDamage = EstimateDamage(key, move);
                 double accuracy = move.AlwaysHits
                     ? 100
                     : MoveRuleMetadata.EffectiveAccuracy(key, move, enemy, hero);
