@@ -200,7 +200,7 @@ for (int id = 1; id <= 721; id++)
             : $"new[] {{ {string.Join(", ", machineOnlyMoveKeys.Select(m => $"\"{m}\""))} }}";
 
         var abilityNames = new List<string>();
-        foreach (var slot in pokemon.abilities.Take(2))
+        foreach (var slot in pokemon.abilities)
         {
             string aslug = slot.ability.name;
             if (!abilityCache.TryGetValue(aslug, out var korAbility))
