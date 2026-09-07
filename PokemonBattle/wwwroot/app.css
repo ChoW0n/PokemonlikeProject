@@ -6555,3 +6555,20 @@ p {
         width: 100%;
     }
 }
+
+/* 포켓몬 발밑 그림자는 나중에 다시 켤 수 있도록 스타일로만 숨긴다. */
+.platform-shadow {
+    display: none;
+}
+
+/* 장식용 영어 문구는 숨기되 실제 턴 번호 머리말은 유지한다. */
+.eyebrow,
+.action-icon,
+.selection-helper-label,
+.move-detail-kicker {
+    display: none;
+}
+
+.eyebrow.command-eyebrow {
+    display: block;
+}
