@@ -52,9 +52,9 @@
                         <h1 id="team-select-heading">팀 구성</h1>
                         <p class="intro">포켓몬을 선택해 팀을 만들고, 카드에서 기술·특성·도구를 구성하세요.</p>
                     </div>
-                    <div class="flow-count" aria-label="@($"팀 슬롯 {TeamLoadouts.Count} / {Math.Min(UnlockedIds.Count, 6)}")">
+                    <div class="flow-count" aria-label="@($"팀 슬롯 {TeamLoadouts.Count} / {MaxTeamSize}")">
                         <strong>@TeamLoadouts.Count</strong>
-                        <span>/ @Math.Min(UnlockedIds.Count, 6) 슬롯</span>
+                        <span>/ @MaxTeamSize 슬롯</span>
                     </div>
                 </div>
                 <div class="flow-steps" aria-label="팀 구성 진행 단계">
@@ -64,7 +64,7 @@
                 </div>
                 <div class="team-status-bar" role="status" aria-live="polite">
                     <strong>@(TeamLoadouts.Count == 0 ? "팀을 시작해보세요" : $"{TeamLoadouts.Count}마리 선택됨")</strong>
-                    <span>@(CanStart ? "배틀을 시작할 수 있습니다." : "카드를 눌러 1~6마리를 구성하세요.")</span>
+                    <span>@(CanStart ? "배틀을 시작할 수 있습니다." : $"카드를 눌러 1~{MaxTeamSize}마리를 구성하세요.")</span>
                 </div>
                 <label class="visually-hidden" for="pokemon-search">포켓몬 이름 검색</label>
                  <input id="pokemon-search" class="dex-search" type="search"
@@ -98,7 +98,7 @@
                             bool isUnlocked = UnlockedIds.Contains(entry.Key);
                             var existingInTeam = TeamLoadouts.FirstOrDefault(l => l.PokemonId == entry.Key);
                              <button type="button" class="dex-entry dex-entry-button @(existingInTeam != null ? "is-selected" : "") @(isUnlocked ? "" : "is-locked")"
-                                 disabled="@(!isUnlocked)"
+                                 aria-disabled="@(!isUnlocked ? "true" : "false")"
                                  aria-label="@($"{(isUnlocked ? entry.Value.Name : "잠긴 포켓몬")}, 도감 번호 {entry.Key}{(existingInTeam != null ? $", 현재 팀에 레벨 {existingInTeam.Level}" : "")}")"
                                  aria-pressed="@(existingInTeam != null ? "true" : "false")"
                                  @onclick="() => StartConfiguring(entry.Key, isUnlocked)">
@@ -403,7 +403,7 @@
             <div class="pokedex-footer">
                 <div class="footer-copy">
                     <strong>@(CanStart ? "배틀 준비 완료" : "팀 구성을 계속하세요")</strong>
-                    <span>팀 구성: @TeamLoadouts.Count / @Math.Min(UnlockedIds.Count, 6)</span>
+                <span>팀 구성: @TeamLoadouts.Count / @MaxTeamSize</span>
                 </div>
                 <button type="button" disabled="@(!CanStart || IsOperationBusy)" @onclick="ConfirmTeam">
                     @(IsOperationBusy ? "저장 중..." : "이 팀으로 배틀 시작")
@@ -472,7 +472,24 @@
     private string? PendingItemName;
     private int? PendingItemOwnerId;
 
-    private bool CanStart => TeamLoadouts.Count is >= 1 and <= 6;
+    private int MaxTeamSize => GetMaximumTeamSize(UnlockedIds.Count);
+    private bool CanStart => TeamLoadouts.Count is >= 1 && TeamLoadouts.Count <= MaxTeamSize;
+
+    public static int GetMaximumTeamSize(int unlockedCount) =>
+        Math.Min(Math.Max(unlockedCount, 0), 6);
+
+    public static List<PokemonLoadout> FilterPresetLoadouts(
+        IEnumerable<PokemonLoadout> loadouts,
+        IReadOnlySet<int> unlockedIds)
+    {
+        int maximumTeamSize = GetMaximumTeamSize(unlockedIds.Count);
+        return loadouts
+            .Where(loadout =>
+                unlockedIds.Contains(loadout.PokemonId)
+                && PokemonDatabase.All.ContainsKey(loadout.PokemonId))
+            .Take(maximumTeamSize)
+            .ToList();
+    }
 
     private void OpenEnemyPreview()
     {
@@ -593,11 +610,25 @@
 
     private void StartConfiguring(int id, bool isUnlocked)
     {
-        if (!isUnlocked) return;
+        if (!isUnlocked)
+        {
+            PresetMessage = "이 포켓몬은 아직 해금되지 않아 팀에 넣을 수 없습니다.";
+            PresetMessageIsError = true;
+            return;
+        }
 
-        int maxTeamSize = Math.Min(UnlockedIds.Count, 6);
-        if (TeamLoadouts.Count >= maxTeamSize && !TeamLoadouts.Any(l => l.PokemonId == id)) return;
+        if (TeamLoadouts.Count >= MaxTeamSize && !TeamLoadouts.Any(l => l.PokemonId == id))
+        {
+            string limitReason = UnlockedIds.Count < 6
+                ? $"현재 해금한 포켓몬이 {UnlockedIds.Count}마리라"
+                : "한 팀의 최대 인원이 6마리라";
+            PresetMessage = $"팀이 꽉 찼습니다. {limitReason} 최대 {MaxTeamSize}마리까지 선택할 수 있습니다.";
+            PresetMessageIsError = true;
+            return;
+        }
 
+        PresetMessage = "";
+        PresetMessageIsError = false;
         ConfiguringId = id;
         ItemSearchText = "";
         ViewingMoveKey = null;
@@ -840,9 +871,14 @@
                 .GroupBy(loadout => loadout.PokemonId)
                 .ToDictionary(group => group.Key, group => group.First().Level);
 
-            TeamLoadouts = TeamLoadoutRules.NormalizeUniqueItems(loaded)
+            var normalizedLoaded = TeamLoadoutRules.NormalizeUniqueItems(loaded);
+            var availableLoaded = normalizedLoaded
                 .Where(l => UnlockedIds.Contains(l.PokemonId) && PokemonDatabase.All.ContainsKey(l.PokemonId))
-                .Take(Math.Min(UnlockedIds.Count, 6))
+                .ToList();
+            int unavailableCount = normalizedLoaded.Count - availableLoaded.Count;
+            int overLimitCount = Math.Max(0, availableLoaded.Count - MaxTeamSize);
+
+            TeamLoadouts = FilterPresetLoadouts(normalizedLoaded, UnlockedIds)
                 .Select(l =>
                 {
                     var validKeys = PokemonDatabase.All[l.PokemonId].MoveNames.ToHashSet();
@@ -859,10 +895,22 @@
                             : State.CurrentRunLevel,
                         Gender = l.Gender
                     };
-                }).ToList();
+                })
+                .ToList();
 
-            TeamLoadouts = TeamLoadoutRules.NormalizeUniqueItems(TeamLoadouts);
-            PresetMessage = $"'{name}' 프리셋을 불러왔습니다.";
+            // 마지막에도 최대 인원을 다시 확인해 초과 경로를 막는다.
+            TeamLoadouts = TeamLoadoutRules.NormalizeUniqueItems(TeamLoadouts)
+                .Take(MaxTeamSize)
+                .ToList();
+            var omittedReasons = new List<string>();
+            if (unavailableCount > 0)
+                omittedReasons.Add($"해금되지 않은 포켓몬 {unavailableCount}마리");
+            if (overLimitCount > 0)
+                omittedReasons.Add($"최대 인원을 넘은 포켓몬 {overLimitCount}마리");
+
+            PresetMessage = omittedReasons.Count == 0
+                ? $"'{name}' 프리셋을 불러왔습니다."
+                : $"'{name}' 프리셋을 불러왔습니다. {string.Join(" 및 ", omittedReasons)}는 제외했습니다.";
             PresetMessageIsError = false;
         }
         catch

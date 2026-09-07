@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using PokemonBattle.Data;
 using PokemonBattle.Models;
+using PokemonBattle.Pages;
 using PokemonBattle.Services;
 using Xunit;
 
@@ -74,6 +75,25 @@ public class ProgressionRegressionTests
 
         Assert.Equal(12, merged.Single(loadout => loadout.PokemonId == 1).Level);
         Assert.Equal(1, merged.Single(loadout => loadout.PokemonId == 4).Level);
+    }
+
+    [Fact]
+    public void TeamSelect_limits_preset_to_maximum_team_size()
+    {
+        var unlockedIds = new HashSet<int> { 1, 4, 7, 10 };
+        var preset = new[]
+        {
+            new PokemonLoadout { PokemonId = 1 },
+            new PokemonLoadout { PokemonId = 4 },
+            new PokemonLoadout { PokemonId = 7 },
+            new PokemonLoadout { PokemonId = 10 },
+            new PokemonLoadout { PokemonId = 13 }
+        };
+
+        var selected = TeamSelect.FilterPresetLoadouts(preset, unlockedIds);
+
+        Assert.Equal(TeamSelect.GetMaximumTeamSize(unlockedIds.Count), selected.Count);
+        Assert.Equal(new[] { 1, 4, 7, 10 }, selected.Select(loadout => loadout.PokemonId));
     }
 
     [Fact]
