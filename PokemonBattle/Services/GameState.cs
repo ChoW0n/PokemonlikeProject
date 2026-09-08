@@ -458,7 +458,9 @@ public class GameState
             if (covenant.GrantsImmediateLegacy)
             {
                 var grantedLegacy = RunMetaCatalog.Legacies
-                    .Where(legacy => !RunMeta.LegacyIds.Contains(legacy.Id))
+                    // 보유 개수가 최대 중첩 수보다 적은 유산만 즉시 지급 후보로 고른다.
+                    .Where(legacy => RunMeta.LegacyIds.Count(id => id == legacy.Id)
+                        < RunMetaCatalog.MaxLegacyStacks(legacy.Id))
                     .OrderBy(_ => _metaRandom.Next())
                     .FirstOrDefault();
                 if (grantedLegacy != null)
@@ -505,7 +507,9 @@ public class GameState
     {
         if (RunMeta.LegacyClaimsRemaining <= 0
             || !RunMeta.PendingLegacyChoices.Contains(legacyId)
-            || RunMeta.LegacyIds.Contains(legacyId))
+            // 최대 중첩 수에 도달한 유산만 획득을 거부한다.
+            || RunMeta.LegacyIds.Count(id => id == legacyId)
+                >= RunMetaCatalog.MaxLegacyStacks(legacyId))
         {
             return false;
         }
@@ -921,7 +925,9 @@ public class GameState
     private void PrepareVictoryRewards()
     {
         var availableLegacies = RunMetaCatalog.Legacies
-            .Where(legacy => !RunMeta.LegacyIds.Contains(legacy.Id))
+            // 보유 개수가 최대 중첩 수보다 적은 유산만 승리 보상 후보로 고른다.
+            .Where(legacy => RunMeta.LegacyIds.Count(id => id == legacy.Id)
+                < RunMetaCatalog.MaxLegacyStacks(legacy.Id))
             .OrderBy(_ => _metaRandom.Next())
             .Take(3)
             .Select(legacy => legacy.Id)
