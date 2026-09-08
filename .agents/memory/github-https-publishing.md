@@ -7,4 +7,4 @@ When the user explicitly requests a GitHub push, run `gh auth setup-git` before 
 
 **Why:** A direct HTTPS push can reject the configured credential even when GitHub CLI is already authenticated. SSH also depends on a configured key and non-interactive host verification.
 
-**How to apply:** Keep `origin` as the HTTPS GitHub remote, use the GitHub CLI credential bridge, and do not report completion until local and remote commit IDs match.
+**How to apply:** Keep `origin` as the HTTPS GitHub remote, use the GitHub CLI credential bridge, and do not report completion until local and remote commit IDs match. If `gh auth setup-git` cannot write the Replit global config path, use `git -c credential.helper='!gh auth git-credential' push origin main` instead.
