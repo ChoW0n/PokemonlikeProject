@@ -28,6 +28,11 @@
 
     @if (State.LastBattleWon)
     {
+        // 같은 유산은 아이디별로 묶어 이름과 중첩 수를 한 번씩 표시한다.
+        var groupedLegacies = State.ActiveLegacies
+            .GroupBy(legacy => legacy.Id, StringComparer.Ordinal)
+            .Select(group => new { Legacy = group.First(), Count = group.Count() })
+            .ToList();
         <h1 class="result-win">승리!</h1>
         @if (State.IsRivalBattle)
         {
@@ -74,9 +79,14 @@
                 </div>
             </section>
         }
-        @if (State.ActiveLegacies.Count > 0)
+        @if (groupedLegacies.Count > 0)
         {
-            <p class="config-label">현재 관록: @string.Join(" · ", State.ActiveLegacies.Select(legacy => legacy.Name))</p>
+            <p class="config-label">
+                현재 관록: @string.Join(" · ", groupedLegacies.Select(groupedLegacy =>
+                    groupedLegacy.Count > 1
+                        ? $"{groupedLegacy.Legacy.Name} ×{groupedLegacy.Count}"
+                        : groupedLegacy.Legacy.Name))
+            </p>
         }
 
         <section class="info-panel" aria-label="기술 강탈">
