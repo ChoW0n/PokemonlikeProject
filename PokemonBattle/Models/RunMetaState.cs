@@ -72,7 +72,8 @@ public sealed record RunLegacyDefinition(
     string Id,
     string Name,
     string Description,
-    RunLegacyEffect Effect);
+    RunLegacyEffect Effect,
+    IReadOnlyList<double> StackMultipliers);
 
 public enum RunLegacyEffect
 {
@@ -106,32 +107,33 @@ public sealed record RiskCovenantDefinition(
 
 public static class RunMetaCatalog
 {
+    // 중첩 배율 목록의 길이가 해당 유산의 최대 중첩 수를 결정한다.
     public static readonly IReadOnlyList<RunLegacyDefinition> Legacies =
     [
         new("first-strike", "선혈의 선봉",
-            "선공으로 사용하는 공격 기술의 위력이 25% 증가합니다.",
-            RunLegacyEffect.FirstStrikePower),
+            "선공 공격 기술에 1중첩 1.08배, 2중첩 1.13배, 3중첩 1.16배의 위력이 적용됩니다.",
+            RunLegacyEffect.FirstStrikePower, new[] { 1.08, 1.13, 1.16 }),
         new("affliction", "상처의 공명",
-            "상태 이상에 걸린 상대를 공격할 때 위력이 25% 증가합니다.",
-            RunLegacyEffect.AfflictedTargetPower),
+            "상태 이상 상대 공격에 1중첩 1.08배, 2중첩 1.13배, 3중첩 1.16배의 위력이 적용됩니다.",
+            RunLegacyEffect.AfflictedTargetPower, new[] { 1.08, 1.13, 1.16 }),
         new("iron-vitality", "철의 생명력",
-            "HP가 75% 이상일 때 받는 공격 피해가 25% 감소합니다.",
-            RunLegacyEffect.HighHpDefense),
+            "HP가 75% 이상일 때 받는 피해가 1중첩 0.94배, 2중첩 0.90배, 3중첩 0.88배로 줄어듭니다.",
+            RunLegacyEffect.HighHpDefense, new[] { 0.94, 0.90, 0.88 }),
         new("last-breath", "마지막 불씨",
-            "턴 종료 시 HP를 1/16 회복합니다.",
-            RunLegacyEffect.EndTurnRecovery),
+            "중첩되지 않으며, 턴 종료 시 HP를 1/16 회복합니다.",
+            RunLegacyEffect.EndTurnRecovery, new[] { 1.0 }),
         new("hunters-eye", "사냥꾼의 눈",
-            "공격 기술의 급소율이 1단계 증가합니다.",
-            RunLegacyEffect.CriticalRate),
+            "중첩되지 않으며, 공격 기술의 급소율이 1단계 증가합니다.",
+            RunLegacyEffect.CriticalRate, new[] { 1.0 }),
         new("judges-scale", "심판의 저울",
-            "자신의 HP가 25% 이하일 때 공격 기술의 위력이 20% 증가합니다.",
-            RunLegacyEffect.LowHpOffense),
+            "자신의 HP가 25% 이하일 때 1중첩 1.10배, 2중첩 1.16배, 3중첩 1.20배가 적용됩니다.",
+            RunLegacyEffect.LowHpOffense, new[] { 1.10, 1.16, 1.20 }),
         new("calm-before-storm", "폭풍전야",
-            "날씨 효과가 있을 때 공격 기술의 위력이 10% 증가합니다.",
-            RunLegacyEffect.WeatherPower),
+            "날씨 효과 중 공격 기술에 1중첩 1.06배, 2중첩 1.10배, 3중첩 1.12배가 적용됩니다.",
+            RunLegacyEffect.WeatherPower, new[] { 1.06, 1.10, 1.12 }),
         new("chain-breaker", "사슬을 끊는 자",
-            "화상과 마비로 인한 공격·스피드 감소를 절반만 적용받습니다.",
-            RunLegacyEffect.StatusPenaltyResistance)
+            "중첩되지 않으며, 화상과 마비로 인한 공격·스피드 감소를 절반만 적용받습니다.",
+            RunLegacyEffect.StatusPenaltyResistance, new[] { 1.0 })
     ];
 
     public static readonly IReadOnlyList<BattlefieldImprintDefinition> BattlefieldImprints =
@@ -183,6 +185,10 @@ public static class RunMetaCatalog
     public static RunLegacyDefinition? Legacy(string id) =>
         Legacies.FirstOrDefault(legacy => legacy.Id == id);
 
+    // 유산 정의에 기록된 배율 개수로 최대 중첩 수를 계산한다.
+    public static int MaxLegacyStacks(string id) =>
+        Legacy(id)?.StackMultipliers.Count ?? 0;
+
     public static BattlefieldImprintDefinition? Battlefield(string? id) =>
         BattlefieldImprints.FirstOrDefault(imprint => imprint.Id == id);
 
@@ -233,10 +239,14 @@ public static class RunMetaCatalog
         state ??= new RunMetaState();
         state.LegacyIds = state.LegacyIds
             .Where(id => Legacy(id) != null)
-            .Distinct(StringComparer.Ordinal)
+            .GroupBy(id => id, StringComparer.Ordinal)
+            .SelectMany(group => Enumerable.Repeat(
+                group.Key,
+                Math.Min(group.Count(), MaxLegacyStacks(group.Key))))
             .ToList();
         state.PendingLegacyChoices = state.PendingLegacyChoices
-            .Where(id => Legacy(id) != null && !state.LegacyIds.Contains(id))
+            .Where(id => Legacy(id) != null
+                && state.LegacyIds.Count(ownedId => ownedId == id) < MaxLegacyStacks(id))
             .Distinct(StringComparer.Ordinal)
             .Take(3)
             .ToList();

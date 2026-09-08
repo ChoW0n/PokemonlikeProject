@@ -11,37 +11,43 @@ public sealed class RunMetaEffectHandler : IBattleEffectHandler
         var meta = context.RunMeta;
         if (meta == null) return;
 
-        foreach (var legacyId in meta.LegacyIds)
+        // 같은 유산은 종류별로 묶어 현재 중첩 단계의 배율 하나만 적용한다.
+        foreach (var legacyGroup in meta.LegacyIds.GroupBy(id => id, StringComparer.Ordinal))
         {
-            var legacy = RunMetaCatalog.Legacy(legacyId);
+            var legacy = RunMetaCatalog.Legacy(legacyGroup.Key);
             if (legacy == null) continue;
+            int stackStage = Math.Min(
+                legacyGroup.Count(),
+                legacy.StackMultipliers.Count);
+            if (stackStage == 0) continue;
+            double stackMultiplier = legacy.StackMultipliers[stackStage - 1];
 
             switch (legacy.Effect)
             {
                 case RunLegacyEffect.FirstStrikePower
                     when context.AttackerIsHero && context.AttackerMovedFirst:
-                    context.Power *= 1.25;
+                    context.Power *= stackMultiplier;
                     break;
                 case RunLegacyEffect.AfflictedTargetPower
                     when context.AttackerIsHero
                         && (context.Defender.Status != StatusCondition.None
                         || context.Defender.IsConfused):
-                    context.Power *= 1.25;
+                    context.Power *= stackMultiplier;
                     break;
                 case RunLegacyEffect.HighHpDefense
                     when !context.AttackerIsHero
                         && context.Defender.CurrentHp >= context.Defender.MaxHp * 0.75:
-                    context.Power *= 0.75;
+                    context.Power *= stackMultiplier;
                     break;
                 case RunLegacyEffect.LowHpOffense
                     when context.AttackerIsHero
                         && context.Attacker.CurrentHp <= context.Attacker.MaxHp * 0.25:
-                    context.Power *= 1.2;
+                    context.Power *= stackMultiplier;
                     break;
                 case RunLegacyEffect.WeatherPower
                     when context.AttackerIsHero
                         && BattleWeather.Current != BattleWeather.Clear:
-                    context.Power *= 1.1;
+                    context.Power *= stackMultiplier;
                     break;
             }
         }

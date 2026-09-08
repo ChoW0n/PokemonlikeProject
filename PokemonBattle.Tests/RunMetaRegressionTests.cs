@@ -80,7 +80,7 @@ public class RunMetaRegressionTests
         var playerAttack = NewPowerContext(
             attacker, defender, firstStrike, attackerIsHero: true, movedFirst: true);
         handler.ModifyPower(playerAttack);
-        Assert.Equal(125, playerAttack.Power);
+        Assert.Equal(108, playerAttack.Power, 6);
 
         var enemyAttack = NewPowerContext(
             attacker, defender, firstStrike, attackerIsHero: false, movedFirst: true);
@@ -103,7 +103,7 @@ public class RunMetaRegressionTests
             attackerIsHero: true,
             movedFirst: false);
         handler.ModifyPower(afflicted);
-        Assert.Equal(125, afflicted.Power);
+        Assert.Equal(108, afflicted.Power, 6);
 
         var highHp = NewPowerContext(
             attacker,
@@ -112,11 +112,11 @@ public class RunMetaRegressionTests
             attackerIsHero: false,
             movedFirst: false);
         handler.ModifyPower(highHp);
-        Assert.Equal(75, highHp.Power);
+        Assert.Equal(94, highHp.Power, 6);
 
         defender.CurrentHp = defender.MaxHp / 2;
         handler.ModifyPower(highHp);
-        Assert.Equal(75, highHp.Power);
+        Assert.Equal(94, highHp.Power, 6);
     }
 
     [Fact]
@@ -200,7 +200,7 @@ public class RunMetaRegressionTests
             attackerIsHero: true,
             movedFirst: false);
         handler.ModifyPower(lowHp);
-        Assert.Equal(120, lowHp.Power, 6);
+        Assert.Equal(110, lowHp.Power, 6);
 
         BattleWeather.Set(BattleWeather.Rain);
         var weather = NewPowerContext(
@@ -210,7 +210,7 @@ public class RunMetaRegressionTests
             attackerIsHero: true,
             movedFirst: false);
         handler.ModifyPower(weather);
-        Assert.Equal(110, weather.Power, 6);
+        Assert.Equal(106, weather.Power, 6);
         BattleWeather.Reset();
 
         attacker.SelectedAbility = "심록";
@@ -226,6 +226,32 @@ public class RunMetaRegressionTests
             movedFirst: false);
         handler.ModifyPower(darkPact);
         Assert.Equal(115, darkPact.Power, 6);
+    }
+
+    [Fact]
+    public void ThreeSameLegacyStacksUseOnlyTheThirdStageMultiplier()
+    {
+        var attacker = NewPokemon(1);
+        var defender = NewPokemon(4);
+        var handler = new RunMetaEffectHandler();
+        var context = NewPowerContext(
+            attacker,
+            defender,
+            new RunMetaState
+            {
+                LegacyIds = new List<string>
+                {
+                    "first-strike",
+                    "first-strike",
+                    "first-strike"
+                }
+            },
+            attackerIsHero: true,
+            movedFirst: true);
+
+        handler.ModifyPower(context);
+
+        Assert.Equal(116, context.Power, 6);
     }
 
     [Fact]
