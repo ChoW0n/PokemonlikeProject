@@ -11,6 +11,10 @@ public sealed class RunMetaEffectHandler : IBattleEffectHandler
         var meta = context.RunMeta;
         if (meta == null) return;
 
+        // 유산 공격·방어 배율은 반복 중 누적한 뒤 전체 상한을 적용한다.
+        double offenseMultiplier = 1;
+        double defenseMultiplier = 1;
+
         // 같은 유산은 종류별로 묶어 현재 중첩 단계의 배율 하나만 적용한다.
         foreach (var legacyGroup in meta.LegacyIds.GroupBy(id => id, StringComparer.Ordinal))
         {
@@ -26,31 +30,35 @@ public sealed class RunMetaEffectHandler : IBattleEffectHandler
             {
                 case RunLegacyEffect.FirstStrikePower
                     when context.AttackerIsHero && context.AttackerMovedFirst:
-                    context.Power *= stackMultiplier;
+                    offenseMultiplier *= stackMultiplier;
                     break;
                 case RunLegacyEffect.AfflictedTargetPower
                     when context.AttackerIsHero
                         && (context.Defender.Status != StatusCondition.None
                         || context.Defender.IsConfused):
-                    context.Power *= stackMultiplier;
+                    offenseMultiplier *= stackMultiplier;
                     break;
                 case RunLegacyEffect.HighHpDefense
                     when !context.AttackerIsHero
                         && context.Defender.CurrentHp >= context.Defender.MaxHp * 0.75:
-                    context.Power *= stackMultiplier;
+                    defenseMultiplier *= stackMultiplier;
                     break;
                 case RunLegacyEffect.LowHpOffense
                     when context.AttackerIsHero
                         && context.Attacker.CurrentHp <= context.Attacker.MaxHp * 0.25:
-                    context.Power *= stackMultiplier;
+                    offenseMultiplier *= stackMultiplier;
                     break;
                 case RunLegacyEffect.WeatherPower
                     when context.AttackerIsHero
                         && BattleWeather.Current != BattleWeather.Clear:
-                    context.Power *= stackMultiplier;
+                    offenseMultiplier *= stackMultiplier;
                     break;
             }
         }
+
+        offenseMultiplier = Math.Min(offenseMultiplier, 1.5);
+        defenseMultiplier = Math.Max(defenseMultiplier, 0.6);
+        context.Power *= offenseMultiplier * defenseMultiplier;
 
         if (!context.AttackerIsHero
             && meta.RiskCovenantAccepted
